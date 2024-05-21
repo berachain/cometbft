@@ -1163,11 +1163,7 @@ type ConsensusConfig struct {
 	TimeoutPrecommit time.Duration `mapstructure:"timeout_precommit"`
 	// How much the timeout_precommit increases with each round
 	TimeoutPrecommitDelta time.Duration `mapstructure:"timeout_precommit_delta"`
-	// How long we wait after committing a block, before starting on the new
-	// height (this gives us a chance to receive some more precommits, even
-	// though we already have +2/3).
-	// NOTE: when modifying, make sure to update time_iota_ms genesis parameter
-	// Set to 0 if you want to make progress as soon as the node has all the precommits.
+	// Deprecated: use `next_block_delay` in the ABCI application's `FinalizeBlockResponse`.
 	TimeoutCommit time.Duration `mapstructure:"timeout_commit"`
 
 	// Deprecated: set `timeout_commit` to 0 instead.
@@ -1215,7 +1211,6 @@ func TestConsensusConfig() *ConsensusConfig {
 	cfg.TimeoutPrevoteDelta = 1 * time.Millisecond
 	cfg.TimeoutPrecommit = 10 * time.Millisecond
 	cfg.TimeoutPrecommitDelta = 1 * time.Millisecond
-	// NOTE: when modifying, make sure to update time_iota_ms (testGenesisFmt) in toml.go
 	cfg.TimeoutCommit = 0
 	cfg.PeerGossipSleepDuration = 5 * time.Millisecond
 	cfg.PeerQueryMaj23SleepDuration = 250 * time.Millisecond

@@ -460,14 +460,10 @@ timeout_prevote_delta = "{{ .Consensus.TimeoutPrevoteDelta }}"
 timeout_precommit = "{{ .Consensus.TimeoutPrecommit }}"
 # How much the timeout_precommit increases with each round
 timeout_precommit_delta = "{{ .Consensus.TimeoutPrecommitDelta }}"
-# How long we wait after committing a block, before starting on the new
-# height (this gives us a chance to receive some more precommits, even
-# though we already have +2/3).
-# Set to 0 if you want to make progress as soon as the node has all the precommits.
 # Deprecated: use `next_block_delay` in the ABCI application's `FinalizeBlockResponse`.
 timeout_commit = "{{ .Consensus.TimeoutCommit }}"
 
-# Deprecated: set `timeout_commit` to 0 instead.
+# Deprecated: use `next_block_delay` in the ABCI application's `FinalizeBlockResponse`.
 skip_timeout_commit = {{ .Consensus.SkipTimeoutCommit }}
 
 # How many blocks to look back to check existence of the node's consensus votes before joining consensus
