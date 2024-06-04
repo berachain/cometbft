@@ -156,9 +156,9 @@ func TestSwitches(t *testing.T) {
 			},
 		},
 	}
-	s1.Broadcast(Envelope{ChannelID: byte(0x00), Message: ch0Msg})
-	s1.Broadcast(Envelope{ChannelID: byte(0x01), Message: ch1Msg})
-	s1.Broadcast(Envelope{ChannelID: byte(0x02), Message: ch2Msg})
+	s1.BroadcastEnvelope(Envelope{ChannelID: byte(0x00), Message: ch0Msg})
+	s1.BroadcastEnvelope(Envelope{ChannelID: byte(0x01), Message: ch1Msg})
+	s1.BroadcastEnvelope(Envelope{ChannelID: byte(0x02), Message: ch2Msg})
 	assertMsgReceivedWithTimeout(t,
 		ch0Msg,
 		byte(0x00),
@@ -841,22 +841,11 @@ func BenchmarkSwitchBroadcast(b *testing.B) {
 
 	b.ResetTimer()
 
-	numSuccess, numFailure := 0, 0
-
 	// Send random message from foo channel to another
 	for i := 0; i < b.N; i++ {
 		chID := byte(i % 4)
-		successChan := s1.Broadcast(Envelope{ChannelID: chID})
-		for s := range successChan {
-			if s {
-				numSuccess++
-			} else {
-				numFailure++
-			}
-		}
+		s1.BroadcastEnvelope(Envelope{ChannelID: chID})
 	}
-
-	b.Logf("success: %v, failure: %v", numSuccess, numFailure)
 }
 
 func TestSwitchRemovalErr(t *testing.T) {
