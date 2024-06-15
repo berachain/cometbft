@@ -350,14 +350,22 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		switch msg := msg.(type) {
 		case *VoteMessage:
 			cs := conR.conS
-			conR.rsMtx.RLock()
-			height, valSize, lastCommitSize := conR.rs.Height, conR.rs.Validators.Size(), conR.rs.LastCommit.Size()
-			conR.rsMtx.RUnlock()
-			ps.EnsureVoteBitArrays(height, valSize)
-			ps.EnsureVoteBitArrays(height-1, lastCommitSize)
+			conR.mtx.RLock()
+			height, round := conR.rs.Height, conR.rs.Round
+			conR.mtx.RUnlock()
 			ps.SetHasVote(msg.Vote)
 
-			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
+			// if vote is late, and is not a precommit for the last block, mark it late and return.
+			isLate := msg.Vote.Height < height || (msg.Vote.Height == height && msg.Vote.Round < round)
+			if isLate {
+				notLastBlockPrecommit := msg.Vote.Type != types.PrecommitType || msg.Vote.Height != height-1
+				if notLastBlockPrecommit {
+					cs.metrics.MarkLateVote(msg.Vote.Type)
+					return
+				}
+			}
+
+			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), cmttime.Now()}
 
 		default:
 			// don't punish (leave room for soft upgrades)
