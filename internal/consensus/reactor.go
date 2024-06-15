@@ -41,11 +41,10 @@ const (
 type Reactor struct {
 	p2p.BaseReactor // BaseService + p2p.Switch
 
-	conS *State
-
-	waitSync atomic.Bool
-	eventBus *types.EventBus
-
+	conS          *State
+	mtx           cmtsync.RWMutex
+	waitSync      atomic.Bool
+	eventBus      *types.EventBus
 	rsMtx         cmtsync.RWMutex
 	rs            *cstypes.RoundState
 	initialHeight int64 // under rsMtx
@@ -561,11 +560,13 @@ func (conR *Reactor) updateRoundStateRoutine() {
 		if !conR.IsRunning() {
 			return
 		}
-		rs := conR.conS.GetRoundState()
-		conR.rsMtx.Lock()
+		conR.conS.mtx.RLock()
+		rs, initialHeight := conR.conS.getRoundState(), conR.conS.state.InitialHeight
+		conR.conS.mtx.RUnlock()
+		conR.mtx.Lock()
 		conR.rs = rs
-		conR.initialHeight = conR.conS.state.InitialHeight
-		conR.rsMtx.Unlock()
+		conR.initialHeight = initialHeight
+		conR.mtx.Unlock()
 	}
 }
 
