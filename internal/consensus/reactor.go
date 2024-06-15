@@ -46,8 +46,9 @@ type Reactor struct {
 	waitSync atomic.Bool
 	eventBus *types.EventBus
 
-	rsMtx cmtsync.Mutex
-	rs    *cstypes.RoundState
+	rsMtx         cmtsync.RWMutex
+	rs            *cstypes.RoundState
+	initialHeight int64 // under rsMtx
 
 	Metrics *Metrics
 }
@@ -267,9 +268,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 	case StateChannel:
 		switch msg := msg.(type) {
 		case *NewRoundStepMessage:
-			conR.conS.mtx.Lock()
-			initialHeight := conR.conS.state.InitialHeight
-			conR.conS.mtx.Unlock()
+			conR.rsMtx.RLock()
+			initialHeight := conR.initialHeight
+			conR.rsMtx.RUnlock()
 			if err = msg.ValidateHeight(initialHeight); err != nil {
 				conR.Logger.Error("Peer sent us invalid msg", "peer", e.Src, "msg", msg, "err", err)
 				conR.Switch.StopPeerForError(e.Src, err)
@@ -283,10 +284,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		case *HasProposalBlockPartMessage:
 			ps.ApplyHasProposalBlockPartMessage(msg)
 		case *VoteSetMaj23Message:
-			cs := conR.conS
-			cs.mtx.Lock()
-			height, votes := cs.Height, cs.Votes
-			cs.mtx.Unlock()
+			conR.rsMtx.RLock()
+			height, votes := conR.rs.Height, conR.rs.Votes
+			conR.rsMtx.RUnlock()
 			if height != msg.Height {
 				return
 			}
@@ -351,9 +351,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		switch msg := msg.(type) {
 		case *VoteMessage:
 			cs := conR.conS
-			cs.mtx.RLock()
-			height, valSize, lastCommitSize := cs.Height, cs.Validators.Size(), cs.LastCommit.Size()
-			cs.mtx.RUnlock()
+			conR.rsMtx.RLock()
+			height, valSize, lastCommitSize := conR.rs.Height, conR.rs.Validators.Size(), conR.rs.LastCommit.Size()
+			conR.rsMtx.RUnlock()
 			ps.EnsureVoteBitArrays(height, valSize)
 			ps.EnsureVoteBitArrays(height-1, lastCommitSize)
 			ps.SetHasVote(msg.Vote)
@@ -372,10 +372,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		}
 		switch msg := msg.(type) {
 		case *VoteSetBitsMessage:
-			cs := conR.conS
-			cs.mtx.Lock()
-			height, votes := cs.Height, cs.Votes
-			cs.mtx.Unlock()
+			conR.rsMtx.RLock()
+			height, votes := conR.rs.Height, conR.rs.Votes
+			conR.rsMtx.RUnlock()
 
 			if height == msg.Height {
 				var ourVotes *bits.BitArray
@@ -421,6 +420,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 	const subscriber = "consensus-reactor"
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventNewRoundStep,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastNewRoundStepMessage(data.(*cstypes.RoundState))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (NewRoundStep)", "err", err)
@@ -428,6 +428,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventValidBlock,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastNewValidBlockMessage(data.(*cstypes.RoundState))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (ValidBlock)", "err", err)
@@ -435,6 +436,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventVote,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastHasVoteMessage(data.(*types.Vote))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (Vote)", "err", err)
@@ -562,8 +564,17 @@ func (conR *Reactor) updateRoundStateRoutine() {
 		rs := conR.conS.GetRoundState()
 		conR.rsMtx.Lock()
 		conR.rs = rs
+		conR.initialHeight = conR.conS.state.InitialHeight
 		conR.rsMtx.Unlock()
 	}
+}
+
+func (conR *Reactor) updateRoundStateNoCsLock() {
+	rs := conR.conS.getRoundState()
+	conR.rsMtx.Lock()
+	conR.rs = rs
+	conR.initialHeight = conR.conS.state.InitialHeight
+	conR.rsMtx.Unlock()
 }
 
 func (conR *Reactor) getRoundState() *cstypes.RoundState {
