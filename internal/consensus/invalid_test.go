@@ -51,7 +51,7 @@ func TestReactorInvalidPrecommit(t *testing.T) {
 	}
 	byzVal.mtx.Unlock()
 
-	// wait for a bunch of blocks
+	// wait for a bunch of blocks, from each validator
 	// TODO: make this tighter by ensuring the halt happens by block 2
 	for i := 0; i < 10; i++ {
 		timeoutWaitGroup(n, func(j int) {
