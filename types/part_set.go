@@ -322,6 +322,12 @@ func (ps *PartSet) IsComplete() bool {
 	return ps.count == ps.total
 }
 
+func (ps *PartSet) IsCompleteMtx() bool {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return ps.count == ps.total
+}
+
 func (ps *PartSet) GetReader() io.Reader {
 	if !ps.IsComplete() {
 		panic("Cannot GetReader() on incomplete PartSet")
