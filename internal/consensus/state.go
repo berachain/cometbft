@@ -2123,6 +2123,10 @@ func allowProcessingProposalBlockPart(msg *BlockPartMessage, logger log.Logger, 
 		return false
 	}
 
+	if part.Index >= csBlockParts.Total() {
+		return false
+	}
+
 	if csBlockParts.IsCompleteMtx() || csBlockParts.GetPart(int(part.Index)) != nil {
 		return false
 	}
