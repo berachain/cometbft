@@ -149,7 +149,7 @@ LOOP:
 		case errors.Is(err, io.EOF):
 			break LOOP
 		case IsDataCorruptionError(err):
-			cs.Logger.Error("data has been corrupted in last height of consensus WAL", "err", err, "height", csHeight)
+			cs.Logger.Error("ata has been corrupted in last height of consensus WAL", "err", err, "height", csHeight)
 			return err
 		case err != nil:
 			return err
