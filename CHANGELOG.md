@@ -1,6 +1,15 @@
 # CHANGELOG
 
+<<<<<<< HEAD
 ## Unreleased
+=======
+## v0.37.4-v25-osmo-10
+
+* [#115](https://github.com/osmosis-labs/cometbft/pull/115) perf(p2p/secretconn): Buffer secret connection writes (#3346)
+
+
+## v0.37.4-v25-osmo-9
+>>>>>>> 9f773defd ( perf(p2p/secretconn): Buffer secret connection writes #3346  (#115))
 
 *July 1, 2024*
 
