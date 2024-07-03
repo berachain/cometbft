@@ -881,7 +881,7 @@ func (ch *Channel) writePacketMsgTo(w protoio.Writer) (n int, err error) {
 // complete. NOTE message bytes may change on next call to recvPacketMsg.
 // Not goroutine-safe.
 func (ch *Channel) recvPacketMsg(packet tmp2p.PacketMsg) ([]byte, error) {
-	ch.Logger.Debug("Read PacketMsg", "conn", ch.conn, "packet", packet)
+	// ch.Logger.Debug("Read PacketMsg", "conn", ch.conn, "packet", packet)
 	recvCap, recvReceived := ch.desc.RecvMessageCapacity, len(ch.recving)+len(packet.Data)
 	if recvCap < recvReceived {
 		return nil, fmt.Errorf("received message exceeds available capacity: %v < %v", recvCap, recvReceived)

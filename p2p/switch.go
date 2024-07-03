@@ -290,10 +290,10 @@ func (sw *Switch) BroadcastEnvelope(e Envelope) {
 func (sw *Switch) TryBroadcast(e Envelope) {
 	sw.Logger.Debug("TryBroadcast", "channel", e.ChannelID)
 
-	peers := sw.peers.List()
+	peers := sw.peers.list
 	for _, peer := range peers {
 		go func(p Peer) {
-			p.TrySendEnvelope(e)
+			p.TrySend(e)
 		}(peer)
 	}
 }
