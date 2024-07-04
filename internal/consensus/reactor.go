@@ -376,7 +376,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 				}
 			}
 
-			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), cmttime.Now()}
+			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
 		default:
 			// don't punish (leave room for soft upgrades)
