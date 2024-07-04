@@ -336,9 +336,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasProposalBlockPart(msg.Height, msg.Round, int(msg.Part.Index))
 			conR.Metrics.BlockParts.With("peer_id", string(e.Src.ID())).Add(1)
 
-			conR.conS.mtx.RLock()
+			conR.rsMtx.RLock()
 			height, blockParts := conR.rs.Height, conR.rs.ProposalBlockParts
-			conR.conS.mtx.RUnlock()
+			conR.rsMtx.RUnlock()
 
 			allowFutureBlockPart := true
 			ok := allowProcessingProposalBlockPart(msg, conR.Logger, conR.Metrics, height, blockParts, allowFutureBlockPart, e.Src.ID())
@@ -359,9 +359,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		switch msg := msg.(type) {
 		case *VoteMessage:
 			cs := conR.conS
-			conR.conS.mtx.RLock()
+			conR.rsMtx.RLock()
 			height, round := conR.rs.Height, conR.rs.Round
-			conR.conS.mtx.RUnlock()
+			conR.rsMtx.RUnlock()
 			ps.SetHasVote(msg.Vote)
 
 			// if vote is late, and is not a precommit for the last block, mark it late and return.
@@ -577,13 +577,13 @@ func (conR *Reactor) updateRoundStateRoutine() {
 		if !conR.IsRunning() {
 			return
 		}
-		conR.conS.mtx.RLock()
+		conR.rsMtx.RLock()
 		rs, initialHeight := conR.conS.getRoundState(), conR.conS.state.InitialHeight
-		conR.conS.mtx.RUnlock()
-		conR.conS.mtx.Lock()
+		conR.rsMtx.RUnlock()
+		conR.rsMtx.Lock()
 		conR.rs = rs
 		conR.initialHeight = initialHeight
-		conR.conS.mtx.Unlock()
+		conR.rsMtx.Unlock()
 	}
 }
 
