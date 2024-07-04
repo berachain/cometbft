@@ -1,6 +1,32 @@
 # CHANGELOG
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 ## Unreleased
+=======
+=======
+## Unreleased (I think)
+
+* [#123](https://github.com/osmosis-labs/cometbft/pull/123)  perf(p2p/conn): Remove unneeded global pool buffers in secret connection #3403 
+* perf(p2p): Delete expensive debug log already slated for deletion #3412 
+* perf(p2p): Reduce the p2p metrics overhead. #3411 
+* commit f663bd35153b0b366c1e1e6b41e7f2dcff7963fd : one more debug log deletion
+* [#120](https://github.com/osmosis-labs/cometbft/pull/120) perf(consensus): Use TrySend for hasVote/HasBlockPart messages #3407 
+
+
+## v0.37.4-v25-osmo-11
+
+* [#117](https://github.com/osmosis-labs/cometbft/pull/117) fix(mempool)!: stop accepting TXs in the mempool if we can't keep up
+* [#118](https://github.com/osmosis-labs/cometbft/pull/118) perf: bring back stop recheck
+
+>>>>>>> d941920d2 (Secret conn remove pool buffer, align with upstream (#123))
+## v0.37.4-v25-osmo-10
+
+* [#115](https://github.com/osmosis-labs/cometbft/pull/115) perf(p2p/secretconn): Buffer secret connection writes (#3346)
+
+
+## v0.37.4-v25-osmo-9
+>>>>>>> 9f773defd ( perf(p2p/secretconn): Buffer secret connection writes #3346  (#115))
 
 *July 1, 2024*
 

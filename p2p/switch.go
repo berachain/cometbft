@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/cosmos/gogoproto/proto"
@@ -272,31 +271,28 @@ func (sw *Switch) OnStop() {
 // closed once msg bytes are sent to all peers (or time out).
 //
 // NOTE: Broadcast uses goroutines, so order of broadcast may not be preserved.
-func (sw *Switch) Broadcast(e Envelope) chan bool {
+func (sw *Switch) Broadcast(e Envelope) {
 	sw.Logger.Debug("Broadcast", "channel", e.ChannelID)
 
-	var wg sync.WaitGroup
-	successChan := make(chan bool, sw.peers.Size())
+	for _, peer := range sw.peers.list {
+		go func(p Peer) {
+			success := p.Send(e)
+			_ = success
+		}(peer)
+	}
+}
+
+// TryBroadcast runs a go routine for each attempted send.
+//
+// NOTE: TryBroadcast uses goroutines, so order of broadcast may not be preserved.
+func (sw *Switch) TryBroadcast(e Envelope) {
+	sw.Logger.Debug("TryBroadcast", "channel", e.ChannelID)
 
 	sw.peers.ForEach(func(p Peer) {
-		wg.Add(1) // Incrementing by one is safer.
 		go func(peer Peer) {
-			defer wg.Done()
-			success := peer.Send(e)
-			// For rare cases where PeerSet changes between a call to `peers.Size()` and `peers.ForEach()`.
-			select {
-			case successChan <- success:
-			default:
-			}
+			peer.TrySend(e)
 		}(p)
 	})
-
-	go func() {
-		wg.Wait()
-		close(successChan)
-	}()
-
-	return successChan
 }
 
 // NumPeers returns the count of outbound/inbound and outbound-dialing peers.

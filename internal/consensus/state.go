@@ -244,10 +244,18 @@ func (cs *State) GetLastHeight() int64 {
 }
 
 // GetRoundState returns a shallow copy of the internal consensus state.
+// This function is thread-safe.
 func (cs *State) GetRoundState() *cstypes.RoundState {
 	cs.mtx.RLock()
-	rs := cs.RoundState // copy
+	rs := cs.getRoundState()
 	cs.mtx.RUnlock()
+	return rs
+}
+
+// getRoundState returns a shallow copy of the internal consensus state.
+// This function is not thread-safe. Use GetRoundState for the thread-safe version.
+func (cs *State) getRoundState() *cstypes.RoundState {
+	rs := cs.RoundState // copy
 	return &rs
 }
 
@@ -2079,31 +2087,62 @@ func (cs *State) defaultSetProposal(proposal *types.Proposal, recvTime time.Time
 	return nil
 }
 
-// NOTE: block is not necessarily valid.
-// Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit,
-// once we have the full block.
-func (cs *State) addProposalBlockPart(msg *BlockPartMessage, peerID p2p.ID) (added bool, err error) {
+// checks if we should allow processing the proposal block part.
+// Shared code between reactor and state machine.
+// This must not modify csBlockParts, only take read-only accesses to it.
+// Returns true if the block part is not old or duplicated.
+func allowProcessingProposalBlockPart(msg *BlockPartMessage, logger log.Logger, metrics *Metrics, csHeight int64, csBlockParts *types.PartSet, allowFutureHeights bool, peerID p2p.ID) bool {
 	height, round, part := msg.Height, msg.Round, msg.Part
 
-	// Blocks might be reused, so round mismatch is OK
-	if cs.Height != height {
-		cs.Logger.Debug("Received block part from wrong height", "height", height, "round", round)
-		cs.metrics.BlockGossipPartsReceived.With("matches_current", "false").Add(1)
-		return false, nil
+	// Blocks might be reused, so round mismatch is OK. Meant for reactor, where we may get
+	// future block parts while the proposal for the next block is still in message queue.
+	if allowFutureHeights && height > csHeight {
+		return true
+	}
+	if csHeight != height {
+		logger.Debug("received block part from wrong height", "height", height, "round", round)
+		metrics.BlockGossipPartsReceived.With("matches_current", "false").Add(1)
+		return false
 	}
 
 	// We're not expecting a block part.
-	if cs.ProposalBlockParts == nil {
-		cs.metrics.BlockGossipPartsReceived.With("matches_current", "false").Add(1)
+	if csBlockParts == nil {
+		if allowFutureHeights {
+			return true
+		}
+		metrics.BlockGossipPartsReceived.With("matches_current", "false").Add(1)
 		// NOTE: this can happen when we've gone to a higher round and
 		// then receive parts from the previous round - not necessarily a bad peer.
-		cs.Logger.Debug(
-			"Received a block part when we are not expecting any",
+		logger.Debug(
+			"received a block part when we are not expecting any",
 			"height", height,
 			"round", round,
 			"index", part.Index,
 			"peer", peerID,
 		)
+		return false
+	}
+
+	if part.Index >= csBlockParts.Total() {
+		return false
+	}
+
+	if csBlockParts.IsCompleteMtx() || csBlockParts.GetPart(int(part.Index)) != nil {
+		return false
+	}
+
+	return true
+}
+
+// NOTE: block is not necessarily valid.
+// Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit,
+// once we have the full block.
+func (cs *State) addProposalBlockPart(msg *BlockPartMessage, peerID p2p.ID) (added bool, err error) {
+	part := msg.Part
+	// TODO: better handle block parts for future heights, by saving them and processing them later.
+	allowFutureBlockPart := false
+	ok := allowProcessingProposalBlockPart(msg, cs.Logger, cs.metrics, cs.Height, cs.ProposalBlockParts, allowFutureBlockPart, peerID)
+	if !ok {
 		return false, nil
 	}
 
@@ -2125,7 +2164,7 @@ func (cs *State) addProposalBlockPart(msg *BlockPartMessage, peerID p2p.ID) (add
 	}
 
 	count, total := cs.ProposalBlockParts.Count(), cs.ProposalBlockParts.Total()
-	cs.Logger.Debug("Receive block part", "height", height, "round", round,
+	cs.Logger.Debug("Receive block part", "height", cs.Height, "round", cs.Round,
 		"index", part.Index, "count", count, "total", total, "from", peerID)
 
 	maxBytes := cs.state.ConsensusParams.Block.MaxBytes
@@ -2286,7 +2325,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		cs.Logger.Debug("Added vote to last precommits", "last_commit", cs.LastCommit.StringShort())
+		// cs.Logger.Debug("added vote to last precommits", "last_commit", cs.LastCommit.StringShort())
 		if err := cs.eventBus.PublishEventVote(types.EventDataVote{Vote: vote}); err != nil {
 			return added, err
 		}
@@ -2376,7 +2415,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 	switch vote.Type {
 	case types.PrevoteType:
 		prevotes := cs.Votes.Prevotes(vote.Round)
-		cs.Logger.Debug("Added vote to prevote", "vote", vote, "prevotes", prevotes.StringShort())
+		// cs.Logger.Debug("added vote to prevote", "vote", vote, "prevotes", prevotes.StringShort())
 
 		// Check to see if >2/3 of the voting power on the network voted for any non-nil block.
 		if blockID, ok := prevotes.TwoThirdsMajority(); ok && !blockID.IsNil() {
@@ -2391,11 +2430,11 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 					cs.ValidBlock = cs.ProposalBlock
 					cs.ValidBlockParts = cs.ProposalBlockParts
 				} else {
-					cs.Logger.Debug(
-						"Valid block we do not know about; set ProposalBlock=nil",
-						"proposal", log.NewLazyBlockHash(cs.ProposalBlock),
-						"block_id", blockID.Hash,
-					)
+					// cs.Logger.Debug(
+					// 	"valid block we do not know about; set ProposalBlock=nil",
+					// 	"proposal", log.NewLazyBlockHash(cs.ProposalBlock),
+					// 	"block_id", blockID.Hash,
+					// )
 
 					// we're getting the wrong block
 					cs.ProposalBlock = nil

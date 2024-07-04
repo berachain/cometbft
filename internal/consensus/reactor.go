@@ -38,18 +38,16 @@ const (
 // -----------------------------------------------------------------------------
 
 // Reactor defines a reactor for the consensus service.
+// Reactor defines a reactor for the consensus service.
 type Reactor struct {
 	p2p.BaseReactor // BaseService + p2p.Switch
-
-	conS *State
-
-	waitSync atomic.Bool
-	eventBus *types.EventBus
-
-	rsMtx cmtsync.Mutex
-	rs    *cstypes.RoundState
-
-	Metrics *Metrics
+	conS            *State
+	waitSync        atomic.Bool
+	eventBus        *types.EventBus
+	rsMtx           cmtsync.RWMutex
+	rs              *cstypes.RoundState
+	Metrics         *Metrics
+	initialHeight   int64
 }
 
 type ReactorOption func(*Reactor)
@@ -267,9 +265,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 	case StateChannel:
 		switch msg := msg.(type) {
 		case *NewRoundStepMessage:
-			conR.conS.mtx.Lock()
-			initialHeight := conR.conS.state.InitialHeight
-			conR.conS.mtx.Unlock()
+			conR.rsMtx.RLock()
+			initialHeight := conR.initialHeight
+			conR.rsMtx.RUnlock()
 			if err = msg.ValidateHeight(initialHeight); err != nil {
 				conR.Logger.Error("Peer sent us invalid msg", "peer", e.Src, "msg", msg, "err", err)
 				conR.Switch.StopPeerForError(e.Src, err)
@@ -283,10 +281,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		case *HasProposalBlockPartMessage:
 			ps.ApplyHasProposalBlockPartMessage(msg)
 		case *VoteSetMaj23Message:
-			cs := conR.conS
-			cs.mtx.Lock()
-			height, votes := cs.Height, cs.Votes
-			cs.mtx.Unlock()
+			conR.rsMtx.RLock()
+			height, votes := conR.rs.Height, conR.rs.Votes
+			conR.rsMtx.RUnlock()
 			if height != msg.Height {
 				return
 			}
@@ -338,7 +335,18 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		case *BlockPartMessage:
 			ps.SetHasProposalBlockPart(msg.Height, msg.Round, int(msg.Part.Index))
 			conR.Metrics.BlockParts.With("peer_id", string(e.Src.ID())).Add(1)
-			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
+
+			conR.rsMtx.RLock()
+			height, blockParts := conR.rs.Height, conR.rs.ProposalBlockParts
+			conR.rsMtx.RUnlock()
+
+			allowFutureBlockPart := true
+			ok := allowProcessingProposalBlockPart(msg, conR.Logger, conR.Metrics, height, blockParts, allowFutureBlockPart, e.Src.ID())
+			if !ok {
+				return
+			}
+
+			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Now()}
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 		}
@@ -351,12 +359,20 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		switch msg := msg.(type) {
 		case *VoteMessage:
 			cs := conR.conS
-			cs.mtx.RLock()
-			height, valSize, lastCommitSize := cs.Height, cs.Validators.Size(), cs.LastCommit.Size()
-			cs.mtx.RUnlock()
-			ps.EnsureVoteBitArrays(height, valSize)
-			ps.EnsureVoteBitArrays(height-1, lastCommitSize)
+			conR.rsMtx.RLock()
+			height, round := conR.rs.Height, conR.rs.Round
+			conR.rsMtx.RUnlock()
 			ps.SetHasVote(msg.Vote)
+
+			// if vote is late, and is not a precommit for the last block, mark it late and return.
+			isLate := msg.Vote.Height < height || (msg.Vote.Height == height && msg.Vote.Round < round)
+			if isLate {
+				notLastBlockPrecommit := msg.Vote.Type != types.PrecommitType || msg.Vote.Height != height-1
+				if notLastBlockPrecommit {
+					cs.metrics.MarkLateVote(msg.Vote.Type)
+					return
+				}
+			}
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
@@ -372,10 +388,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		}
 		switch msg := msg.(type) {
 		case *VoteSetBitsMessage:
-			cs := conR.conS
-			cs.mtx.Lock()
-			height, votes := cs.Height, cs.Votes
-			cs.mtx.Unlock()
+			conR.rsMtx.RLock()
+			height, votes := conR.rs.Height, conR.rs.Votes
+			conR.rsMtx.RUnlock()
 
 			if height == msg.Height {
 				var ourVotes *bits.BitArray
@@ -421,6 +436,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 	const subscriber = "consensus-reactor"
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventNewRoundStep,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastNewRoundStepMessage(data.(*cstypes.RoundState))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (NewRoundStep)", "err", err)
@@ -428,6 +444,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventValidBlock,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastNewValidBlockMessage(data.(*cstypes.RoundState))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (ValidBlock)", "err", err)
@@ -435,6 +452,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventVote,
 		func(data cmtevents.EventData) {
+			conR.updateRoundStateNoCsLock()
 			conR.broadcastHasVoteMessage(data.(*types.Vote))
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (Vote)", "err", err)
@@ -455,10 +473,12 @@ func (conR *Reactor) unsubscribeFromBroadcastEvents() {
 
 func (conR *Reactor) broadcastNewRoundStepMessage(rs *cstypes.RoundState) {
 	nrsMsg := makeRoundStepMessage(rs)
-	conR.Switch.Broadcast(p2p.Envelope{
-		ChannelID: StateChannel,
-		Message:   nrsMsg,
-	})
+	go func() {
+		conR.Switch.Broadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   nrsMsg,
+		})
+	}()
 }
 
 func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
@@ -470,10 +490,12 @@ func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
 		BlockParts:         rs.ProposalBlockParts.BitArray().ToProto(),
 		IsCommit:           rs.Step == cstypes.RoundStepCommit,
 	}
-	conR.Switch.Broadcast(p2p.Envelope{
-		ChannelID: StateChannel,
-		Message:   csMsg,
-	})
+	go func() {
+		conR.Switch.TryBroadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   csMsg,
+		})
+	}()
 }
 
 // Broadcasts HasVoteMessage to peers that care.
@@ -484,10 +506,13 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 		Type:   vote.Type,
 		Index:  vote.ValidatorIndex,
 	}
-	conR.Switch.Broadcast(p2p.Envelope{
-		ChannelID: StateChannel,
-		Message:   msg,
-	})
+
+	go func() {
+		conR.Switch.TryBroadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   msg,
+		})
+	}()
 	/*
 		// TODO: Make this broadcast more selective.
 		for _, peer := range conR.Switch.Peers().Copy() {
@@ -519,7 +544,7 @@ func (conR *Reactor) broadcastHasProposalBlockPartMessage(partMsg *BlockPartMess
 		Round:  partMsg.Round,
 		Index:  int32(partMsg.Part.Index),
 	}
-	conR.Switch.Broadcast(p2p.Envelope{
+	conR.Switch.TryBroadcast(p2p.Envelope{
 		ChannelID: StateChannel,
 		Message:   msg,
 	})
@@ -552,11 +577,22 @@ func (conR *Reactor) updateRoundStateRoutine() {
 		if !conR.IsRunning() {
 			return
 		}
-		rs := conR.conS.GetRoundState()
+		conR.rsMtx.RLock()
+		rs, initialHeight := conR.conS.getRoundState(), conR.conS.state.InitialHeight
+		conR.rsMtx.RUnlock()
 		conR.rsMtx.Lock()
 		conR.rs = rs
+		conR.initialHeight = initialHeight
 		conR.rsMtx.Unlock()
 	}
+}
+
+func (conR *Reactor) updateRoundStateNoCsLock() {
+	rs := conR.conS.getRoundState()
+	conR.rsMtx.Lock()
+	conR.rs = rs
+	conR.initialHeight = conR.conS.state.InitialHeight
+	conR.rsMtx.Unlock()
 }
 
 func (conR *Reactor) getRoundState() *cstypes.RoundState {
@@ -1450,12 +1486,12 @@ func (ps *PeerState) SetHasVote(vote *types.Vote) {
 }
 
 func (ps *PeerState) setHasVote(height int64, round int32, voteType types.SignedMsgType, index int32) {
-	ps.logger.Debug("setHasVote",
-		"peerH/R",
-		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
-		"H/R",
-		log.NewLazySprintf("%d/%d", height, round),
-		"type", voteType, "index", index)
+	// ps.logger.Debug("setHasVote",
+	// 	"peerH/R",
+	// 	log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
+	// 	"H/R",
+	// 	log.NewLazySprintf("%d/%d", height, round),
+	// 	"type", voteType, "index", index)
 
 	// NOTE: some may be nil BitArrays -> no side effects.
 	psVotes := ps.getVoteBitArray(height, round, voteType)

@@ -360,7 +360,7 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 		return false
 	}
 
-	c.Logger.Debug("Send", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
+	// c.Logger.Debug("Send", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
 
 	// Send message to channel.
 	channel, ok := c.channelsIdx[chID]
@@ -376,9 +376,11 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 		case c.send <- struct{}{}:
 		default:
 		}
-	} else {
-		c.Logger.Debug("Send failed", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
 	}
+
+	// else {
+	// 	// c.Logger.Debug("Send failed", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
+	// }
 	return success
 }
 
@@ -389,7 +391,7 @@ func (c *MConnection) TrySend(chID byte, msgBytes []byte) bool {
 		return false
 	}
 
-	c.Logger.Debug("TrySend", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
+	// c.Logger.Debug("TrySend", "channel", chID, "conn", c, "msgBytes", log.NewLazySprintf("%X", msgBytes))
 
 	// Send message to channel.
 	channel, ok := c.channelsIdx[chID]
@@ -521,16 +523,23 @@ func (c *MConnection) sendSomePacketMsgs(w protoio.Writer) bool {
 // Returns true if messages from channels were exhausted.
 func (c *MConnection) sendBatchPacketMsgs(w protoio.Writer, batchSize int) bool {
 	// Send a batch of PacketMsgs.
+	totalBytesWritten := 0
+	defer func() {
+		if totalBytesWritten > 0 {
+			c.sendMonitor.Update(totalBytesWritten)
+		}
+	}()
 	for i := 0; i < batchSize; i++ {
 		channel := selectChannelToGossipOn(c.channels)
 		// nothing to send across any channel.
 		if channel == nil {
 			return true
 		}
-		err := c.sendPacketMsgOnChannel(w, channel)
+		bytesWritten, err := c.sendPacketMsgOnChannel(w, channel)
 		if err {
 			return true
 		}
+		totalBytesWritten += bytesWritten
 	}
 	return false
 }
@@ -562,18 +571,18 @@ func selectChannelToGossipOn(channels []*Channel) *Channel {
 	return leastChannel
 }
 
-func (c *MConnection) sendPacketMsgOnChannel(w protoio.Writer, sendChannel *Channel) bool {
+// returns (num_bytes_written, error_occurred).
+func (c *MConnection) sendPacketMsgOnChannel(w protoio.Writer, sendChannel *Channel) (int, bool) {
 	// Make & send a PacketMsg from this channel
-	_n, err := sendChannel.writePacketMsgTo(w)
+	n, err := sendChannel.writePacketMsgTo(w)
 	if err != nil {
 		c.Logger.Error("Failed to write PacketMsg", "err", err)
 		c.stopForError(err)
-		return true
+		return n, true
 	}
-	// TODO: Change this to only do one update for the entire bawtch.
-	c.sendMonitor.Update(_n)
+	// TODO: Change this to only add flush signals at the start and end of the batch.
 	c.flushTimer.Set()
-	return false
+	return n, false
 }
 
 // recvRoutine reads PacketMsgs and reconstructs the message using the channels' "recving" buffer.
@@ -772,6 +781,10 @@ type Channel struct {
 	sending       []byte
 	recentlySent  int64 // exponential moving average
 
+	nextPacketMsg           *tmp2p.PacketMsg
+	nextP2pWrapperPacketMsg *tmp2p.Packet_PacketMsg
+	nextPacket              *tmp2p.Packet
+
 	maxPacketMsgPayloadSize int
 
 	Logger log.Logger
@@ -786,6 +799,9 @@ func newChannel(conn *MConnection, desc ChannelDescriptor) *Channel {
 		conn:                    conn,
 		desc:                    desc,
 		sendQueue:               make(chan []byte, desc.SendQueueCapacity),
+		nextPacketMsg:           &tmp2p.PacketMsg{ChannelID: int32(desc.ID)},
+		nextP2pWrapperPacketMsg: &tmp2p.Packet_PacketMsg{},
+		nextPacket:              &tmp2p.Packet{},
 		recving:                 make([]byte, 0, desc.RecvBufferCapacity),
 		maxPacketMsgPayloadSize: conn.config.MaxPacketMsgPayloadSize,
 	}
@@ -845,29 +861,28 @@ func (ch *Channel) isSendPending() bool {
 	return true
 }
 
-// Creates a new PacketMsg to send.
+// Updates the nextPacket proto message for us to send.
 // Not goroutine-safe.
-func (ch *Channel) nextPacketMsg() tmp2p.PacketMsg {
-	packet := tmp2p.PacketMsg{ChannelID: int32(ch.desc.ID)}
+func (ch *Channel) updateNextPacket() {
 	maxSize := ch.maxPacketMsgPayloadSize
 	if len(ch.sending) <= maxSize {
-		packet.Data = ch.sending
-		packet.EOF = true
+		ch.nextPacketMsg.Data = ch.sending
+		ch.nextPacketMsg.EOF = true
 		ch.sending = nil
 		atomic.AddInt32(&ch.sendQueueSize, -1) // decrement sendQueueSize
 	} else {
-		packet.Data = ch.sending[:maxSize]
-		packet.EOF = false
+		ch.nextPacketMsg.Data = ch.sending[:maxSize]
+		ch.nextPacketMsg.EOF = false
 		ch.sending = ch.sending[maxSize:]
 	}
-	return packet
+	wrapPacketMsgWithBuffers(ch.nextPacketMsg, ch.nextP2pWrapperPacketMsg, ch.nextPacket)
 }
 
 // Writes next PacketMsg to w and updates c.recentlySent.
 // Not goroutine-safe.
 func (ch *Channel) writePacketMsgTo(w protoio.Writer) (n int, err error) {
-	packet := ch.nextPacketMsg()
-	n, err = w.WriteMsg(mustWrapPacket(&packet))
+	ch.updateNextPacket()
+	n, err = w.WriteMsg(ch.nextPacket)
 	if err != nil {
 		return 0, err
 	}
@@ -879,7 +894,7 @@ func (ch *Channel) writePacketMsgTo(w protoio.Writer) (n int, err error) {
 // complete. NOTE message bytes may change on next call to recvPacketMsg.
 // Not goroutine-safe.
 func (ch *Channel) recvPacketMsg(packet tmp2p.PacketMsg) ([]byte, error) {
-	ch.Logger.Debug("Read PacketMsg", "conn", ch.conn, "packet", packet)
+	// ch.Logger.Debug("Read PacketMsg", "conn", ch.conn, "packet", packet)
 	recvCap, recvReceived := ch.desc.RecvMessageCapacity, len(ch.recving)+len(packet.Data)
 	if recvCap < recvReceived {
 		return nil, fmt.Errorf("received message exceeds available capacity: %v < %v", recvCap, recvReceived)
@@ -911,32 +926,33 @@ func (ch *Channel) updateStats() {
 
 // mustWrapPacket takes a packet kind (oneof) and wraps it in a tmp2p.Packet message.
 func mustWrapPacket(pb proto.Message) *tmp2p.Packet {
-	var msg tmp2p.Packet
+	msg := &tmp2p.Packet{}
+	mustWrapPacketInto(pb, msg)
+	return msg
+}
 
+func mustWrapPacketInto(pb proto.Message, dst *tmp2p.Packet) {
 	switch pb := pb.(type) {
-	case *tmp2p.Packet: // already a packet
-		msg = *pb
+	case *tmp2p.Packet: // already a packet, make a copy
+		*dst = *pb
 	case *tmp2p.PacketPing:
-		msg = tmp2p.Packet{
-			Sum: &tmp2p.Packet_PacketPing{
-				PacketPing: pb,
-			},
+		dst.Sum = &tmp2p.Packet_PacketPing{
+			PacketPing: pb,
 		}
 	case *tmp2p.PacketPong:
-		msg = tmp2p.Packet{
-			Sum: &tmp2p.Packet_PacketPong{
-				PacketPong: pb,
-			},
+		dst.Sum = &tmp2p.Packet_PacketPong{
+			PacketPong: pb,
 		}
 	case *tmp2p.PacketMsg:
-		msg = tmp2p.Packet{
-			Sum: &tmp2p.Packet_PacketMsg{
-				PacketMsg: pb,
-			},
+		dst.Sum = &tmp2p.Packet_PacketMsg{
+			PacketMsg: pb,
 		}
 	default:
 		panic(fmt.Errorf("unknown packet type %T", pb))
 	}
+}
 
-	return &msg
+func wrapPacketMsgWithBuffers(pb *tmp2p.PacketMsg, sumArg *tmp2p.Packet_PacketMsg, dst *tmp2p.Packet) {
+	sumArg.PacketMsg = pb
+	dst.Sum = sumArg
 }
