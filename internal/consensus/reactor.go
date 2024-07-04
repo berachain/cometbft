@@ -493,7 +493,7 @@ func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
 		IsCommit:           rs.Step == cstypes.RoundStepCommit,
 	}
 	go func() {
-		conR.Switch.BroadcastEnvelope(p2p.Envelope{
+		conR.Switch.TryBroadcast(p2p.Envelope{
 			ChannelID: StateChannel,
 			Message:   csMsg,
 		})
@@ -546,7 +546,7 @@ func (conR *Reactor) broadcastHasProposalBlockPartMessage(partMsg *BlockPartMess
 		Round:  partMsg.Round,
 		Index:  int32(partMsg.Part.Index),
 	}
-	conR.Switch.BroadcastEnvelope(p2p.Envelope{
+	conR.Switch.TryBroadcast(p2p.Envelope{
 		ChannelID: StateChannel,
 		Message:   msg,
 	})

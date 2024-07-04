@@ -276,8 +276,6 @@ func (sw *Switch) BroadcastEnvelope(e Envelope) {
 
 	for _, peer := range sw.peers.list {
 		go func(p Peer) {
-			// TODO: We don't use the success value. Should most behavior
-			// really be TrySend?
 			success := p.Send(e)
 			_ = success
 		}(peer)
@@ -290,22 +288,11 @@ func (sw *Switch) BroadcastEnvelope(e Envelope) {
 func (sw *Switch) TryBroadcast(e Envelope) {
 	sw.Logger.Debug("TryBroadcast", "channel", e.ChannelID)
 
-	marshalMsg := e.Message
-	if wrapper, ok := e.Message.(Wrapper); ok {
-		marshalMsg = wrapper.Wrap()
-	}
-	marshalledMsg, err := proto.Marshal(marshalMsg)
-	if err != nil {
-		return
-	}
-	marshalledEnvelope := MarshalledEnvelope{
-		Envelope:          e,
-		MarshalledMessage: marshalledMsg,
-	}
-	peers := sw.peers.list
-	for _, peer := range peers {
-		peer.TrySendMarshalled(marshalledEnvelope)
-	}
+	sw.peers.ForEach(func(p Peer) {
+		go func(peer Peer) {
+			peer.TrySend(e)
+		}(p)
+	})
 }
 
 // NumPeers returns the count of outbound/inbound and outbound-dialing peers.
