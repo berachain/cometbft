@@ -39,6 +39,7 @@ type Peer interface {
 
 	Send(e Envelope) bool
 	TrySend(e Envelope) bool
+	TrySendMarshalled(me MarshalledEnvelope) bool
 
 	Set(key string, value any)
 	Get(key string) any
@@ -259,20 +260,17 @@ func (p *peer) Send(e Envelope) bool {
 	return p.send(e.ChannelID, e.Message, p.mconn.Send)
 }
 
-// TrySend msg bytes to the channel identified by chID byte. Immediately returns
-// false if the send queue is full.
-//
-// thread safe.
+func (p *peer) TrySendMarshalled(e MarshalledEnvelope) bool {
+	return p.sendMarshalled(e.ChannelID, getMsgType(e.Message), e.MarshalledMessage, p.mconn.TrySend)
+}
+
+// TrySend attempts to sends the message in the envelope on the channel specified by the
+// envelope. Returns false immediately if the connection's internal queue is full.
 func (p *peer) TrySend(e Envelope) bool {
 	return p.send(e.ChannelID, e.Message, p.mconn.TrySend)
 }
 
 func (p *peer) send(chID byte, msg proto.Message, sendFunc func(byte, []byte) bool) bool {
-	if !p.IsRunning() {
-		return false
-	} else if !p.hasChannel(chID) {
-		return false
-	}
 	msgType := getMsgType(msg)
 	if w, ok := msg.(types.Wrapper); ok {
 		msg = w.Wrap()
@@ -280,6 +278,15 @@ func (p *peer) send(chID byte, msg proto.Message, sendFunc func(byte, []byte) bo
 	msgBytes, err := proto.Marshal(msg)
 	if err != nil {
 		p.Logger.Error("marshaling message to send", "error", err)
+		return false
+	}
+	return p.sendMarshalled(chID, msgType, msgBytes, sendFunc)
+}
+
+func (p *peer) sendMarshalled(chID byte, msgType reflect.Type, msgBytes []byte, sendFunc func(byte, []byte) bool) bool {
+	if !p.IsRunning() {
+		return false
+	} else if !p.hasChannel(chID) {
 		return false
 	}
 	res := sendFunc(chID, msgBytes)

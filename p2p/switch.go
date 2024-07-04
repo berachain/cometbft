@@ -290,11 +290,21 @@ func (sw *Switch) BroadcastEnvelope(e Envelope) {
 func (sw *Switch) TryBroadcast(e Envelope) {
 	sw.Logger.Debug("TryBroadcast", "channel", e.ChannelID)
 
+	marshalMsg := e.Message
+	if wrapper, ok := e.Message.(Wrapper); ok {
+		marshalMsg = wrapper.Wrap()
+	}
+	marshalledMsg, err := proto.Marshal(marshalMsg)
+	if err != nil {
+		return
+	}
+	marshalledEnvelope := MarshalledEnvelope{
+		Envelope:          e,
+		MarshalledMessage: marshalledMsg,
+	}
 	peers := sw.peers.list
 	for _, peer := range peers {
-		go func(p Peer) {
-			p.TrySend(e)
-		}(peer)
+		peer.TrySendMarshalled(marshalledEnvelope)
 	}
 }
 

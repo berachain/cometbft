@@ -433,16 +433,16 @@ func (_m *Peer) TrySend(e p2p.Envelope) bool {
 	return r0
 }
 
-// NewPeer creates a new instance of Peer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-// The first argument is typically a *testing.T value.
-func NewPeer(t interface {
-	mock.TestingT
-	Cleanup(func())
-}) *Peer {
-	mock := &Peer{}
-	mock.Mock.Test(t)
+// TrySendMarshalled provides a mock function with given fields: _a0
+func (_m *Peer) TrySendMarshalled(_a0 p2p.MarshalledEnvelope) bool {
+	ret := _m.Called(_a0)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(p2p.MarshalledEnvelope) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
 
-	return mock
+	return r0
 }
