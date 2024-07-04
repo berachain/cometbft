@@ -270,8 +270,8 @@ func (sw *Switch) OnStop() {
 // success values for each attempted send (false if times out). Channel will be
 // closed once msg bytes are sent to all peers (or time out).
 //
-// NOTE: BroadcastEnvelope uses goroutines, so order of broadcast may not be preserved.
-func (sw *Switch) BroadcastEnvelope(e Envelope) {
+// NOTE: Broadcast uses goroutines, so order of broadcast may not be preserved.
+func (sw *Switch) Broadcast(e Envelope) {
 	sw.Logger.Debug("Broadcast", "channel", e.ChannelID)
 
 	for _, peer := range sw.peers.list {

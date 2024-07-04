@@ -432,17 +432,3 @@ func (_m *Peer) TrySend(e p2p.Envelope) bool {
 
 	return r0
 }
-
-// TrySendMarshalled provides a mock function with given fields: _a0
-func (_m *Peer) TrySendMarshalled(_a0 p2p.MarshalledEnvelope) bool {
-	ret := _m.Called(_a0)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(p2p.MarshalledEnvelope) bool); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}

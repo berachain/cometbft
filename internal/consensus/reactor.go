@@ -476,7 +476,7 @@ func (conR *Reactor) unsubscribeFromBroadcastEvents() {
 func (conR *Reactor) broadcastNewRoundStepMessage(rs *cstypes.RoundState) {
 	nrsMsg := makeRoundStepMessage(rs)
 	go func() {
-		conR.Switch.BroadcastEnvelope(p2p.Envelope{
+		conR.Switch.Broadcast(p2p.Envelope{
 			ChannelID: StateChannel,
 			Message:   nrsMsg,
 		})

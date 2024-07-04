@@ -39,7 +39,6 @@ type Peer interface {
 
 	Send(e Envelope) bool
 	TrySend(e Envelope) bool
-	TrySendMarshalled(me MarshalledEnvelope) bool
 
 	Set(key string, value any)
 	Get(key string) any
@@ -258,10 +257,6 @@ func (p *peer) Status() cmtconn.ConnectionStatus {
 // thread safe.
 func (p *peer) Send(e Envelope) bool {
 	return p.send(e.ChannelID, e.Message, p.mconn.Send)
-}
-
-func (p *peer) TrySendMarshalled(e MarshalledEnvelope) bool {
-	return p.sendMarshalled(e.ChannelID, getMsgType(e.Message), e.MarshalledMessage, p.mconn.TrySend)
 }
 
 // TrySend attempts to sends the message in the envelope on the channel specified by the
