@@ -38,18 +38,16 @@ const (
 // -----------------------------------------------------------------------------
 
 // Reactor defines a reactor for the consensus service.
+// Reactor defines a reactor for the consensus service.
 type Reactor struct {
 	p2p.BaseReactor // BaseService + p2p.Switch
-
-	conS          *State
-	mtx           cmtsync.RWMutex
-	waitSync      atomic.Bool
-	eventBus      *types.EventBus
-	rsMtx         cmtsync.RWMutex
-	rs            *cstypes.RoundState
-	initialHeight int64 // under rsMtx
-
-	Metrics *Metrics
+	conS            *State
+	waitSync        atomic.Bool
+	eventBus        *types.EventBus
+	rsMtx           cmtsync.RWMutex
+	rs              *cstypes.RoundState
+	Metrics         *Metrics
+	initialHeight   int64
 }
 
 type ReactorOption func(*Reactor)
@@ -338,9 +336,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasProposalBlockPart(msg.Height, msg.Round, int(msg.Part.Index))
 			conR.Metrics.BlockParts.With("peer_id", string(e.Src.ID())).Add(1)
 
-			conR.mtx.RLock()
+			conR.conS.mtx.RLock()
 			height, blockParts := conR.rs.Height, conR.rs.ProposalBlockParts
-			conR.mtx.RUnlock()
+			conR.conS.mtx.RUnlock()
 
 			allowFutureBlockPart := true
 			ok := allowProcessingProposalBlockPart(msg, conR.Logger, conR.Metrics, height, blockParts, allowFutureBlockPart, e.Src.ID())
@@ -361,9 +359,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 		switch msg := msg.(type) {
 		case *VoteMessage:
 			cs := conR.conS
-			conR.mtx.RLock()
+			conR.conS.mtx.RLock()
 			height, round := conR.rs.Height, conR.rs.Round
-			conR.mtx.RUnlock()
+			conR.conS.mtx.RUnlock()
 			ps.SetHasVote(msg.Vote)
 
 			// if vote is late, and is not a precommit for the last block, mark it late and return.
@@ -582,10 +580,10 @@ func (conR *Reactor) updateRoundStateRoutine() {
 		conR.conS.mtx.RLock()
 		rs, initialHeight := conR.conS.getRoundState(), conR.conS.state.InitialHeight
 		conR.conS.mtx.RUnlock()
-		conR.mtx.Lock()
+		conR.conS.mtx.Lock()
 		conR.rs = rs
 		conR.initialHeight = initialHeight
-		conR.mtx.Unlock()
+		conR.conS.mtx.Unlock()
 	}
 }
 
