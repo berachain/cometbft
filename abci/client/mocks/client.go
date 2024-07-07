@@ -433,7 +433,7 @@ func (_m *Client) OfferSnapshot(ctx context.Context, req *v1.OfferSnapshotReques
 	return r0, r1
 }
 
-// OnReset provides a mock function with given fields:
+// OnReset provides a mock function with the given fields:
 func (_m *Client) OnReset() error {
 	ret := _m.Called()
 
