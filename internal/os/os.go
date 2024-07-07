@@ -100,7 +100,7 @@ func CopyFile(src, dst string) error {
 		return errors.New("cannot read from directories")
 	}
 
-	// create new file, truncate if exists and apply same permissions as the original one
+	// create a new file, truncate if exists and apply same permissions as the original one
 	dstfile, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, info.Mode().Perm())
 	if err != nil {
 		return err

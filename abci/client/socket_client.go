@@ -22,7 +22,7 @@ const (
 	flushThrottleMS = 20  // Don't wait longer than...
 )
 
-// socketClient is the client side implementation of the Tendermint
+// socketClient is the client-side implementation of the Tendermint
 // Socket Protocol (TSP). It is used by an instance of Tendermint to pass
 // ABCI requests to an out of process application running the socketServer.
 //

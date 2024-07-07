@@ -31,7 +31,7 @@ type Client interface {
 	Flush(ctx context.Context) error
 	Echo(ctx context.Context, echo string) (*types.EchoResponse, error)
 
-	// FIXME: All other operations are run synchronously and rely
+	// FIXME: All other operations are run synchronously and rely on
 	// on the caller to dictate concurrency (i.e. run a go routine),
 	// with the exception of `CheckTxAsync` which we maintain
 	// for the v0 mempool. We should explore refactoring the
