@@ -20,8 +20,7 @@ CometBFT keeps multiple distinct databases in the `$CMTHOME/data`:
   used to temporarily store intermediate results during block processing.
 - `tx_index.db`: Indexes transactions and by tx hash and height. The tx results are indexed if they are added to the `FinalizeBlock` response in the application.
 
-> By default, CometBFT will only index transactions by their hash and height, if you want the result events to be indexed, see [indexing transactions](../../guides/app-dev/indexing-transactions.md#adding-events) for
-for details.
+> By default, CometBFT will only index transactions by their hash and height, if you want the result events to be indexed, see [indexing transactions](../../guides/app-dev/indexing-transactions.md#adding-events) for details.
 
 Applications can expose block pruning strategies to the node operator.
 Please read the documentation of your application to find out more details.

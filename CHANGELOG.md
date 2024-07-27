@@ -448,7 +448,7 @@ longer used. ([\#3084](https://github.com/cometbft/cometbft/issues/3084))
 - `[blockstore]` Use LRU caches for LoadBlockPart. Make the LoadBlockPart and LoadBlockCommit APIs 
     return mutative copies, that the caller is expected to not modify. This saves on memory copying.
   ([\#3342](https://github.com/cometbft/cometbft/issues/3342))
-- `[blockstore]` Use LRU caches in blockstore, significiantly improving consensus gossip routine performance
+- `[blockstore]` Use LRU caches in blockstore, significantly improving consensus gossip routine performance
   ([\#3003](https://github.com/cometbft/cometbft/issues/3003))
 - `[blocksync]` Avoid double-calling `types.BlockFromProto` for performance
   reasons ([\#2016](https://github.com/cometbft/cometbft/pull/2016))
@@ -508,7 +508,7 @@ longer used. ([\#3084](https://github.com/cometbft/cometbft/issues/3084))
   ([\#3162](https://github.com/cometbft/cometbft/issues/3162))
 - `[consensus]` Use an independent rng for gossip threads, reducing mutex contention.
   ([\#3005](https://github.com/cometbft/cometbft/issues/3005))
-- `[consensus]` When prevoting, avoid calling PropocessProposal when we know the
+- `[consensus]` When prevoting, avoid calling ProcessProposal when we know the
   proposal was already validated by correct nodes.
   ([\#1230](https://github.com/cometbft/cometbft/pull/1230))
 - `[crypto/merkle]` faster calculation of hashes ([#1921](https://github.com/cometbft/cometbft/pull/1921))
@@ -549,7 +549,7 @@ longer used. ([\#3084](https://github.com/cometbft/cometbft/issues/3084))
   ([\#2841](https://github.com/cometbft/cometbft/pull/2841)).
 - `[internal/bits]` 10x speedup creating initialized bitArrays, which speedsup extendedCommit.BitArray(). This is used in consensus vote gossip.
   ([\#2959](https://github.com/cometbft/cometbft/pull/2841)).
-- `[jsonrpc]` enable HTTP basic auth in websocket client ([#2434](https://github.com/cometbft/cometbft/pull/2434))
+- `[JSON-RPC]` enable HTTP basic auth in websocket client ([#2434](https://github.com/cometbft/cometbft/pull/2434))
 - `[libs/json]` Lower the memory overhead of JSON encoding by using JSON encoders internally.
   ([\#2846](https://github.com/cometbft/cometbft/pull/2846))
 - `[light]` Export light package errors ([\#1904](https://github.com/cometbft/cometbft/pull/1904)) (contributes to [\#1140](https://github.com/cometbft/cometbft/issues/1140))
@@ -717,7 +717,7 @@ for people who forked CometBFT and interact directly with the indexers kvstore.
 - `[state]` Move pruneBlocks from node/state to state/execution.
   ([\#6541](https://github.com/tendermint/tendermint/pull/6541))
 - `[state]` Signature of `ExtendVote` changed in `BlockExecutor`.
-  It now includes the block whose precommit will be extended, an the state object.
+  It now includes the block whose precommit will be extended, and the state object.
   ([\#1270](https://github.com/cometbft/cometbft/pull/1270))
 
 ### BUG FIXES
@@ -843,7 +843,7 @@ See below for more details.
 - `[abci/counter]` Delete counter example app
   ([\#6684](https://github.com/tendermint/tendermint/pull/6684))
 - `[abci/params]` Deduplicate `ConsensusParams` and `BlockParams` so
-  only `types` proto definitions are use. Remove `TimeIotaMs` and use
+  only `types` proto definitions are used. Remove `TimeIotaMs` and use
   a hard-coded 1 millisecond value to ensure monotonically increasing
   block times. Rename `AppVersion` to `App` so as to not stutter.
   ([\#9287](https://github.com/tendermint/tendermint/pull/9287))
@@ -916,7 +916,7 @@ See below for more details.
 
 ### IMPROVEMENTS
 
-- `[abci]` Added `AbciVersion` to `RequestInfo` allowing
+- `[abci]` Added `ABCI Version` to `RequestInfo` allowing
   applications to check ABCI version when connecting to CometBFT.
   ([\#5706](https://github.com/tendermint/tendermint/pull/5706))
 - `[cli]` add `--hard` flag to rollback command (and a boolean to the `RollbackState` method). This will rollback
