@@ -19,7 +19,7 @@
 | v0.37.x | [![Tests][tests-badge-v037x]][tests-url-v037x] | [![Lint][lint-badge-v037x]][lint-url-v037x] |
 | v0.34.x | [![Tests][tests-badge-v034x]][tests-url-v034x] | [![Lint][lint-badge-v034x]][lint-url-v034x] |
 
-CometBFT is a Byzantine Fault Tolerant (BFT) middleware that takes a
+[CometBFT](https://cometbft.com/) is a Byzantine Fault Tolerant (BFT) middleware that takes a
 state transition machine - written in any programming language - and securely
 replicates it on many machines.
 
