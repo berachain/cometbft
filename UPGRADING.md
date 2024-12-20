@@ -36,7 +36,7 @@ The existing algorithm, called BFT-Time is kept for backwards compatibility.
 Upgrading to `v1.0` does not automatically switch the chain from BFT-Time
 to PBTS; rather a ConsensusParam called `PbtsEnableHeight` can be set to a future
 height to transition from BFT-Time to PBTS.
-This flexible mechanism allows chains disentagle the upgrade to `v1.0` from the transition
+This flexible mechanism allows chains disentangle the upgrade to `v1.0` from the transition
 in the algorithm used for block times.
 For further information, please check the [PBTS specification][pbts-spec].
 
@@ -244,7 +244,7 @@ coordinated upgrade.
 
 ### Mempool Changes
 
-- The priority mempool (what was referred in the code as version `v1`) has been
+- The priority mempool (what was referred to in the code as version `v1`) has been
   removed. There is now only one mempool (what was called version `v0`), that
   is, the default implementation as a queue of transactions.
 - In the protobuf message `ResponseCheckTx`, fields `sender`, `priority`, and
