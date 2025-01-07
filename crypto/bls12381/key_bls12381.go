@@ -38,8 +38,8 @@ var (
 // Changing this to 'minimal-signature-size' would render CometBFT not Ethereum
 // compatible.
 type (
-	blstPublicKey          = blst.P1Affine
-	blstSignature          = blst.P2Affine
+	blstPublicKey = blst.P1Affine
+	blstSignature = blst.P2Affine
 )
 
 // -------------------------------------.

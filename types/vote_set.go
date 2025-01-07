@@ -711,16 +711,19 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 		panic(fmt.Errorf("BLS aggregation error: %w", err))
 	}
 
-	// 2. Aggregate the signatures for nil.
+	// 2. Aggregate the signatures for nil, if any.
 	sigsToAgg = make([][]byte, 0, len(voteSet.votes))
 	for _, v := range voteSet.votes {
 		if v != nil && v.BlockID.IsNil() {
 			sigsToAgg = append(sigsToAgg, v.Signature)
 		}
 	}
-	agSig2, err := bls12381.AggregateSignatures(sigsToAgg)
-	if err != nil {
-		panic(fmt.Errorf("BLS aggregation error: %w", err))
+	var agSig2 []byte
+	if len(sigsToAgg) > 0 {
+		agSig2, err = bls12381.AggregateSignatures(sigsToAgg)
+		if err != nil {
+			panic(fmt.Errorf("BLS aggregation error: %w", err))
+		}
 	}
 
 	// For every validator, get the precommit without extensions
@@ -756,10 +759,12 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	}
 
 	// Add agSig2 to the first validator who voted for nil.
-	for i, v := range voteSet.votes {
-		if v != nil && v.BlockID.IsNil() {
-			sigs[i].CommitSig.Signature = agSig2
-			break
+	if agSig2 != nil {
+		for i, v := range voteSet.votes {
+			if v != nil && v.BlockID.IsNil() {
+				sigs[i].CommitSig.Signature = agSig2
+				break
+			}
 		}
 	}
 

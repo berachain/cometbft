@@ -1317,9 +1317,11 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		// because votes are different.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		canBeAggregated := blsKey &&
-			cs.state.Validators.AllKeysHaveSameType() &&
-			cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(cs.Height)
+			cs.state.Validators.AllKeysHaveSameType()
 		if canBeAggregated {
+			if cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(cs.Height) {
+				panic("VoteExtensions are not supported with BLS aggregation")
+			}
 			lastExtCommit = cs.LastCommit.MakeBLSCommit()
 		} else {
 			lastExtCommit = cs.LastCommit.MakeExtendedCommit(cs.state.ConsensusParams.Feature)

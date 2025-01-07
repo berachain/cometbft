@@ -468,8 +468,10 @@ func verifyAggregatedCommit(
 		talliedVotingPower int64
 		aggSig1, aggSig2   []byte
 		msg1, msg2         []byte
-		pubkeys1, pubkeys2 []*bls12381.PubKey
 	)
+
+	pubkeys1 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
+	pubkeys2 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
 
 	for idx, commitSig := range commit.Signatures {
 		// skip over signatures that should be ignored
@@ -530,12 +532,14 @@ func verifyAggregatedCommit(
 
 	ok := bls12381.VerifyAggregateSignature(aggSig1, pubkeys1, msg1)
 	if !ok {
-		return fmt.Errorf("wrong aggregated signature for block: %X", aggSig1)
+		return fmt.Errorf("wrong aggregated signature for block: %X (pubkeys: %v)", aggSig1, pubkeys1)
 	}
 
-	ok = bls12381.VerifyAggregateSignature(aggSig2, pubkeys2, msg2)
-	if !ok {
-		return fmt.Errorf("wrong aggregated signature for nil: %X", aggSig2)
+	if aggSig2 != nil {
+		ok = bls12381.VerifyAggregateSignature(aggSig2, pubkeys2, msg2)
+		if !ok {
+			return fmt.Errorf("wrong aggregated signature for nil: %X (pubkeys: %v)", aggSig2, pubkeys2)
+		}
 	}
 
 	return nil
