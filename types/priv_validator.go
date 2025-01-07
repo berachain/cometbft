@@ -83,7 +83,7 @@ func NewMockPVWithKeyType(keyType string) MockPV {
 			panic(err)
 		}
 	default:
-		panic(fmt.Sprintf("unexpected key type: %s", keyType))
+		panic("unexpected key type: " + keyType)
 	}
 	return MockPV{pk, false, false}
 }

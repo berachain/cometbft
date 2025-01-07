@@ -636,7 +636,7 @@ func TestVoteSet_MakeBLSCommit(t *testing.T) {
 
 	// Verify the aggregated signatures.
 	ignore := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagAbsent }
-	count := func(c CommitSig) bool { return true }
+	count := func(CommitSig) bool { return true }
 	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 7, ignore, count, false)
 	require.NoError(t, err)
 }
