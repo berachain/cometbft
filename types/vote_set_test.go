@@ -559,7 +559,7 @@ func TestVoteSet_VoteExtensionsEnabled(t *testing.T) {
 
 func TestVoteSet_MakeBLSCommit(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, bls12381.KeyType)
+	voteSet, vals, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, bls12381.KeyType)
 	blockHash, blockPartSetHeader := crypto.CRandBytes(32), PartSetHeader{123, crypto.CRandBytes(32)}
 
 	voteProto := &Vote{
@@ -633,6 +633,12 @@ func TestVoteSet_MakeBLSCommit(t *testing.T) {
 	if err := commit.ValidateBasic(); err != nil {
 		t.Errorf("error in Commit.ValidateBasic(): %v", err)
 	}
+
+	// Verify the aggregated signatures.
+	ignore := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagAbsent }
+	count := func(c CommitSig) bool { return true }
+	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 7, ignore, count, false)
+	require.NoError(t, err)
 }
 
 // NOTE: privValidators are in order.
