@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/internal/bits"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
@@ -686,12 +687,12 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	defer voteSet.mtx.Unlock()
 
 	if voteSet.signedMsgType != PrecommitType {
-		panic("Cannot MakeExtendCommit() unless VoteSet.Type is PrecommitType")
+		panic("Cannot MakeBLSCommit() unless VoteSet.Type is PrecommitType")
 	}
 
 	// Make sure we have a 2/3 majority
 	if voteSet.maj23 == nil {
-		panic("Cannot MakeExtendCommit() unless a blockhash has +2/3")
+		panic("Cannot MakeBLSCommit() unless a blockhash has +2/3")
 	}
 
 	// 1. Aggregate the signatures for the block.
@@ -726,7 +727,11 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	sigs := make([]ExtendedCommitSig, len(voteSet.votes))
 	for i, v := range voteSet.votes {
 		cSig := v.CommitSig()
-		cSig.Signature = []byte{0x00} // clear the signature
+		if cSig.BlockIDFlag != BlockIDFlagAbsent {
+			cSig.Signature = []byte{0x00} // clear the signature
+		} else {
+			cSig.Signature = []byte{} // clear the signature
+		}
 		sig := ExtendedCommitSig{
 			CommitSig: cSig,
 		}

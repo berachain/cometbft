@@ -8,6 +8,7 @@ import (
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	ce "github.com/cometbft/cometbft/crypto/encoding"
 	"github.com/cometbft/cometbft/internal/keytypes"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
@@ -191,7 +192,12 @@ func ValidatorFromProto(vp *cmtproto.Validator) (*Validator, error) {
 // RandValidator returns a randomized validator, useful for testing.
 // UNSTABLE.
 func RandValidator(randPower bool, minPower int64) (*Validator, PrivValidator) {
-	privVal := NewMockPV()
+	return RandValidatorWithKeyType(randPower, minPower, ed25519.KeyType)
+}
+
+// UNSTABLE.
+func RandValidatorWithKeyType(randPower bool, minPower int64, keyType string) (*Validator, PrivValidator) {
+	privVal := NewMockPVWithKeyType(keyType)
 	votePower := minPower
 	if randPower {
 		votePower += int64(cmtrand.Uint32())

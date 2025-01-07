@@ -2,19 +2,22 @@ package types
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 	val0 := privValidators[0]
 
 	val0p, err := val0.GetPubKey()
@@ -46,7 +49,7 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 
 func TestVoteSet_AddVote_Bad(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 
 	voteProto := &Vote{
 		ValidatorAddress: nil,
@@ -121,7 +124,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 
 func TestVoteSet_2_3Majority(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
@@ -171,7 +174,7 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 
 func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 100, 1, false)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 100, 1, false, ed25519.KeyType)
 
 	blockHash := crypto.CRandBytes(32)
 	blockPartsTotal := uint32(123)
@@ -270,7 +273,7 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 
 func TestVoteSet_Conflicts(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 4, 1, false)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 4, 1, false, ed25519.KeyType)
 	blockHash1 := cmtrand.Bytes(32)
 	blockHash2 := cmtrand.Bytes(32)
 
@@ -395,7 +398,7 @@ func TestVoteSet_Conflicts(t *testing.T) {
 
 func TestVoteSet_MakeCommit(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true)
+	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, ed25519.KeyType)
 	blockHash, blockPartSetHeader := crypto.CRandBytes(32), PartSetHeader{123, crypto.CRandBytes(32)}
 
 	voteProto := &Vote{
@@ -554,6 +557,84 @@ func TestVoteSet_VoteExtensionsEnabled(t *testing.T) {
 	}
 }
 
+func TestVoteSet_MakeBLSCommit(t *testing.T) {
+	height, round := int64(1), int32(0)
+	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, bls12381.KeyType)
+	blockHash, blockPartSetHeader := crypto.CRandBytes(32), PartSetHeader{123, crypto.CRandBytes(32)}
+
+	voteProto := &Vote{
+		ValidatorAddress: nil,
+		ValidatorIndex:   -1,
+		Height:           height,
+		Round:            round,
+		Timestamp:        cmttime.Now(),
+		Type:             PrecommitType,
+		BlockID:          BlockID{blockHash, blockPartSetHeader},
+	}
+
+	// 6 out of 10 voted for some block.
+	for i := int32(0); i < 6; i++ {
+		pv, err := privValidators[i].GetPubKey()
+		require.NoError(t, err)
+		addr := pv.Address()
+		vote := withValidator(voteProto, addr, i)
+		_, err = signAddVote(privValidators[i], vote, voteSet)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	// MakeCommit should fail.
+	assert.Panics(t, func() { voteSet.MakeBLSCommit() }, "Doesn't have +2/3 majority")
+
+	// 7th voted for some other block.
+	{
+		pv, err := privValidators[6].GetPubKey()
+		require.NoError(t, err)
+		addr := pv.Address()
+		vote := withValidator(voteProto, addr, 6)
+		vote = withBlockHash(vote, cmtrand.Bytes(32))
+		vote = withBlockPartSetHeader(vote, PartSetHeader{123, cmtrand.Bytes(32)})
+
+		_, err = signAddVote(privValidators[6], vote, voteSet)
+		require.NoError(t, err)
+	}
+
+	// The 8th voted like everyone else.
+	{
+		pv, err := privValidators[7].GetPubKey()
+		require.NoError(t, err)
+		addr := pv.Address()
+		vote := withValidator(voteProto, addr, 7)
+		_, err = signAddVote(privValidators[7], vote, voteSet)
+		require.NoError(t, err)
+	}
+
+	// The 9th voted for nil.
+	{
+		pv, err := privValidators[8].GetPubKey()
+		require.NoError(t, err)
+		addr := pv.Address()
+		vote := withValidator(voteProto, addr, 8)
+		vote.BlockID = BlockID{}
+
+		_, err = signAddVote(privValidators[8], vote, voteSet)
+		require.NoError(t, err)
+	}
+
+	commit := voteSet.MakeBLSCommit()
+
+	// Commit should have 10 elements
+	assert.Len(t, commit.ExtendedSignatures, 10)
+
+	fmt.Println(commit)
+
+	// Ensure that Commit is good.
+	if err := commit.ValidateBasic(); err != nil {
+		t.Errorf("error in Commit.ValidateBasic(): %v", err)
+	}
+}
+
 // NOTE: privValidators are in order.
 func randVoteSet(
 	height int64,
@@ -562,8 +643,9 @@ func randVoteSet(
 	numValidators int,
 	votingPower int64,
 	extEnabled bool,
+	keyType string,
 ) (*VoteSet, *ValidatorSet, []PrivValidator) {
-	valSet, privValidators := RandValidatorSet(numValidators, votingPower)
+	valSet, privValidators := RandValidatorSetWithKeyType(numValidators, votingPower, keyType)
 	if extEnabled {
 		if signedMsgType != PrecommitType {
 			return nil, nil, nil
