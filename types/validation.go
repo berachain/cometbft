@@ -531,6 +531,8 @@ func verifyAggregatedCommit(
 		return ErrNotEnoughVotingPowerSigned{Got: got, Needed: needed}
 	}
 
+	// Since we are above the voting power threshold needed, we know `aggSig1`,
+	// `pubkeys1`, and `msg1` are not `nil`
 	ok := bls12381.VerifyAggregateSignature(aggSig1, pubkeys1, msg1)
 	if !ok {
 		return fmt.Errorf("wrong aggregated signature for block: %X (pubkeys: %v)", aggSig1, pubkeys1)
