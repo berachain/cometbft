@@ -2,7 +2,7 @@
 
 CometBFT uses modified [semantic versioning](https://semver.org/) with each
 release following a `vX.Y.Z` format. The versioning approach used by CometBFT
-v1.x onwards differs from that of the v0.x series, and is documented in
+v1.x onwards differs from that of the v0.x series and is documented in
 [README.md](./README.md#versioning). The `main` branch is used for active
 development and thus it is not advisable to build against it.
 
@@ -87,7 +87,7 @@ the 2.x line.
    git push -u origin update-docs-v2.x
    ```
 
-   Be sure to merge this PR before making other changes on the newly-created
+   Be sure to merge this PR before making other changes to the newly created
    backport branch.
 
 5. Ensure that the RPC docs' `version` field in `rpc/openapi/openapi.yaml` has
@@ -120,7 +120,7 @@ After doing these steps, go back to `main` and do the following:
 ## Pre-releases
 
 Before creating an official release, especially a major release, we may want to
-create an alpha or beta version, or release candidate (RC) for our friends and
+create an alpha or beta version or release candidate (RC) for our friends and
 partners to test out. We use git tags to create pre-releases, and we build them
 off of backport branches, for example:
 
@@ -261,8 +261,8 @@ To create a patch release:
    * Build the changelog using unclog, and commit the built changelog.
    * Bump the CometBFT in `version.go`
    * Bump the ABCI version number, if necessary. (Note that ABCI follows semver,
-     and that ABCI versions are the only versions which can change during patch
-     releases, and only field additions are valid patch changes.)
+     and that ABCI versions are the only versions that can change during patch
+     releases and only field additions are valid patch changes.)
 4. Open a PR with these changes that will land them back on `v2.x`
 5. Once this change has landed on the backport branch, make sure to pull it locally, then push a tag.
    * `git tag -a v2.0.1 -s -m 'Release v2.0.1'`
@@ -285,9 +285,8 @@ the [versioning](https://github.com/cometbft/cometbft/blob/main/UPGRADING.md#ver
 
 ## Major Release Checklist
 
-The following set of steps are performed on all releases that increment the
-_major_ version, e.g. v1.0 to v2.0. These steps ensure that CometBFT is well
-tested, stable, and suitable for adoption by the various diverse projects that
+The following set of steps is performed on all releases that increment the
+_major_ version, e.g. v1.0 to v2.0. These steps ensure that CometBFT is well-tested, stable, and suitable for adoption by the various diverse projects that
 rely on CometBFT.
 
 ### Feature Freeze
@@ -308,7 +307,7 @@ quality. The following must not be merged during a feature freeze:
 This period directly follows the creation of the [backport
 branch](#creating-a-backport-branch). The CometBFT team instead directs all
 attention to ensuring that the existing code is stable and reliable. Broken
-tests are fixed, flakey-tests are remedied, end-to-end test failures are
+tests are fixed, flakey tests are remedied, end-to-end test failures are
 thoroughly diagnosed and all efforts of the team are aimed at improving the
 quality of the code. During this period, the upgrade harness tests are run
 repeatedly and a variety of in-house testnets are run to ensure CometBFT
@@ -319,26 +318,26 @@ operators.
 
 The CometBFT team maintains [a set of end-to-end
 tests](https://github.com/cometbft/cometbft/blob/main/test/e2e/README.md#L1)
-that run each night on the latest commit of the project and on the code in the
+that run each night on the latest commit of the project and on the code at the
 tip of each supported backport branch. These tests start a network of
 containerized CometBFT processes and run automated checks that the network
 functions as expected in both stable and unstable conditions. During the feature
 freeze, these tests are run nightly and must pass consistently for a release of
-CometBFT to be considered stable.
+CometBFT is to be considered stable.
 
 ### Upgrade Harness
 
 The CometBFT team is creating an upgrade test harness to exercise the workflow
 of stopping an instance of CometBFT running one version of the software and
 starting up the same application running the next version. To support upgrade
-testing, we will add the ability to terminate the CometBFT process at specific
+testing, we will add the ability to terminate the CometBFT process at a specific
 pre-defined points in its execution so that we can verify upgrades work in a
 representative sample of stop conditions.
 
 ### Large Scale Testnets
 
 The CometBFT end-to-end tests run a small network (~10s of nodes) to exercise
-basic consensus interactions. Real world deployments of CometBFT often have
+basic consensus interactions. Real-world deployments of CometBFT often have
 over a hundred nodes just in the validator set, with many others acting as full
 nodes and sentry nodes. To gain more assurance before a release, we will also
 run larger-scale test networks to shake out emergent behaviors at scale.
@@ -347,7 +346,7 @@ Large-scale test networks are run on a set of virtual machines (VMs). Each VM is
 equipped with 4 Gigabytes of RAM and 2 CPU cores. The network runs a very simple
 key-value store application. The application adds artificial delays to different
 ABCI calls to simulate a slow application. Each testnet is briefly run with no
-load being generated to collect a baseline performance. Once baseline is
+load being generated to collect a baseline performance. Once a baseline is
 captured, a consistent load is applied across the network. This load takes the
 form of 10% of the running nodes all receiving a consistent stream of two
 hundred transactions per minute each.
@@ -363,13 +362,13 @@ node:
 * Seconds for each step of consensus (Propose, Prevote, Precommit, Commit)
 * Latency to receive block proposals
 
-For these tests we intentionally target low-powered host machines (with low core
+For these tests, we intentionally target low-powered host machines (with low-core
 counts and limited memory) to ensure we observe similar kinds of resource contention
 and limitation that real-world  deployments of CometBFT experience in production.
 
 #### 200 Node Testnet
 
-To test the stability and performance of CometBFT in a real world scenario,
+To test the stability and performance of CometBFT in a real-world scenario,
 a 200 node test network is run. The network comprises 5 seed nodes, 175
 validators and 20 non-validating full nodes. All nodes begin by dialing
 a subset of the seed nodes to discover peers. The network is run for several
@@ -381,31 +380,31 @@ critical systems, testnets of larger sizes should be considered.
 Real-world deployments of CometBFT frequently see new nodes arrive and old nodes
 exit the network. The rotating node testnet ensures that CometBFT is able to
 handle this reliably. In this test, a network with 10 validators and 3 seed
-nodes is started. A rolling set of 25 full nodes are started and each connects
+nodes is started. A rolling set of 25 full nodes is started and each connects
 to the network by dialing one of the seed nodes. Once the node is able to
-blocksync to the head of the chain and begins producing blocks using consensus
+block sync to the head of the chain and begins producing blocks using consensus
 it is stopped. Once stopped, a new node is started and takes its place. This
 network is run for several days.
 
 #### Vote-extension Testnet
 
 CometBFT v0.38.0 introduced **vote-extensions**, which are added as the name
-suggests, to precommit votes sent by validators. The Vote-extension Testnet is
+suggests, to pre-commit votes sent by validators. The Vote-extension Testnet is
 used to determine how vote-extensions affect the performance of CometBFT, under
-various settings. The application used in the experiment is the same used on the
+various settings. The application used in the experiment is the same one used in the
 (#200-node-testnet), but is configured differently to gauge de effects of
 varying vote extension sizes. In the (#200-node-testnet) the application extends
-pre-commit votes with a 64 bit number encoded with variable compression. In the
+pre-commit votes with a 64-bit number encoded with variable compression. In the
 Vote-extension Testnet, pre-commit votes are extended with a non-compressed
 extension of configurable size. Experiments are run with multiple sizes to
-determine their impact and, for comparison sake, we include a run with the same
+determine their impact and, for comparison's sake, we include a run with the same
 settings as in the (#200-node-testnet).
 
-The testnet consists of 175 validators, 20 non-validator full-nodes, and 5 seed
-nodes. All 195 full-nodes begin by dialing a subset of the seed nodes to
-discover peers. Once all full-nodes are started, a 5 minute period is waited
+The testnet consists of 175 validators, 20 non-validator full nodes, and 5 seed
+nodes. All 195 full nodes begin by dialing a subset of the seed nodes to
+discover peers. Once all full nodes are started, a 5-minute period is waited
 before starting an experiment. For each experiment, the load generators issue
-requests at a constant rate during 150 seconds, then wait for 5 minutes to allow
+requests at a constant rate for 150 seconds, then wait for 5 minutes to allow
 the system to quiesce, then repeat the load generation; the load generation step
 is repeated 5 times for each experiment.
 
@@ -417,7 +416,7 @@ stop making blocks. Upon alleviation of the partition, the network is expected
 to once again become fully connected and capable of producing blocks. The
 network partition testnet ensures that CometBFT is able to handle this reliably
 at scale. In this test, a network with 100 validators and 95 full nodes is
-started. All validators have equal stake. Once the network is producing blocks,
+started. All validators have equal stakes. Once the network is producing blocks,
 a set of firewall rules is deployed to create a partitioned network with 50% of
 the stake on one side and 50% on the other. Once the network stops producing
 blocks, the firewall rules are removed and the nodes are monitored to ensure
@@ -450,9 +449,9 @@ For each release, if necessary, publish the proto changes to the `Buf` schema re
     * If you see `cometbft` and have `Writer` role, login in Buf via terminal:
         - `buf registry login`
     * When prompted for the username, type it and hit enter. It will ask for a `token` next.
-    * Go back to the Buf website and click on your username, and select `Settings`.
-    * Click on `Create new token`, add a name and select an expiry date.
-    * Once the token is created, copy the token code from the website and paste it on the terminal and hit enter. You
+    * Go back to the Buf website, click on your username, and select `Settings`.
+    * Click on `Create new token`, add a name, and select an expiry date.
+    * Once the token is created, copy the token code from the website paste it on the terminal and hit enter. You
       should see a message saying `Credentials saved ...`
 * Publish the files:
     * Checkout the new release that was tagged:
@@ -469,7 +468,7 @@ For each release, if necessary, publish the proto changes to the `Buf` schema re
       commit checksum from the release.
         - `buf push --tag "$(git rev-parse HEAD)"`
     * Go to the `Commits` section for the `cometbft/cometbft` repository and ensure that you
-      can see commit just [published there](https://buf.build/cometbft/cometbft/commits).
+      can see the commit just [published there](https://buf.build/cometbft/cometbft/commits).
     * All set, the Buf registry now hosts the [latest proto files](https://buf.build/cometbft/cometbft) in the `cometbft/cometbft` repository.
 
 [unclog]: https://github.com/informalsystems/unclog
