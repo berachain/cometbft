@@ -5,7 +5,7 @@
 *December 17, 2024*
 
 This is a major release of CometBFT that includes several substantial changes
-that aim to reduce bandwidth consumption, enable modularity, improve
+that aims to reduce bandwidth consumption, enable modularity, improve
 integrators' experience and increase the velocity of the CometBFT development
 team, including:
 
@@ -21,7 +21,7 @@ team, including:
    gossip-related bandwidth consumption further.
 4. An opt-in `nop` mempool, which allows application developers to turn off all
    mempool-related functionality in Comet such that they can build their own
-   transaction dissemination mechanism, for example a standalone mempool-like
+   transaction dissemination mechanism, for example, a standalone mempool-like
    process that can be scaled independently of the consensus engine/application.
    This requires application developers to implement their own gossip/networking
    mechanisms. See [ADR 111](./docs/architecture/adr-111-nop-mempool.md) for
@@ -154,15 +154,15 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
 - `[libs/timer]` Move to `internal`
   ([\#1485](https://github.com/cometbft/cometbft/pull/1485))
 - `[mempool]` Add to the `Mempool` interface a new method `PreUpdate()`. This method should be
-  called before acquiring the mempool lock, to signal that a new update is coming. Also add to
-  `ErrMempoolIsFull` a new field `RecheckFull`.
+  called before acquiring the mempool lock, to signal that a new update is coming. Also, add to
+  `ErrMempoolIsFull`a new field `RecheckFull`.
   ([\#3314](https://github.com/cometbft/cometbft/pull/3314))
 - `[mempool]` Change the signature of `CheckTx` in the `Mempool` interface to
 `CheckTx(tx types.Tx, sender p2p.ID) (*abcicli.ReqRes, error)`.
 ([\#1010](https://github.com/cometbft/cometbft/issues/1010), [\#3084](https://github.com/cometbft/cometbft/issues/3084))
 - `[mempool]` Extend `ErrInvalidTx` with new fields taken from `CheckTxResponse`
   ([\#4550](https://github.com/cometbft/cometbft/pull/4550)).
-- `[mempool]` Remove `mempoolIDs` for internally storing peer ids as `p2p.ID`
+- `[mempool]` Remove `mempoolIDs` for internally storing peer IDs as `p2p.ID`
   instead of `uint16`.
   ([\#1146](https://github.com/cometbft/cometbft/pull/1146))
 - `[node]` Change the signature of `GenesisDocProvider` to
@@ -175,13 +175,13 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
 `CliParams` as a parameter now.
   ([\#3595](https://github.com/cometbft/cometbft/pull/3595))
 - `[node]` Go-API breaking: Change the signature of `LoadStateFromDBOrGenesisDocProvider`
-   to accept an optional operator provided hash of the genesis file
+   to accept an optional operator-provided hash of the genesis file
   ([\#1324](https://github.com/cometbft/cometbft/pull/1324)).
 - `[p2p]` Remove `p2p_peer_send_bytes_total` and `p2p_peer_receive_bytes_total`
   metrics as they are costly to track, and not that informative in debugging
   ([\#3184](https://github.com/cometbft/cometbft/issues/3184))
 - `[p2p]` Rename `IPeerSet#List` to `Copy`, add `Random`, `ForEach` methods.
-   Rename `PeerSet#List` to `Copy`, add `Random`, `ForEach` methods.
+   Rename `PeerSet#List` to `Copy`, and add `Random`, `ForEach` methods.
    ([\#2246](https://github.com/cometbft/cometbft/pull/2246))
 - `[privval]` allow privval to sign arbitrary bytes
   ([\#2692](https://github.com/cometbft/cometbft/pull/2692))
@@ -201,12 +201,12 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
   * `GetLatestBlockResults` from `cometbft.services.block_results.v1.BlockResultsService`.
 - `[rpc/grpc]` Remove support for stateful block data retrieval methods from the
   data companion APIs as per [RFC 106](https://github.com/cometbft/cometbft/blob/main/docs/references/rfc/rfc-106-separate-stateful-methods.md)
-  * `GetLatestBlock` method removed from the `BlockServiceClient` interface.
-  * `GetLatestBlockResults` method removed from the `BlockResultServiceClient` interface.
+  * `GetLatestBlock` method was removed from the `BlockServiceClient` interface.
+  * `GetLatestBlockResults` method was removed from the `BlockResultServiceClient` interface.
   * `GetLatest` endpoint is no longer served by `BlockServiceServer` instances.
   * `GetLatestBlockResults` endpoint is no longer served by `BlockResultServiceServer` instances.
 - `[proto]` Renamed the packages from `tendermint.*` to `cometbft.*`
-  and introduced versioned packages to distinguish between proto definitions
+  and introduced versioned packages to distinguish between proto-definitions
   released in `0.34.x`, `0.37.x`, `0.38.x`, and `1.x` versions.
   Prior to the 1.0 release, the versioned packages are suffixed with
   `.v1beta1`, `.v1beta2`, and so on; all definitions describing the protocols
@@ -222,11 +222,11 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
    [#1504](https://github.com/cometbft/cometbft/issues/1504),
    [#1530](https://github.com/cometbft/cometbft/issues/1530)):
   * Names of request and response types used in gRPC changed by making
-    `Request`/`Response` the suffix instead of the prefix, e.g.
+    `Request`/`Response` is the suffix instead of the prefix, e.g.
     `RequestCheckTx` ⭢ `CheckTxRequest`.
   * The `Request` and `Response` multiplex messages are redefined accordingly.
-  * `CheckTxType` values renamed with the `CHECK_TX_TYPE_` prefix.
-  * `MisbehaviorType` values renamed with the `MISBEHAVIOR_TYPE_` prefix.
+  * `CheckTxType` values are renamed with the `CHECK_TX_TYPE_` prefix.
+  * `MisbehaviorType` values are renamed with the `MISBEHAVIOR_TYPE_` prefix.
   * `Result` enum formerly nested in `ResponseOfferSnapshot` replaced with the package-level
     `OfferSnapshotResult`, its values named with the
     `OFFER_SNAPSHOT_RESULT_` prefix.
@@ -255,13 +255,13 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
   performing block sync or state sync.
   ([\#785](https://github.com/cometbft/cometbft/issues/785))
 - `[mempool]` When the node is performing block sync or state sync, the mempool
-  reactor now discards incoming transactions from peers, and does not propagate
+  reactor now discards incoming transactions from peers and does not propagate
   transactions to peers.
   ([\#785](https://github.com/cometbft/cometbft/issues/785))
-- `[state/indexer/block]` BlockIndexer now has additional method `Prune`, `GetRetainHeight`, `SetRetainHeight` ([\#1176](https://github.com/cometbft/cometbft/pull/1176))
+- `[state/indexer/block]` BlockIndexer now has an additional method `Prune`, `GetRetainHeight`, `SetRetainHeight` ([\#1176](https://github.com/cometbft/cometbft/pull/1176))
 - `[state/txindex]` TxIndexer now has additional methods: `Prune`, `GetRetainHeight`, `SetRetainHeight` ([\#1176](https://github.com/cometbft/cometbft/pull/1176))
 - `[state/store]` go-API breaking change in `PruneABCIResponses`: added parameter to force compaction. ([\#1972](https://github.com/cometbft/cometbft/pull/1972))
-- `[state/store]` go-API breaking change in `PruneStates`: added parameter to pass the number of pruned states and return pruned entries in current pruning iteration. ([\#1972](https://github.com/cometbft/cometbft/pull/1972))
+- `[state/store]` go-API breaking change in `PruneStates`: added parameter to pass the number of pruned states and return pruned entries in the current pruning iteration. ([\#1972](https://github.com/cometbft/cometbft/pull/1972))
 - `[state]` The `state.Store` interface has been expanded
   to accommodate the data pull companion API of ADR 101
   ([\#1096](https://github.com/cometbft/cometbft/issues/1096))
@@ -276,9 +276,9 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
   ([\#2774](https://github.com/cometbft/cometbft/pull/2774))
 - `[blocksync]` Added peer banning
   ([\#ABC-0013](https://github.com/cometbft/cometbft/security/advisories/GHSA-hg58-rf2h-6rr7))
-- `[blockstore]` Send correct error message when vote extensions do not align with received packet
+- `[blockstore]` Send correct error message when vote extensions do not align with the received packet
   ([\#ABC-0014](https://github.com/cometbft/cometbft/security/advisories/GHSA-hg58-rf2h-6rr7))
-- `[blocksync]` Do not stay in blocksync if the node's validator voting power
+- `[blocksync]` Do not stay in block sync if the node's validator voting power
   is high enough to block the chain while it is not online
   ([\#3406](https://github.com/cometbft/cometbft/pull/3406))
 - `[blocksync]` Wait for `poolRoutine` to stop in `(*Reactor).OnStop`
@@ -298,7 +298,7 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
 - `[consensus]` Remove logic to unlock block on +2/3 prevote for nil
   ([\#1175](https://github.com/cometbft/cometbft/pull/1175): @BrendanChou)
 - `[crypto]` `SupportsBatchVerifier` returns false
-  if public key is nil instead of dereferencing nil.
+  if the public key is nil instead of dereferencing nil.
   ([\#1825](https://github.com/cometbft/cometbft/pull/1825))
 - `[evidence]` When `VerifyCommitLight` & `VerifyCommitLightTrusting` are called as part
   of evidence verification, all signatures present in the evidence must be verified
@@ -320,12 +320,11 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
   ([\#2443](https://github.com/cometbft/cometbft/issues/2443)).
 - `[mempool]` Panic when a CheckTx request to the app returns an error
   ([\#2225](https://github.com/cometbft/cometbft/pull/2225))
-- `[mempool]` The calculation method of tx size returned by calling proxyapp should be consistent with that of mempool
+- `[mempool]` The calculation method of tx size returned by calling the proxy app should be consistent with that of mempool
   ([\#1687](https://github.com/cometbft/cometbft/pull/1687))
 - `[metrics]` Call unused `rejected_txs` metric in mempool
   ([\#4019](https://github.com/cometbft/cometbft/pull/4019))
-- `[mocks]` Mockery `v2.49.0` broke the mocks. We had to add a `.mockery.yaml` to
-properly handle this change.
+- `[mocks]` Mockery `v2.49.0` broke the mocks. We had to add a `.mockery.yaml` to handle this change properly.
   ([\#4521](https://github.com/cometbft/cometbft/pull/4521))
 - `[p2p/pex]` Gracefully shutdown Reactor ([\#2010](https://github.com/cometbft/cometbft/pull/2010))
 - `[p2p]` Node respects configured `max_num_outbound_peers` limit when dialing
@@ -336,11 +335,11 @@ properly handle this change.
 - `[rpc]` Fix an issue where a legacy ABCI response, created on `v0.37` or before, is not returned properly in `v0.38` and up
 on the `/block_results` RPC endpoint.
   ([\#3002](https://github.com/cometbft/cometbft/issues/3002))
-- `[rpc]` Fix nil pointer error in `/tx` and `/tx_search` when block is
+- `[rpc]` Fix nil pointer error in `/tx` and `/tx_search` when the block is
   absent ([\#3352](https://github.com/cometbft/cometbft/issues/3352))
 - `[state/indexer]` Respect both height params while querying for events
    ([\#1529](https://github.com/cometbft/cometbft/pull/1529))
-- `[state/pruning]` When no blocks are pruned, do not attempt to prune statestore
+- `[state/pruning]` When no blocks are pruned, do not attempt to prune state store
    ([\#1616](https://github.com/cometbft/cometbft/pull/1616))
 - `[state]` Fix rollback to a specific height
   ([\#2136](https://github.com/cometbft/cometbft/pull/2136))
@@ -401,13 +400,13 @@ on the `/block_results` RPC endpoint.
 - `[config]` Added `[grpc]` section to configure the gRPC server.
   ([\#816](https://github.com/cometbft/cometbft/issues/816))
 - `[config]` Added `[storage.experimental_db_key_layout]` storage parameter, set to "v2"
-  for order preserving representation
+  for order-preserving representation
 ([\#2327](https://github.com/cometbft/cometbft/pull/2327/))
 - `[config]` Removed unused `[mempool.max_batch_bytes]` mempool parameter.
  ([\#2056](https://github.com/cometbft/cometbft/pull/2056/))
 - `[config]` Update the default value of `mempool.max_txs_bytes` to 64 MiB.
   ([\#2756](https://github.com/cometbft/cometbft/issues/2756))
-- `[consensus]` Make mempool updates asynchronous from consensus Commit's,
+- `[consensus]` Make mempool updates asynchronous from consensus Commits,
   reducing latency for reaching consensus timeouts.
   ([#3008](https://github.com/cometbft/cometbft/pull/3008))
 - `[consensus]` Update block validation to no longer require the block timestamp
@@ -446,10 +445,10 @@ on the `/block_results` RPC endpoint.
 - `[e2e]` Add new `--testnet-dir` parameter to set a custom directory for the generated testnet files.
   ([\#2433](https://github.com/cometbft/cometbft/pull/2433))
 - `[evidence/store]` Added support for a different DB key representation within the evidence store ([\#2327](https://github.com/cometbft/cometbft/pull/2327/))
-- `[grpc]` Add `BlockResultsService` with client to fetch BlockResults
-  for a given height, or latest.
+- `[grpc]` Add `BlockResultsService` with the client to fetch BlockResults
+  for a given height, or the latest.
   ([\#1095](https://github.com/cometbft/cometbft/issues/1095))
-- `[grpc]` Add `BlockService` with client to facilitate fetching of blocks and
+- `[grpc]` Add `BlockService` with the client to facilitate fetching of blocks and
   streaming of the latest committed block height
   ([\#1094](https://github.com/cometbft/cometbft/issues/1094))
 - `[light/store]` Added support for a different DB key representation within the light block store ([\#2327](https://github.com/cometbft/cometbft/pull/2327/))
@@ -469,11 +468,11 @@ on the `/block_results` RPC endpoint.
 ```
 - `[metrics]` Add metric for mempool size in bytes `SizeBytes`.
   ([\#1512](https://github.com/cometbft/cometbft/pull/1512))
-- `[metrics]` Add metrics to monitor pruning and current available data in stores: `PruningServiceBlockRetainHeight`, `PruningServiceBlockResultsRetainHeight`, `ApplicationBlockRetainHeight`, `BlockStoreBaseHeight`, `ABCIResultsBaseHeight`.
+- `[metrics]` Add metrics to monitor pruning and currently available data in stores: `PruningServiceBlockRetainHeight`, `PruningServiceBlockResultsRetainHeight`, `ApplicationBlockRetainHeight`, `BlockStoreBaseHeight`, `ABCIResultsBaseHeight`.
   ([\#1234](https://github.com/cometbft/cometbft/pull/1234))
 - `[metrics]` Added metrics to monitor block store access. ([\#1974](https://github.com/cometbft/cometbft/pull/1974))
 - `[metrics]` Added metrics to monitor state store access. ([\#1974](https://github.com/cometbft/cometbft/pull/1974))
-- `[privval]` Add `key-type` flag to all command that _may_ generate a `privval` file,
+- `[privval]` Add `key-type` flag to all commands that _may_ generate a `privval` file,
   and make `GenFilePV` flexible to accept different key generators.
   ([\#3517](https://github.com/cometbft/cometbft/pull/3517))
 - `[proto]` Add definitions and generated code for
@@ -482,7 +481,7 @@ on the `/block_results` RPC endpoint.
   ([\#1097](https://github.com/cometbft/cometbft/issues/1097))
 - `[rpc/grpc]` Add privileged gRPC server and client facilities, in
   `server/privileged` and `client/privileged` packages respectively, to
-  enable a separate API server within the node which serves trusted clients
+  enable a separate API server within the node that serves trusted clients
   without authentication and should never be exposed to public internet
   ([\#1097](https://github.com/cometbft/cometbft/issues/1097))
 - `[rpc/grpc]` Add a pruning service adding on the privileged gRPC server API to
@@ -500,7 +499,7 @@ on the `/block_results` RPC endpoint.
   to control the pruning service
   ([\#1097](https://github.com/cometbft/cometbft/issues/1097))
 - `[proto]` add `syncing_to_height` to `FinalizeBlockRequest` to let the ABCI app
-  know if the node is syncing or not.
+  Please let me know if the node is syncing or not.
   ([\#1247](https://github.com/cometbft/cometbft/issues/1247))
 - `[rpc/grpc]` Add gRPC client with support for version service
   ([\#816](https://github.com/cometbft/cometbft/issues/816))
@@ -533,11 +532,11 @@ on the `/block_results` RPC endpoint.
 - `[blockstore]` Use LRU caches for LoadBlockPart. Make the LoadBlockPart and LoadBlockCommit APIs 
     return mutative copies, that the caller is expected to not modify. This saves on memory copying.
   ([\#3342](https://github.com/cometbft/cometbft/issues/3342))
-- `[blockstore]` Use LRU caches in blockstore, significiantly improving consensus gossip routine performance
+- `[blockstore]` Use LRU caches in block store, significantly improving consensus gossip routine performance
   ([\#3003](https://github.com/cometbft/cometbft/issues/3003))
 - `[blocksync]` Avoid double-calling `types.BlockFromProto` for performance
   reasons ([\#2016](https://github.com/cometbft/cometbft/pull/2016))
-- `[blocksync]` Request a block from peer B if we are approaching pool's height
+- `[blocksync]` Request a block from peer B if we are approaching the pool's height
   (less than 50 blocks) and the current peer A is slow in sending us the
   block ([\#2475](https://github.com/cometbft/cometbft/pull/2475))
 - `[blocksync]` Request the block N from peer B immediately after getting
@@ -545,7 +544,7 @@ on the `/block_results` RPC endpoint.
   ([\#2475](https://github.com/cometbft/cometbft/pull/2475))
 - `[blocksync]` Sort peers by download rate (the fastest peer is picked first)
   ([\#2475](https://github.com/cometbft/cometbft/pull/2475))
-- `[blocksync]` make the max number of downloaded blocks dynamic.
+- `[blocksync]` makes the maximum number of downloaded blocks dynamic.
   Previously it was a const 600. Now it's `peersCount * maxPendingRequestsPerPeer (20)`
   ([\#2467](https://github.com/cometbft/cometbft/pull/2467))
 - `[cli/node]` The genesis hash provided with the `--genesis-hash` is now
@@ -554,7 +553,7 @@ on the `/block_results` RPC endpoint.
 - `[config]` Added `[storage.pruning]` and `[storage.pruning.data_companion]`
   sections to facilitate background pruning and data companion (ADR 101)
   operations ([\#1096](https://github.com/cometbft/cometbft/issues/1096))
-- `[config]` Added `genesis_hash` storage parameter, which when set it is checked
+- `[config]` Added `genesis_hash` storage parameter, which when set is checked
  on node startup
  ([\#1324](https://github.com/cometbft/cometbft/pull/1324/))
 - `[config]` Added `recheck_timeout` mempool parameter to set how much time to wait for recheck
@@ -570,7 +569,7 @@ on the `/block_results` RPC endpoint.
   ([\#2928](https://github.com/cometbft/cometbft/pull/2928))
 - `[consensus]` Add `chain_size_bytes` metric for measuring the size of the blockchain in bytes
   ([\#2093](https://github.com/cometbft/cometbft/pull/2093))
-- `[consensus]` Fix some reactor messages taking write locks instead of read locks.
+- `[consensus]` Fix some reactor messages by taking write locks instead of read locks.
   ([\#3159](https://github.com/cometbft/cometbft/issues/3159))
 - `[consensus]` Improve performance of consensus metrics by lowering string operations
   ([\#3017](https://github.com/cometbft/cometbft/issues/3017))
@@ -578,22 +577,22 @@ on the `/block_results` RPC endpoint.
   ([\#1022](https://github.com/cometbft/cometbft/pull/1022))
 - `[consensus]` Lower the consensus blocking overhead of broadcasts from `num_peers * process_creation_time` to `process_creation_time`.
   ([\#3180](https://github.com/cometbft/cometbft/issues/3180))
-- `[consensus]` Make Vote messages only take one peerstate mutex
+- `[consensus]` Make Vote messages only take one peer state mutex
   ([\#3156](https://github.com/cometbft/cometbft/issues/3156))
 - `[consensus]` Make broadcasting `HasVote` and `HasProposalBlockPart` control
   messages use `TrySend` instead of `Send`. This saves notable amounts of
-  performance, while at the same time those messages are for preventing
-  redundancy, not critical, and may be dropped without risks for the protocol.
+  performance, while at the same time, those messages are for preventing
+  redundancy, are not critical, and may be dropped without risks to the protocol.
   ([\#3151](https://github.com/cometbft/cometbft/issues/3151))
-- `[consensus]` Make the consensus reactor no longer have packets on receive take the consensus lock.
+- `[consensus]` Make the consensus reactor no longer have packets on receive and ake the consensus lock.
 Consensus will now update the reactor's view after every relevant change through the existing 
 synchronous event bus subscription.
   ([\#3211](https://github.com/cometbft/cometbft/pull/3211))
 - `[consensus]` New metrics (counters) to track duplicate votes and block parts.
   ([\#896](https://github.com/cometbft/cometbft/pull/896))
-- `[consensus]` Optimize vote and block part gossip with new message `HasProposalBlockPartMessage`,
+- `[consensus]` Optimize vote and block part gossip with a new message `HasProposalBlockPartMessage`,
   which is similar to `HasVoteMessage`; and random sleep in the loop broadcasting those messages.
-  The sleep can be configured with new config `peer_gossip_intraloop_sleep_duration`, which is set to 0
+  The sleep can be configured with the new config `peer_gossip_intraloop_sleep_duration`, which is set to 0
   by default as this is experimental.
   Our scale tests show substantial bandwidth improvement with a value of 50 ms.
   ([\#904](https://github.com/cometbft/cometbft/pull/904))
@@ -603,15 +602,15 @@ synchronous event bus subscription.
   ([\#3162](https://github.com/cometbft/cometbft/issues/3162))
 - `[consensus]` Use an independent rng for gossip threads, reducing mutex contention.
   ([\#3005](https://github.com/cometbft/cometbft/issues/3005))
-- `[consensus]` When prevoting, avoid calling PropocessProposal when we know the
-  proposal was already validated by correct nodes.
+- `[consensus]` When pre-voting, avoid calling PropocessProposal when we know the
+  proposal was already validated by the correct nodes.
   ([\#1230](https://github.com/cometbft/cometbft/pull/1230))
 - `[crypto/merkle]` faster calculation of hashes ([#1921](https://github.com/cometbft/cometbft/pull/1921))
 - `[docs]` Add a new ABCI 2.0 tutorial.
   ([\#2853](https://github.com/cometbft/cometbft/issues/2853)) thanks @alijnmerchant21 for contributions to the tutorial
 - `[docs]` Added an upgrade guide from CometBFT `v0.38.x` to `v1.0`.
   ([\#4184](https://github.com/cometbft/cometbft/pull/4184))
-- `[docs]` Merge configuration doc in explanation section with the config.toml document in references.
+- `[docs]` Merge the configuration doc in the explanation section with the config.toml document in references.
   ([\#2769](https://github.com/cometbft/cometbft/pull/2769))
 - `[e2e]` Add `log_format` option to manifest file
   ([#3836](https://github.com/cometbft/cometbft/issues/3836)).
@@ -637,7 +636,7 @@ synchronous event bus subscription.
   ([\#2453](https://github.com/cometbft/cometbft/pull/2453))
 - `[e2e]` Log the number of transactions that were sent successfully or failed.
   ([\#2328](https://github.com/cometbft/cometbft/pull/2328))
-- `[e2e]` increase the timeout value during a `kill` node perturbation
+- `[e2e]` increases the timeout value during a `kill` node perturbation
   ([\#4351](https://github.com/cometbft/cometbft/pull/4351))
 - `[event-bus]` Remove the debug logs in PublishEventTx, which were noticed production slowdowns.
   ([\#2911](https://github.com/cometbft/cometbft/pull/2911))
@@ -650,7 +649,7 @@ synchronous event bus subscription.
   ([\#2142](https://github.com/cometbft/cometbft/pull/2142)) thanks to external contributor @k0marov !
 - `[internal/bits]` 10x speedup and remove heap overhead of `bitArray.PickRandom` (used extensively in consensus gossip)
   ([\#2841](https://github.com/cometbft/cometbft/pull/2841)).
-- `[internal/bits]` 10x speedup creating initialized bitArrays, which speedsup extendedCommit.BitArray(). This is used in consensus vote gossip.
+- `[internal/bits]` 10x speedup creating initialized bitArrays, which speeds up extendedCommit.BitArray(). This is used in consensus vote gossip.
   ([\#2959](https://github.com/cometbft/cometbft/pull/2841)).
 - `[jsonrpc]` enable HTTP basic auth in websocket client ([#2434](https://github.com/cometbft/cometbft/pull/2434))
 - `[libs/json]` Lower the memory overhead of JSON encoding by using JSON encoders internally.
@@ -661,7 +660,7 @@ synchronous event bus subscription.
   ([\#1958](https://github.com/cometbft/cometbft/pull/1958/))
 - `[log]` Change "mempool is full" log to debug level
   ([\#4123](https://github.com/cometbft/cometbft/pull/4123))
-- `[log]` allow strip out all debug-level code from the binary at compile time using build flags
+- `[log]` allows stripping out all debug-level code from the binary at compile time using build flags
   ([\#2847](https://github.com/cometbft/cometbft/issues/2847))
 - `[mempool]` Add a metric (a counter) to measure whether a tx was received more than once.
   ([\#634](https://github.com/cometbft/cometbft/pull/634))
@@ -692,13 +691,13 @@ synchronous event bus subscription.
   ([\#1096](https://github.com/cometbft/cometbft/issues/1096))
 - `[node]` export node package errors
   ([\#3056](https://github.com/cometbft/cometbft/pull/3056))
-- `[p2p/channel]` Speedup `ProtoIO` writer creation time, and thereby speedup channel writing by 5%.
+- `[p2p/channel]` Speedup `ProtoIO` writer creation time, and thereby speed up channel writing by 5%.
   ([\#2949](https://github.com/cometbft/cometbft/pull/2949))
 - `[p2p/conn]` Minor speedup (3%) to connection.WritePacketMsgTo, by removing MinInt calls.
   ([\#2952](https://github.com/cometbft/cometbft/pull/2952))
-- `[p2p/conn]` Remove the usage of a synchronous pool of buffers in secret connection, storing instead the buffer in the connection struct. This reduces the synchronization primitive usage, speeding up the code.
+- `[p2p/conn]` Remove the usage of a synchronous pool of buffers in a secret connection, storing instead the buffer in the connection struct. This reduces the primitive usage of synchronization, speeding up the code.
   ([\#3403](https://github.com/cometbft/cometbft/issues/3403))
-- `[p2p/conn]` Removes several heap allocations per packet send, stemming from how we double-wrap packets prior to proto marshalling them in the connection layer. This change reduces the memory overhead and speeds up the code.
+- `[p2p/conn]` Removes several heap allocations per packet sent, stemming from how we double-wrap packets prior to proto-marshalling them in the connection layer. This change reduces the memory overhead and speeds up the code.
   ([\#3423](https://github.com/cometbft/cometbft/issues/3423))
 - `[p2p/conn]` Speedup connection.WritePacketMsgTo, by reusing internal buffers rather than re-allocating.
   ([\#2986](https://github.com/cometbft/cometbft/pull/2986))
@@ -715,7 +714,7 @@ synchronous event bus subscription.
 - `[p2p]` fix exponential backoff logic to increase reconnect retries close to 24 hours
  ([\#3519](https://github.com/cometbft/cometbft/issues/3519))
 - `[p2p]` make `PeerSet.Remove` more efficient (Author: @odeke-em) [\#2246](https://github.com/cometbft/cometbft/pull/2246)
-- `[privval]` DO NOT require extension signature from privval if vote
+- `[privval]` DO NOT require an extension signature from privval if vote
   extensions are disabled. Remote signers can skip signing the extension if
   `skip_extension_signing` flag in `SignVoteRequest` is true.
   ([\#2496](https://github.com/cometbft/cometbft/pull/2496))
@@ -740,7 +739,7 @@ synchronous event bus subscription.
   ([\#1412](https://github.com/cometbft/cometbft/pull/1412))
 - `[rpc]` Use default port for HTTP(S) URLs when there is no explicit port ([\#1903](https://github.com/cometbft/cometbft/pull/1903))
 - `[spec]` Update Apalache type annotations in the light client spec ([#955](https://github.com/cometbft/cometbft/pull/955))
-- `[state/execution]` Cache the block hash computation inside of the Block Type, so we only compute it once.
+- `[state/execution]` Caches the block hash computation inside of the Block Type, so we only compute it once.
   ([\#2924](https://github.com/cometbft/cometbft/pull/2924))
 - `[state/indexer]` Add transaction and block index pruning
   ([\#1176](https://github.com/cometbft/cometbft/pull/1176))
@@ -757,13 +756,13 @@ synchronous event bus subscription.
 - `[state]` Save the state using a single DB batch ([\#1735](https://github.com/cometbft/cometbft/pull/1735))
 - `[state]` avoid double-saving `FinalizeBlockResponse` for performance reasons
   ([\#2017](https://github.com/cometbft/cometbft/pull/2017))
-- `[store]` Save block using a single DB batch if block is less than 640kB, otherwise each block part is saved individually
+- `[store]` Save block using a single DB batch if the block is less than 640kB, otherwise, each block part is saved individually
   ([\#1755](https://github.com/cometbft/cometbft/pull/1755))
 - `[types]` Check that proposer is one of the validators in `ValidateBasic`
   ([\#ABC-0016](https://github.com/cometbft/cometbft/security/advisories/GHSA-g5xx-c4hv-9ccc))
 - `[types]` Make a new method `GetByAddressMut` for `ValSet`, which does not copy the returned validator.
   ([\#3119](https://github.com/cometbft/cometbft/issues/3119))
-- `[types]` Significantly speedup types.MakePartSet and types.AddPart, which are used in creating a block proposal
+- `[types]` Significantly speed up types.MakePartSet and types.AddPart, which is used in creating a block proposal
   ([\#3117](https://github.com/cometbft/cometbft/issues/3117))
 - `[types]` Validate `Validator#Address` in `ValidateBasic` ([\#1715](https://github.com/cometbft/cometbft/pull/1715))
 
@@ -774,7 +773,7 @@ synchronous event bus subscription.
 This release includes the second part of ABCI++, called ABCI 2.0.
 ABCI 2.0 introduces ABCI methods `ExtendVote` and `VerifyVoteExtension`.
 These new methods allow the application to add data (opaque to CometBFT),
-called _vote extensions_ to precommit votes sent by validators.
+called _vote extensions_ to pre-commit votes sent by validators.
 These vote extensions are made available to the proposer(s) of the next height.
 Additionally, ABCI 2.0 coalesces `BeginBlock`, `DeliverTx`, and `EndBlock`
 into one method, `FinalizeBlock`, whose `Request*` and `Response*`
@@ -807,7 +806,7 @@ See the [specification](./spec/abci/) for more details on ABCI 2.0.
   might exceed `RequestPrepareProposal.max_tx_bytes`.
   If that is the case, the application MUST make sure that the total size of transactions
   returned in `ResponsePrepareProposal.txs` does not exceed `RequestPrepareProposal.max_tx_bytes`,
-  otherwise CometBFT will panic.
+  otherwise, CometBFT will panic.
   ([\#980](https://github.com/cometbft/cometbft/issues/980))
 - `[mempool]` Remove priority mempool.
   ([\#260](https://github.com/cometbft/cometbft/issues/260))
@@ -817,12 +816,12 @@ See the [specification](./spec/abci/) for more details on ABCI 2.0.
   ([\#9682](https://github.com/tendermint/tendermint/pull/9682))
 - `[node/state]` Add Go API to bootstrap block store and state store to a height. Make sure block sync starts syncing from bootstrapped height.
   ([\#1057](https://github.com/tendermint/tendermint/pull/#1057)) (@yihuang)
-- `[state/store]` Added Go functions to save height at which offline state sync is performed.
+- `[state/store]` Added Go functions to save the height at which offline state sync is performed.
   ([\#1057](https://github.com/tendermint/tendermint/pull/#1057)) (@jmalicevic)
 - `[node]` Move DBContext and DBProvider from the node package to the config
   package. ([\#9655](https://github.com/tendermint/tendermint/pull/9655))
 - `[node]` Removed `ConsensusState()` accessor from `Node`
-  struct - all access to consensus state should go via the reactor
+  struct - all access to the consensus state should go via the reactor
   ([\#1120](https://github.com/cometbft/cometbft/pull/1120))
 - `[p2p]` Remove UPnP functionality
   ([\#1113](https://github.com/cometbft/cometbft/issues/1113))
@@ -830,21 +829,21 @@ See the [specification](./spec/abci/) for more details on ABCI 2.0.
   ([\#9625](https://github.com/tendermint/tendermint/pull/9625))
 - `[protobuf]` Remove fields `sender`, `priority`, and `mempool_error` from
   `ResponseCheckTx`. ([\#260](https://github.com/cometbft/cometbft/issues/260))
-- `[pubsub]` Added support for big integers and big floats in the pubsub event query system.
+- `[pubsub]` Added support for big integers and big floats in the pub-sub event query system.
   Breaking changes: function `Number` in package `libs/pubsub/query/syntax` changed its return value.
   ([\#797](https://github.com/cometbft/cometbft/pull/797))
-- `[rpc]` Remove global environment and replace with constructor
+- `[rpc]` Remove the global environment and replace it with constructor
   ([\#9655](https://github.com/tendermint/tendermint/pull/9655))
 - `[rpc]` Removed `begin_block_events` and `end_block_events` from `BlockResultsResponse`.
   The events are merged into one field called `finalize_block_events`.
   ([\#9427](https://github.com/tendermint/tendermint/issues/9427))
 - `[state/kvindexer]` Remove the function type from the event key stored in the database. This should be breaking only
-for people who forked CometBFT and interact directly with the indexers kvstore.
+for people who forked CometBFT and interact directly with the indexer's kvstore.
   ([\#774](https://github.com/cometbft/cometbft/pull/774))
 - `[state]` Move pruneBlocks from node/state to state/execution.
   ([\#6541](https://github.com/tendermint/tendermint/pull/6541))
 - `[state]` Signature of `ExtendVote` changed in `BlockExecutor`.
-  It now includes the block whose precommit will be extended, an the state object.
+  It now includes the block whose pre-commit will be extended and the state object.
   ([\#1270](https://github.com/cometbft/cometbft/pull/1270))
 
 ### BUG FIXES
@@ -857,7 +856,7 @@ for people who forked CometBFT and interact directly with the indexers kvstore.
   ([\#863](https://github.com/cometbft/cometbft/pull/863))
 - `[consensus]` Rename `(*PeerState).ToJSON` to `MarshalJSON` to fix a logging data race
   ([\#524](https://github.com/cometbft/cometbft/pull/524))
-- `[consensus]` Unexpected error conditions in `ApplyBlock` are non-recoverable, so ignoring the error and carrying on is a bug. We replaced a `return` that disregarded the error by a `panic`.
+- `[consensus]` Unexpected error conditions in `ApplyBlock` are non-recoverable, so ignoring the error and carrying on is a bug. We replaced a `return` that disregarded the error with a `panic`.
   ([\#496](https://github.com/cometbft/cometbft/pull/496))
 - `[docker]` Ensure Docker image uses consistent version of Go.
   ([\#9462](https://github.com/tendermint/tendermint/pull/9462))
@@ -906,7 +905,7 @@ for people who forked CometBFT and interact directly with the indexers kvstore.
   bad HTTP responses.
   ([cometbft/cometbft\#638](https://github.com/cometbft/cometbft/pull/638))
 - `[mempool]` Application can now set `ConsensusParams.Block.MaxBytes` to -1
-  to gain more control on the max size of transactions in a block.
+  to gain more control over the maximum size of transactions in a block.
   It also allows the application to have visibility on all transactions in the
   mempool at `PrepareProposal` time.
   ([\#980](https://github.com/cometbft/cometbft/pull/980))
@@ -914,7 +913,7 @@ for people who forked CometBFT and interact directly with the indexers kvstore.
 - `[node]` Make handshake cancelable ([cometbft/cometbft\#857](https://github.com/cometbft/cometbft/pull/857))
 - `[p2p/pex]` Improve addrBook.hash performance
   ([\#6509](https://github.com/tendermint/tendermint/pull/6509))
-- `[pubsub/kvindexer]` Numeric query conditions and event values are represented as big floats with default precision of 125.
+- `[pubsub/kvindexer]` Numeric query conditions and event values are represented as big floats with a default precision of 125.
   Integers are read as "big ints" and represented with as many bits as they need when converting to floats.
   ([\#797](https://github.com/cometbft/cometbft/pull/797))
 - `[pubsub]` Performance improvements for the event query API
@@ -938,18 +937,18 @@ only become available in the next major release with ABCI 2.0. See the
 
 In the v0.34.27 release, the CometBFT Go module is still
 `github.com/tendermint/tendermint` to facilitate ease of upgrading for users,
-but in this release we have changed this to `github.com/cometbft/cometbft`.
+but in this release, we have changed this to `github.com/cometbft/cometbft`.
 
 Please also see our [upgrading guidelines](./UPGRADING.md) for more details on
 upgrading from the v0.34 release series.
 
-Also see our [QA results](https://docs.cometbft.com/v0.37/qa/v037/cometbft) for
+Als,o see our [QA results](https://docs.cometbft.com/v0.37/qa/v037/cometbft) for
 the v0.37 release.
 
 We'd love your feedback on this release! Please reach out to us via one of our
 communication channels, such as [GitHub
 Discussions](https://github.com/cometbft/cometbft/discussions), with any of your
-questions, comments and/or concerns.
+questions, comments, and/or concerns.
 
 See below for more details.
 
@@ -967,11 +966,11 @@ See below for more details.
     At the same time, `block_sync` is also deprecated. In the next release,
     BlocSync will always be enabled and `block_sync` will be removed.
     ([\#409](https://github.com/cometbft/cometbft/issues/409))
-- `[abci/counter]` Delete counter example app
+- `[abci/counter]` Delete counter-example app
   ([\#6684](https://github.com/tendermint/tendermint/pull/6684))
 - `[abci/params]` Deduplicate `ConsensusParams` and `BlockParams` so
-  only `types` proto definitions are use. Remove `TimeIotaMs` and use
-  a hard-coded 1 millisecond value to ensure monotonically increasing
+  only `types` proto definitions are used. Remove `TimeIotaMs` and use
+  a hard-coded 1-millisecond value to ensure monotonically increasing
   block times. Rename `AppVersion` to `App` so as to not stutter.
   ([\#9287](https://github.com/tendermint/tendermint/pull/9287))
 - `[abci]` Added cli commands for `PrepareProposal` and `ProcessProposal`.
@@ -985,17 +984,17 @@ See below for more details.
   (`uint64`) between ABCI and P2P wire-level protocols
   ([\#5783](https://github.com/tendermint/tendermint/pull/5783))
 - `[abci]` New ABCI methods `PrepareProposal` and `ProcessProposal` which give
-  the app control over transactions proposed and allows for verification of
+  the app control over transactions proposed and allow for verification of
   proposed blocks. ([\#9301](https://github.com/tendermint/tendermint/pull/9301))
 - `[abci]` Removes unused Response/Request `SetOption` from ABCI
   ([\#9145](https://github.com/tendermint/tendermint/pull/9145))
 - `[abci]` Renamed `EvidenceType` to `MisbehaviorType` and `Evidence`
   to `Misbehavior` as a more accurate label of their contents.
   ([\#8216](https://github.com/tendermint/tendermint/pull/8216))
-- `[abci]` Renamed `LastCommitInfo` to `CommitInfo` in preparation for vote
+- `[abci]` Renamed `LastCommitInfo` to `CommitInfo` in preparation for the vote
   extensions. ([\#9122](https://github.com/tendermint/tendermint/pull/9122))
-- `[config]` Rename the fastsync section and the
-  fast\_sync key blocksync and block\_sync respectively
+- `[config]` Rename the fast sync section and the
+  fast\_sync key block sync and block\_sync respectively
   ([\#9259](https://github.com/tendermint/tendermint/pull/9259))
 - `[p2p]` Reactor `Send`, `TrySend` and `Receive` renamed to `SendEnvelope`,
   `TrySendEnvelope` and `ReceiveEnvelope` to allow metrics to be appended to
@@ -1010,7 +1009,7 @@ See below for more details.
 
 ### BUG FIXES
 
-- `[blocksync]` handle the case when the sending
+- `[blocksync]` handles the case when the sending
   queue is full: retry block request after a timeout
   ([\#9518](https://github.com/tendermint/tendermint/pull/9518))
 - `[consensus]` ([\#386](https://github.com/cometbft/cometbft/pull/386)) Short-term fix for the case when `needProofBlock` cannot find previous block meta by defaulting to the creation of a new proof block. (@adizere)
@@ -1020,15 +1019,15 @@ See below for more details.
 - `[consensus]` fix round number of `enterPropose`
   when handling `RoundStepNewRound` timeout.
   ([\#9229](https://github.com/tendermint/tendermint/pull/9229))
-- `[docker]` enable cross platform build using docker buildx
+- `[docker]` enables cross-platform build using docker buildx
   ([\#9073](https://github.com/tendermint/tendermint/pull/9073))
-- `[docker]` ensure Docker image uses consistent version of Go
+- `[docker]` ensures Docker image uses consistent version of Go
   ([\#9462](https://github.com/tendermint/tendermint/pull/9462))
 - `[p2p]` prevent peers who have errored from being added to `peer_set`
   ([\#9500](https://github.com/tendermint/tendermint/pull/9500))
-- `[state/kvindexer]` Fixed the default behaviour of the kvindexer to index and
+- `[state/kvindexer]` Fixed the default behavior of the kvindexer to index and
   query attributes by events in which they occur. In 0.34.25 this was mitigated
-  by a separated RPC flag. @jmalicevic
+  by a separate RPC flag. @jmalicevic
   ([\#77](https://github.com/cometbft/cometbft/pull/77))
 - `[state/kvindexer]` Resolved crashes when event values contained slashes,
   introduced after adding event sequences in
@@ -1038,7 +1037,7 @@ See below for more details.
 ### FEATURES
 
 - `[abci]` New ABCI methods `PrepareProposal` and `ProcessProposal` which give
-  the app control over transactions proposed and allows for verification of
+  the app control over transactions proposed and allow for verification of
   proposed blocks. ([\#9301](https://github.com/tendermint/tendermint/pull/9301))
 
 ### IMPROVEMENTS
@@ -1046,8 +1045,8 @@ See below for more details.
 - `[abci]` Added `AbciVersion` to `RequestInfo` allowing
   applications to check ABCI version when connecting to CometBFT.
   ([\#5706](https://github.com/tendermint/tendermint/pull/5706))
-- `[cli]` add `--hard` flag to rollback command (and a boolean to the `RollbackState` method). This will rollback
-   state and remove the last block. This command can be triggered multiple times. The application must also rollback
+- `[cli]` add `--hard` flag to the rollback command (and a boolean to the `RollbackState` method). This will roll back
+   state and remove the last block. This command can be triggered multiple times. The application must also roll back
    state to the same height.
   ([\#9171](https://github.com/tendermint/tendermint/pull/9171))
 - `[consensus]` Save peer LastCommit correctly to achieve 50% reduction in gossiped precommits.
@@ -1080,7 +1079,7 @@ intended to be compatible with the Tendermint Core v0.34 release series.
 For details as to how to upgrade to CometBFT from Tendermint Core, please see
 our [upgrading guidelines](./UPGRADING.md).
 
-If you have any questions, comments, concerns or feedback on this release, we
+If you have any questions, comments, concerns, or feedback on this release, we
 would love to hear from you! Please contact us via [GitHub
 Discussions](https://github.com/cometbft/cometbft/discussions),
 [Discord](https://discord.gg/cosmosnetwork) (in the `#cometbft` channel) or
@@ -1101,7 +1100,7 @@ to this release!
 
 ### BUG FIXES
 
-- `[consensus]` Fixed a busy loop that happened when sending of a block part
+- `[consensus]` Fixed a busy loop that happened when sending off a block part
   failed by sleeping in case of error.
   ([\#4](https://github.com/informalsystems/tendermint/pull/4))
 - `[consensus]` Short-term fix for the case when `needProofBlock` cannot find
@@ -1110,10 +1109,10 @@ to this release!
   - Special thanks to the [Vega.xyz](https://vega.xyz/) team, and in particular
     to Zohar (@ze97286), for reporting the problem and working with us to get to
     a fix.
-- `[p2p]` Correctly use non-blocking `TrySendEnvelope` method when attempting to
+- `[p2p]` Correctly use the non-blocking `TrySendEnvelope` method when attempting to
   send messages, as opposed to the blocking `SendEnvelope` method. It is unclear
   whether this has a meaningful impact on P2P performance, but this patch does
-  correct the underlying behaviour to what it should be
+  correct the underlying behavior to what it should be
   ([tendermint/tendermint\#9936](https://github.com/tendermint/tendermint/pull/9936))
 - `[state/kvindexer]` Resolved crashes when event values contained slashes,
   introduced after adding event sequences.
@@ -1152,7 +1151,7 @@ to this release!
 - `[mempool/v1]` Suppress "rejected bad transaction" in priority mempool logs by
   reducing log level from info to debug
   ([\#314](https://github.com/cometbft/cometbft/pull/314): @JayT106)
-- `[p2p]` Reduce log spam through reducing log level of "Dialing peer" and
+- `[p2p]` Reduce log spam by reducing the log level of "Dialing peer" and
   "Added peer" messages from info to debug
   ([tendermint/tendermint\#9764](https://github.com/tendermint/tendermint/pull/9764):
   @faddat)
