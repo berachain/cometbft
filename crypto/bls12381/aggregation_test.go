@@ -13,9 +13,7 @@ func TestAggregateAndVerify(t *testing.T) {
 	// Generate private keys.
 	genPrivKeyFn := func() *bls12381.PrivKey {
 		k, err := bls12381.GenPrivKey()
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, err)
 		return k
 	}
 
@@ -55,5 +53,9 @@ func TestAggregateAndVerify(t *testing.T) {
 	// Test with invalid aggregated signature
 	invalidSignature := []byte("Invalid")
 	valid = bls12381.VerifyAggregateSignature(invalidSignature, pubKeys, msg)
+	require.False(t, valid)
+
+	// Verify aggregated signature with one missing pubKey
+	valid = bls12381.VerifyAggregateSignature(aggregatedSignature, pubKeys[1:], msg)
 	require.False(t, valid)
 }

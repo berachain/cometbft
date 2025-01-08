@@ -50,17 +50,18 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 	// only count the signatures that are for the block
 	count := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagCommit }
 
+	// attempt to verify aggregated commit
+	if isAggregatedCommit(vals) {
+		return verifyAggregatedCommit(chainID, vals, commit,
+			votingPowerNeeded, ignore, count, true)
+	}
+
 	// attempt to batch verify
 	if shouldBatchVerify(vals, commit) {
 		return verifyCommitBatch(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, true, true)
 	}
 
-	// attempt to verify aggregated commit
-	if isAggregatedCommit(vals) {
-		return verifyAggregatedCommit(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, true)
-	}
 	// if verification failed or is not supported then fallback to single verification
 	return verifyCommitSingle(chainID, vals, commit, votingPowerNeeded,
 		ignore, count, true, true)
@@ -117,16 +118,16 @@ func verifyCommitLightInternal(
 	// count all the remaining signatures
 	count := func(_ CommitSig) bool { return true }
 
-	// attempt to batch verify
-	if shouldBatchVerify(vals, commit) {
-		return verifyCommitBatch(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, countAllSignatures, true)
-	}
-
 	// attempt to verify aggregated commit
 	if isAggregatedCommit(vals) {
 		return verifyAggregatedCommit(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, true)
+	}
+
+	// attempt to batch verify
+	if shouldBatchVerify(vals, commit) {
+		return verifyCommitBatch(chainID, vals, commit,
+			votingPowerNeeded, ignore, count, countAllSignatures, true)
 	}
 
 	// if verification failed or is not supported then fallback to single verification
@@ -198,18 +199,18 @@ func verifyCommitLightTrustingInternal(
 	// count all the remaining signatures
 	count := func(_ CommitSig) bool { return true }
 
+	// attempt to verify aggregated commit
+	if isAggregatedCommit(vals) {
+		return verifyAggregatedCommit(chainID, vals, commit,
+			votingPowerNeeded, ignore, count, false)
+	}
+
 	// attempt to batch verify commit. As the validator set doesn't necessarily
 	// correspond with the validator set that signed the block we need to look
 	// up by address rather than index.
 	if shouldBatchVerify(vals, commit) {
 		return verifyCommitBatch(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, countAllSignatures, false)
-	}
-
-	// attempt to verify aggregated commit
-	if isAggregatedCommit(vals) {
-		return verifyAggregatedCommit(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, false)
 	}
 
 	// attempt with single verification
