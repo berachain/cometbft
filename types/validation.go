@@ -53,7 +53,7 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 	// attempt to verify aggregated commit
 	if isAggregatedCommit(vals) {
 		return verifyAggregatedCommit(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, true)
+			votingPowerNeeded, true /* verify aggregated signature for nil */, true)
 	}
 
 	// attempt to batch verify
@@ -121,7 +121,7 @@ func verifyCommitLightInternal(
 	// attempt to verify aggregated commit
 	if isAggregatedCommit(vals) {
 		return verifyAggregatedCommit(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, true)
+			votingPowerNeeded, false /* do not verify aggregated signature for nil */, true)
 	}
 
 	// attempt to batch verify
@@ -202,7 +202,7 @@ func verifyCommitLightTrustingInternal(
 	// attempt to verify aggregated commit
 	if isAggregatedCommit(vals) {
 		return verifyAggregatedCommit(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, false)
+			votingPowerNeeded, false /* do not verify aggregated signature for nil */, false)
 	}
 
 	// attempt to batch verify commit. As the validator set doesn't necessarily
@@ -458,8 +458,7 @@ func verifyAggregatedCommit(
 	vals *ValidatorSet,
 	commit *Commit,
 	votingPowerNeeded int64,
-	ignoreSig func(CommitSig) bool,
-	countSig func(CommitSig) bool,
+	verifySigForNil bool,
 	lookUpByIndex bool,
 ) error {
 	var (
@@ -475,8 +474,8 @@ func verifyAggregatedCommit(
 	pubkeys2 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
 
 	for idx, commitSig := range commit.Signatures {
-		// skip over signatures that should be ignored
-		if ignoreSig(commitSig) {
+		if commitSig.BlockIDFlag != BlockIDFlagCommit &&
+			!(verifySigForNil && commitSig.BlockIDFlag == BlockIDFlagNil) {
 			continue
 		}
 
@@ -509,7 +508,7 @@ func verifyAggregatedCommit(
 				msg1 = commit.VoteSignBytes(chainID, int32(idx))
 			}
 			pubkeys1 = append(pubkeys1, val.PubKey.(*bls12381.PubKey))
-		} else if commitSig.BlockIDFlag == BlockIDFlagNil {
+		} else if verifySigForNil && commitSig.BlockIDFlag == BlockIDFlagNil {
 			// first non-empty signature is expected to be the aggregated signature.
 			if aggSig2 == nil {
 				aggSig2 = commitSig.Signature
@@ -518,9 +517,8 @@ func verifyAggregatedCommit(
 			pubkeys2 = append(pubkeys2, val.PubKey.(*bls12381.PubKey))
 		}
 
-		// If this signature counts then add the voting power of the validator
-		// to the tally
-		if countSig(commitSig) {
+		// Only count signatures for block.
+		if commitSig.BlockIDFlag == BlockIDFlagCommit {
 			talliedVotingPower += val.VotingPower
 		}
 	}
@@ -532,13 +530,13 @@ func verifyAggregatedCommit(
 	}
 
 	// Since we are above the voting power threshold needed, we know `aggSig1`,
-	// `pubkeys1`, and `msg1` are not `nil`
+	// `pubkeys1`, and `msg1` are not `nil`.
 	ok := bls12381.VerifyAggregateSignature(aggSig1, pubkeys1, msg1)
 	if !ok {
 		return fmt.Errorf("wrong aggregated signature for block: %X (pubkeys: %v)", aggSig1, pubkeys1)
 	}
 
-	if aggSig2 != nil {
+	if verifySigForNil && aggSig2 != nil {
 		ok = bls12381.VerifyAggregateSignature(aggSig2, pubkeys2, msg2)
 		if !ok {
 			return fmt.Errorf("wrong aggregated signature for nil: %X (pubkeys: %v)", aggSig2, pubkeys2)

@@ -1317,10 +1317,11 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		// because votes are different.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		canBeAggregated := blsKey &&
-			cs.state.Validators.AllKeysHaveSameType()
+			cs.state.Validators.AllKeysHaveSameType() &&
+			!cs.isVoteExtensionsEnabled(cs.Height)
 		if canBeAggregated {
-			if cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(cs.Height) {
-				panic("VoteExtensions are not supported with BLS aggregation")
+			if !cs.isPBTSEnabled(cs.Height) {
+				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
 			}
 			lastExtCommit = cs.LastCommit.MakeBLSCommit()
 		} else {
@@ -1890,7 +1891,7 @@ func (cs *State) finalizeCommit(height int64) {
 		// NOTE: the seenCommit is local justification to commit this block,
 		// but may differ from the LastCommit included in the next block
 		seenExtendedCommit := cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
-		if cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(block.Height) {
+		if cs.isVoteExtensionsEnabled(block.Height) {
 			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit)
 		} else {
 			cs.blockStore.SaveBlock(block, blockParts, seenExtendedCommit.ToCommit())
@@ -2359,7 +2360,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 	}
 
 	// Check to see if the chain is configured to extend votes.
-	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.isVoteExtensionsEnabled(vote.Height)
 	if extEnabled {
 		// The chain is configured to extend votes, check that the vote is
 		// not for a nil block and verify the extensions signature against the
@@ -2555,7 +2556,7 @@ func (cs *State) signVote(
 		BlockID:          types.BlockID{Hash: hash, PartSetHeader: header},
 	}
 
-	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.isVoteExtensionsEnabled(vote.Height)
 	if msgType == types.PrecommitType && !vote.BlockID.IsNil() {
 		// if the signedMessage type is for a non-nil precommit, add
 		// VoteExtension
@@ -2631,7 +2632,7 @@ func (cs *State) signAddVote(
 		return
 	}
 	hasExt := len(vote.ExtensionSignature) > 0
-	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.isVoteExtensionsEnabled(vote.Height)
 	if vote.Type == types.PrecommitType && !vote.BlockID.IsNil() && hasExt != extEnabled {
 		panic(fmt.Errorf("vote extension absence/presence does not match extensions enabled %t!=%t, height %d, type %v",
 			hasExt, extEnabled, vote.Height, vote.Type))
@@ -2792,4 +2793,8 @@ func proposerWaitTime(lt cmttime.Source, bt time.Time) time.Duration {
 // isPBTSEnabled returns true if PBTS is enabled at the current height.
 func (cs *State) isPBTSEnabled(height int64) bool {
 	return cs.state.ConsensusParams.Feature.PbtsEnabled(height)
+}
+
+func (cs *State) isVoteExtensionsEnabled(height int64) bool {
+	return cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(height)
 }

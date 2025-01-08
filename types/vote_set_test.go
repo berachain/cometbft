@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -627,17 +626,13 @@ func TestVoteSet_MakeBLSCommit(t *testing.T) {
 	// Commit should have 10 elements
 	assert.Len(t, commit.ExtendedSignatures, 10)
 
-	fmt.Println(commit)
-
 	// Ensure that Commit is good.
 	if err := commit.ValidateBasic(); err != nil {
 		t.Errorf("error in Commit.ValidateBasic(): %v", err)
 	}
 
 	// Verify the aggregated signatures.
-	ignore := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagAbsent }
-	count := func(CommitSig) bool { return true }
-	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 7, ignore, count, false)
+	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 6, true /* verify signatures for nil */, false)
 	require.NoError(t, err)
 }
 
