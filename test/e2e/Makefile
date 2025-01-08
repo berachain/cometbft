@@ -35,10 +35,10 @@ node:
 	go build -race $(BUILD_FLAGS) -tags '$(BUILD_TAGS)' -o build/node ./node
 
 generator:
-	go build -tags '$(BUILD_TAGS)' -o build/generator ./generator
+	go build -o build/generator ./generator
 
 runner:
-	go build -tags '$(BUILD_TAGS)' -o build/runner ./runner
+	go build -o build/runner ./runner
 
 lint:
 	@echo "--> Running linter for E2E"
