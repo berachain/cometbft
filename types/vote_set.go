@@ -682,6 +682,9 @@ func (voteSet *VoteSet) MakeExtendedCommit(fp FeatureParams) *ExtendedCommit {
 //
 // Note the signatures count is preserved, but only the first signature in the
 // each category (block, nil) is non-empty.
+//
+// NOTE: it doesn't aggregate vote extension signatures since the extensions
+// are all different.
 func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
@@ -729,11 +732,9 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	// For every validator, get the precommit without extensions
 	sigs := make([]ExtendedCommitSig, len(voteSet.votes))
 	for i, v := range voteSet.votes {
-		cSig := v.CommitSig()
-		cSig.Signature = []byte{} // clear the signature
-		sig := ExtendedCommitSig{
-			CommitSig: cSig,
-		}
+		sig := v.ExtendedCommitSig()
+		sig.CommitSig.Signature = []byte{} // clear the signature
+
 		// if block ID exists but doesn't match, exclude sig
 		if sig.BlockIDFlag == BlockIDFlagCommit && !v.BlockID.Equals(*voteSet.maj23) {
 			sig = NewExtendedCommitSigAbsent()
