@@ -9,13 +9,13 @@ hence to CometBFT.
 
 ## Contact: conduct@informal.systems
 
-* We are committed to providing a friendly, safe and welcoming environment for
+* We are committed to providing a friendly, safe, and welcoming environment for
   all, regardless of level of experience, gender, gender identity and
   expression, sexual orientation, disability, personal appearance, body size,
   race, ethnicity, age, religion, nationality, or other similar characteristics.
 
 * On Slack, please avoid using overtly sexual nicknames or other nicknames that
-  might detract from a friendly, safe and welcoming environment for all.
+  might detract from a friendly, safe, and welcoming environment for all.
 
 * Please be kind and courteous. There’s no need to be mean or rude.
 
@@ -24,9 +24,9 @@ hence to CometBFT.
   a right answer.
 
 * Please keep unstructured critique to a minimum. If you have solid ideas you
-  want to experiment with, make a fork and see how it works.
+  want to experiment with, make a fork, and see how it works.
 
-* We will exclude you from interaction if you insult, demean or harass anyone.
+* We will exclude you from interaction if you insult, demean, or harass anyone.
   That is not welcome behavior. We interpret the term “harassment” as including
   the definition in the [Citizen Code of Conduct][ccoc]; if you have any lack of
   clarity about what might be included in that concept, please read their
@@ -39,7 +39,7 @@ hence to CometBFT.
   immediately. Whether you’re a regular contributor or a newcomer, we care about
   making this community a safe place for you and we’ve got your back.
 
-* Likewise any spamming, trolling, flaming, baiting or other attention-stealing
+* Likewise any spamming, trolling, flaming, baiting, or other attention-stealing
   behavior is not welcome.
 
 ----
@@ -47,7 +47,7 @@ hence to CometBFT.
 # Moderation
 
 These are the policies for upholding our community’s standards of conduct. If
-you feel that a thread needs moderation, please contact the above mentioned
+you feel that a thread needs moderation, please contact the above-mentioned
 person.
 
 1. Remarks that violate the CometBFT/Cosmos standards of conduct, including
@@ -71,13 +71,13 @@ person.
 
 7. If a moderator bans someone and you think it was unjustified, please take it
    up with that moderator, or with a different moderator, in private. Complaints
-   about bans in-channel are not allowed.
+   about bans in channels are not allowed.
 
 8. Moderators are held to a higher standard than other community members. If a
    moderator creates an inappropriate situation, they should expect less leeway
    than others.
 
-In the CometBFT/Cosmos community we strive to go the extra step to look out
+In the CometBFT/Cosmos community, we strive to go the extra step to look out
 for each other. Don’t just aim to be technically unimpeachable, try to be your
 best self. In particular, avoid flirting with offensive or sensitive issues,
 particularly if they’re off-topic; this all too often leads to unnecessary
