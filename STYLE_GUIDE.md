@@ -6,7 +6,7 @@ standard is better than your style.  But if we agree to a number of stylistic pr
 and modify new code. Please feel free to make suggestions if there's something you would like to add or modify.
 
 We expect all contributors to be familiar with [Effective Go](https://golang.org/doc/effective_go.html)
-(and it's recommended reading for all Go programmers anyways). Additionally, we generally agree with the suggestions
+(and it's recommended reading for all Go programmers anyway). Additionally, we generally agree with the suggestions
  in [Uber's style guide](https://github.com/uber-go/guide/blob/master/style.md) and use that as a starting point.
 
 
@@ -21,15 +21,15 @@ scroll down and understand the functionality of it just as well as you do. A loo
 * Options (only if they are seen as critical to the struct else they should be placed in another file)
 * Initialization / Start and stop of the service
 * Msgs/Events
-* Public Functions (In order of most important)
+* Public Functions (In order of most importance)
 * Private/helper functions
-* Auxiliary structs and function (can also be above private functions or in a separate file)
+* Auxiliary structs and functions (can also be above private functions or in a separate file)
 
 ## General
 
 * Use `gofmt` (or `goimport`) to format all code upon saving it.  (If you use VIM, check out vim-go).
 * Use a linter (see below) and generally try to keep the linter happy (where it makes sense).
-* Think about documentation, and try to leave godoc comments, when it will help new developers.
+* Think about documentation, and try to leave good comments, when it will help new developers.
 * Every package should have a high level doc.go file to describe the purpose of that package, its main functions, and any other relevant information.
 * `TODO` should not be used. If important enough should be recorded as an issue.
 * `BUG` / `FIXME` should be used sparingly to guide future developers on some of the vulnerabilities of the code.
@@ -38,9 +38,9 @@ scroll down and understand the functionality of it just as well as you do. A loo
 
 ## Comments
 
-* Use a space after comment deliminter (ex. `// your comment`).
-* Many comments are not sentences. These should begin with a lower case letter and end without a period.
-* Conversely, sentences in comments should be sentenced-cased and end with a period.
+* Use a space after the comment delimiter (ex. `// your comment`).
+* Many comments are not sentences. These should begin with a lowercase letter and end without a period.
+* Conversely, sentences in comments should be sentence-cased and end with a period.
 
 ## Linters
 
@@ -74,7 +74,7 @@ type middleware struct {
 Sometimes it's necessary to rename libraries to avoid naming collisions or ambiguity.
 
 * Use [goimports](https://godoc.org/golang.org/x/tools/cmd/goimports)
-* Separate imports into blocks - one for the standard lib, one for external libs and one for application libs.
+* Separate imports into blocks - one for the standard lib, one for external libs, and one for application libs.
 * Here are some common library labels for consistency:
     * dbm "github.com/cometbft/cometbft-db"
     * cmtcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
@@ -95,7 +95,7 @@ Sometimes it's necessary to rename libraries to avoid naming collisions or ambig
 * The first rule of testing is: we add tests to our code
 * The second rule of testing is: we add tests to our code
 * For Golang testing:
-    * Make use of table driven testing where possible and not-cumbersome
+    * Make use of table-driven testing where possible and not-cumbersome
         * [Inspiration](https://dave.cheney.net/2013/06/09/writing-table-driven-tests-in-go)
     * Make use of [assert](https://godoc.org/github.com/stretchr/testify/assert) and [require](https://godoc.org/github.com/stretchr/testify/require)
 * When using mocks, it is recommended to use Testify [mock](<https://pkg.go.dev/github.com/stretchr/testify/mock>
@@ -103,7 +103,7 @@ Sometimes it's necessary to rename libraries to avoid naming collisions or ambig
 
 ## Errors
 
-* Ensure that errors are concise, clear and traceable.
+* Ensure that errors are concise, clear, and traceable.
 * Use stdlib errors package.
 * For wrapping errors, use `fmt.Errorf()` with `%w`.
 * Panic is appropriate when an internal invariant of a system is broken, while all other cases (in particular,
@@ -121,7 +121,7 @@ Sometimes it's necessary to rename libraries to avoid naming collisions or ambig
 * Instead of using pointer flags (eg. `FlagSet().StringVar`) use Viper to retrieve flag values (eg. `viper.GetString`)
     * The flag key used when setting and getting the flag should always be stored in a
    variable taking the form `FlagXxx` or `flagXxx`.
-    * Flag short variable descriptions should always start with a lower case character as to remain consistent with
+    * Flag short variable descriptions should always start with a lowercase character to remain consistent with
    the description provided in the default `--help` flag.
 
 ## Version
