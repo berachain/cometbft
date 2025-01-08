@@ -39,13 +39,13 @@ release?
 
 2. **Each pull request must be at most 300 lines of code changes**. Larger
    changes must be structured as a series of pull requests of at most 300 lines
-   of code changes each, each building upon the previous one, all ideally
+   of code changes, each building upon the previous one, all ideally
    tracked in a tracking issue.
 
    If a single PR absolutely has to be larger, it _must_ be structured such that
    it can be reviewed commit by commit, with each commit doing _one logical
    thing_ (with a good description of what it aims to achieve in the Git
-   commit), and each commit ideally being no larger than 300 lines of code
+   commit), and each commit ideally be no larger than 300 lines of code
    changes. Poorly structured pull requests may be rejected immediately with a
    request to restructure them.
 
@@ -70,7 +70,7 @@ make changes, with a full description of the workflow below the diagram.
 Exceptions to this process will naturally occur (e.g. in the case of urgent
 security fixes), but this is rare.
 
-Each stage of the process is aimed at creating feedback cycles which align
+Each stage of the process is aimed at creating feedback cycles that align
 contributors and maintainers to make sure:
 
 - Contributors don’t waste their time implementing/proposing features which
@@ -108,7 +108,7 @@ flowchart LR
 
 All non-trivial work on the code base should be motivated by a [GitHub
 Issue][gh-issues]. [Search][search-issues] is a good place to start when looking
-for places to contribute. If you would like to work on an issue which already
+for places to contribute. If you would like to work on an issue that already
 exists, please indicate so by leaving a comment. If someone else is already
 assigned to that issue and you would like to contribute to it or take it over,
 please coordinate with the existing assignee(s) and only start work on it once
@@ -119,15 +119,15 @@ All new contributions should start with a [GitHub Issue][new-gh-issue]. The
 issue helps capture the **problem** being solved and allows for early feedback.
 Problems must be captured in terms of the **impact** that they have on specific
 users. Once the issue is created the process can proceed in different directions
-depending on how well defined the problem and potential solution are. If the
-change is simple and well understood, maintainers will indicate their support
+depending on how well-defined the problem and potential solution are. If the
+change is simple and well-understood, maintainers will indicate their support
 with a heartfelt emoji.
 
 ### Request for comments (RFCs)
 
 If the issue would benefit from thorough discussion, maintainers may request
 that you create a [Request For Comment][rfcs] in the CometBFT repo. Discussion
-at the RFC stage will build collective understanding of the dimensions of the
+at the RFC stage will build a collective understanding of the dimensions of the
 problems and help structure conversations around trade-offs.
 
 ### Architecture decision records (ADRs)
@@ -137,19 +137,19 @@ large/complex/risky structural changes to the code base, these changes should be
 proposed in the form of an [Architectural Decision Record
 (ADR)](docs/references/architecture/). The ADR will help build consensus on an overall
 strategy to ensure the code base maintains coherence in the larger context. If
-you are not comfortable with writing an ADR, you can open a less-formal issue
+you are not comfortable with writing an ADR, you can open a less formal issue
 and the maintainers will help you turn it into an ADR. Sometimes the best way to
 demonstrate the value of an ADR is to build a proof-of-concept (PoC) along with
 the ADR - in this case, link to the PoC from the ADR PR.
 
-**How does one pick a number for an new ADR?**
+**How does one pick a number for a new ADR?**
 
 Find the largest existing ADR number (between those in `./docs/architecture/`
 and those that may be open as issues or pull requests) and bump it by 1.
 
 ### Pull requests
 
-When the problem as well as proposed solution are well understood and low-risk,
+When the problem as well as a proposed solution are well understood and low-risk,
 changes should start with a **pull request**.
 
 Please adhere to the guidelines in the [Ease of reviewing](#ease-of-reviewing)
@@ -200,7 +200,7 @@ To pull in updates from the origin repo, run
 
 We use [Go modules] to manage dependencies.
 
-That said, the `main` branch of every CometBFT repository should just build with
+That said, the `main` branch of every CometBFT repository should just be built with
 `go get`, which means they should be kept up-to-date with their dependencies so
 we can get away with telling people they can just `go get` our software.
 
@@ -221,7 +221,7 @@ Do not bump the major Go version in a patch release (namely, `v0.34.x`, `v0.37.x
 
 ## Logging
 
-Operators, consensus engine and application developers all need information from
+Operators, consensus engines, and application developers all need information from
 the system while it is running. One avenue through which they get that
 information is via the logs. Whenever making contributions, please think
 carefully about what each of those groups of users would want to know about the
@@ -277,10 +277,10 @@ interested in the details.
 
 When outputting variables, also keep in mind **concurrency concerns** of doing
 so. If outputting a pointer, understand that the value associated with that
-pointer at the time of calling the log function may differ to its value at the
+pointer at the time of calling the log function may differ from its value at the
 time it is finally serialized into the log message. Perhaps consider creating a
 temporary copy of the specific value you want to output and logging that
-temporary value. Also keep in mind potential data races when doing so.
+temporary value. Also, keep in mind potential data races when doing so.
 
 Finally, **use expensive operations like `fmt.Sprintf` sparingly**, as this can
 have a meaningful performance impact on a running production system. Consider an
@@ -374,21 +374,21 @@ where:
 
 - `category` is one of `improvements`, `breaking-changes`, `bug-fixes`,
   `features` and if multiple apply, create multiple files;
-- `description` is a short (4 to 6 word), hyphen separated description of the
+- `description` is a short (4 to 6 word), hyphen-separated description of the
   fix, starting the component changed; and,
 - `issue or PR number` is the CometBFT issue number, if one exists, or the PR
   number, otherwise.
 
 For examples, see the [.changelog](.changelog) folder.
 
-A feature can also be worked on a feature branch, if its size and/or risk
+A feature can also be worked on a feature branch if its size and/or risk
 justifies it (see [below](#branching-model-and-release)).
 
 ### What does a good changelog entry look like?
 
 Changelog entries should answer the question: "what is important about this
 change for users to know?" or "what problem does this solve for users?". It
-should not simply be a reiteration of the title of the associated PR, unless the
+should not simply be a reiteration of the title of the associated PR unless the
 title of the PR _very_ clearly explains the benefit of a change to a user.
 
 Some good examples of changelog entry descriptions:
@@ -434,15 +434,15 @@ of the change (only necessary if you are not a member of the CometBFT core
 team).
 
 It's also acceptable for `1234` to refer to the relevant issue number, but
-pull-request numbers are preferred. Note this means pull-requests should be
-opened first so the changelog can then be updated with the pull-request's
+pull-request numbers are preferred. Note this means pull requests should be
+opened first so the changelog can then be updated with the pull request's
 number.
 
 Changelog entries should be ordered alphabetically according to the `module`,
 and numerically according to the pull-request number.
 
 Changes with multiple classifications should be doubly included (e.g. a bug fix
-that is also a breaking change should be recorded under both).
+that is also a breaking change that should be recorded under both).
 
 Breaking changes are further subdivided according to the APIs/users they impact.
 Any change that affects multiple APIs/users should be recorded multiply - for
@@ -458,7 +458,7 @@ Every release is maintained in a release branch named according to its major
 release number (e.g. `v0.38.x` or `v1.x`).
 
 Pending minor releases have long-lived release candidate ("RC") branches. Minor
-release changes should be merged to these long-lived RC branches at the same
+release changes should be merged into these long-lived RC branches at the same
 time that the changes are merged to `main`.
 
 If a feature's size is big and/or its risk is high, it can be implemented in a
@@ -469,7 +469,7 @@ the feature is complete, the feature branch is merged back (merge commit) into
 `main`. The moment of the final merge can be carefully chosen so as to land
 different features in different releases.
 
-Note, all pull requests should be squash merged except for merging to a release
+Note, that all pull requests should be squash merged except for merging to a release
 branch. This keeps the commit history clean and makes it easy to reference the
 pull request where a change was introduced.
 
@@ -529,7 +529,7 @@ it's been approved.
 
 Before merging a pull request:
 
-- Ensure pull branch is up-to-date with a recent `main` (GitHub won't let you
+- Ensure the pull branch is up-to-date with a recent `main` (GitHub won't let you
   merge without this!)
 - Run `make test` to ensure that all tests pass
 - [Squash][git-squash] merge pull request
@@ -539,7 +539,7 @@ Before merging a pull request:
 We follow the [Conventional Commits][conventional-commits] spec. Write concise
 commits that start with a type (`fix`, `feat`, `chore`, `ci`, `docs`, etc.) and
 an optional scope - package name (e.g., `feat(internal/consensus)`), followed
-by a description that finishes the sentence "This change modifies CometBFT
+by a description that finishes the sentence, "This change modifies CometBFT
 to...".
 
 If the commit introduces a breaking change, append the `!` after the scope
