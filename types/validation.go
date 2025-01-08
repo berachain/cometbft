@@ -501,6 +501,10 @@ func verifyAggregatedCommit(
 			seenVals[valIdx] = idx
 		}
 
+		if val.PubKey == nil {
+			return fmt.Errorf("validator %v has a nil PubKey at index %d", val, idx)
+		}
+
 		if commitSig.BlockIDFlag == BlockIDFlagCommit {
 			// first non-empty signature is expected to be the aggregated signature.
 			if aggSig1 == nil {
