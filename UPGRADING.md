@@ -5,7 +5,7 @@ This guide provides instructions for upgrading to specific versions of CometBFT.
 
 ### ABCI Changes
 
-Non-replay-protected vote extensions are added to CometBFT to allow applications to sign a blob of bytes by CometBFT using validator's private key infrastructure. Compared to existing vote extensions which are replay protected by containing meta information as chain-id, height and round (canonical vote extension) the data of the non-replay-protected vote extensions is signed as provided by the application. The non-replay-protected vote extension field is an optional part of the vote extension mechanism and it is up to the application to protect this field against replay attacks. If the application does not populate the non-replay-protected field and does not read it either in `VerifyVoteExtension` or `PrepareProposal` there are no security implications to consider by the application, other than limiting the fields's max length (`MaxVoteExtensionSize`) in `VerifyVoteExtension`, just as it is done with the replay protected part
+Non-replay-protected vote extensions are added to CometBFT to allow applications to sign a blob of bytes by CometBFT using the validator's private key infrastructure. Compared to existing vote extensions which are replay-protected by containing meta information such as chain-id, height, and round (canonical vote extension) the data of the non-replay-protected vote extensions is signed as provided by the application. The non-replay-protected vote extension field is an optional part of the vote extension mechanism and it is up to the application to protect this field against replay attacks. If the application does not populate the non-replay-protected field and does not read it either in `VerifyVoteExtension` or `PrepareProposal` there are no security implications to consider by the application, other than limiting the field's max length (`MaxVoteExtensionSize`) in `VerifyVoteExtension`, just as it is done with the replay-protected part
 
 ## v1.x
 
@@ -18,7 +18,7 @@ As of v1.0, the CometBFT team provides the following guarantees relating to
 versioning:
 
 - **Major version** bumps, such as v1.0.0 to v2.0.0, would generally involve
-  changes that _force_ users to perform a coordinated upgrade in order to use
+  changes that _force_ users to perform a coordinated upgrade to use
   the new version, such as protocol-breaking changes (e.g. changes to how block
   hashes are computed and thus what the network considers to be "valid blocks",
   or how the consensus protocol works, or changes that affect network-level
@@ -63,7 +63,7 @@ coordinated upgrade.
 
 ### Mempool Changes
 
-- The priority mempool (what was referred in the code as version `v1`) has been
+- The priority mempool (what was referred to in the code as version `v1`) has been
   removed. There is now only one mempool (what was called version `v0`), that
   is, the default implementation as a queue of transactions.
 - In the protobuf message `ResponseCheckTx`, fields `sender`, `priority`, and
@@ -76,7 +76,7 @@ coordinated upgrade.
 - Added new ABCI methods `ExtendVote`, and `VerifyVoteExtension`.
   Applications upgrading to v0.38.0 must implement these methods as described
   [here](./spec/abci/abci%2B%2B_comet_expected_behavior.md#adapting-existing-applications-that-use-abci)
-- Removed methods `BeginBlock`, `DeliverTx`, `EndBlock`, and replaced them by
+- Removed methods `BeginBlock`, `DeliverTx`, `EndBlock`, and replaced them with
   method `FinalizeBlock`. Applications upgrading to `v0.38.0` must refactor
   the logic handling the methods removed to handle `FinalizeBlock`.
 - The Application's hash (or any data representing the Application's current state)
@@ -105,17 +105,17 @@ user. However, if you own a fork with a modified version of the indexer, you sho
 - Indexer key for block events will not contain information about the function that returned the event.
 The events were indexed by their attributes, event type, the function that returned them, the height and
 event sequence. The functions returning events in old (pre `v0.38.0`) versions of CometBFT were `BeginBlock` or `EndBlock`.
-As events are returned now only via `FinalizeBlock`, the value of this field has no use, and has been removed.
+As events are returned now only via `FinalizeBlock`, the value of this field has no use and has been removed.
 The main motivation is the reduction of the storage footprint.
 
-Events indexed with previous CometBFT or Tendermint Core versions, will still be transparently processed.
-There is no need to re-index the events. This function field is not exposed to queries, and was not
+Events indexed with previous CometBFT or Tendermint Core versions will still be transparently processed.
+There is no need to re-index the events. This function field is not exposed to queries and is not
 visible to users. However, if you forked CometBFT and changed the indexer code directly to accommodate for this,
 this will impact your code.
 
 ## v0.37.0
 
-This release introduces state machine-breaking changes, and therefore requires a
+This release introduces state machine-breaking changes and therefore requires a
 coordinated upgrade.
 
 ### Go API
