@@ -1317,9 +1317,11 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		// because votes are different.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		canBeAggregated := blsKey &&
-			cs.state.Validators.AllKeysHaveSameType() &&
-			!cs.isVoteExtensionsEnabled(cs.Height)
+			cs.state.Validators.AllKeysHaveSameType()
 		if canBeAggregated {
+			if cs.isVoteExtensionsEnabled(cs.Height) {
+				panic("Wanted to aggregate LastCommit, but VoteExtensions are enabled for height " + strconv.FormatInt(cs.Height, 10))
+			}
 			if !cs.isPBTSEnabled(cs.Height) {
 				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
 			}

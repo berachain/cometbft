@@ -730,11 +730,7 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	sigs := make([]ExtendedCommitSig, len(voteSet.votes))
 	for i, v := range voteSet.votes {
 		cSig := v.CommitSig()
-		if cSig.BlockIDFlag != BlockIDFlagAbsent {
-			cSig.Signature = []byte{0x00} // clear the signature
-		} else {
-			cSig.Signature = []byte{} // clear the signature
-		}
+		cSig.Signature = []byte{} // clear the signature
 		sig := ExtendedCommitSig{
 			CommitSig: cSig,
 		}
