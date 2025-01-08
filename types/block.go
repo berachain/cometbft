@@ -588,6 +588,14 @@ const (
 	BlockIDFlagCommit
 	// BlockIDFlagNil - voted for nil.
 	BlockIDFlagNil
+	// BlockIDFlagAggCommit - voted for the Commit.BlockID and contains aggregated signature..
+	BlockIDFlagAggCommit
+	// BlockIDFlagAggCommitAbsent - voted for the Commit.BlockID and contains aggregated signature..
+	BlockIDFlagAggCommitAbsent
+	// BlockIDFlagAggNil - voted for nil and contains aggregated signature..
+	BlockIDFlagAggNil
+	// BlockIDFlagAggNilAbsent - voted for nil and contains aggregated signature..
+	BlockIDFlagAggNilAbsent
 )
 
 const (
@@ -645,12 +653,10 @@ func (cs CommitSig) String() string {
 func (cs CommitSig) BlockID(commitBlockID BlockID) BlockID {
 	var blockID BlockID
 	switch cs.BlockIDFlag {
-	case BlockIDFlagAbsent:
+	case BlockIDFlagAbsent, BlockIDFlagNil, BlockIDFlagAggNil, BlockIDFlagAggNilAbsent:
 		blockID = BlockID{}
-	case BlockIDFlagCommit:
+	case BlockIDFlagCommit, BlockIDFlagAggCommit, BlockIDFlagAggCommitAbsent:
 		blockID = commitBlockID
-	case BlockIDFlagNil:
-		blockID = BlockID{}
 	default:
 		panic(fmt.Sprintf("Unknown BlockIDFlag: %v", cs.BlockIDFlag))
 	}
@@ -663,6 +669,10 @@ func (cs CommitSig) ValidateBasic() error {
 	case BlockIDFlagAbsent:
 	case BlockIDFlagCommit:
 	case BlockIDFlagNil:
+	case BlockIDFlagAggCommit:
+	case BlockIDFlagAggCommitAbsent:
+	case BlockIDFlagAggNil:
+	case BlockIDFlagAggNilAbsent:
 	default:
 		return fmt.Errorf("unknown BlockIDFlag: %v", cs.BlockIDFlag)
 	}

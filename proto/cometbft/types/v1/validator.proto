@@ -19,6 +19,16 @@ enum BlockIDFlag {
   BLOCK_ID_FLAG_COMMIT = 2 [(gogoproto.enumvalue_customname) = "BlockIDFlagCommit"];
   // Voted for nil
   BLOCK_ID_FLAG_NIL = 3 [(gogoproto.enumvalue_customname) = "BlockIDFlagNil"];
+
+  // Aggregated commit
+  // Voted for the block and contains aggregated signature.
+  BLOCK_ID_FLAG_AGG_COMMIT = 4 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggCommit"];
+  // Voted for the block.
+  BLOCK_ID_FLAG_AGG_COMMIT_ABSENT = 5 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggCommitAbsent"];
+  // Voted for nil and contains aggregated signature.
+  BLOCK_ID_FLAG_AGG_NIL = 6 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggNil"];
+  // Voted for nil.
+  BLOCK_ID_FLAG_AGG_NIL_ABSENT = 7 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggNilAbsent"];
 }
 
 // ValidatorSet defines a set of validators.

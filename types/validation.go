@@ -473,10 +473,17 @@ func verifyAggregatedCommit(
 	pubkeys1 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
 	pubkeys2 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
 
+LOOP:
 	for idx, commitSig := range commit.Signatures {
-		if commitSig.BlockIDFlag != BlockIDFlagCommit &&
-			!(verifySigForNil && commitSig.BlockIDFlag == BlockIDFlagNil) {
-			continue
+		// skip over signatures that should be ignored
+		switch commitSig.BlockIDFlag {
+		case BlockIDFlagAggCommit, BlockIDFlagAggCommitAbsent:
+		case BlockIDFlagAggNil, BlockIDFlagAggNilAbsent:
+			if !verifySigForNil {
+				continue LOOP
+			}
+		default:
+			continue LOOP
 		}
 
 		// If the vals and commit have a 1-to-1 correspondence we can retrieve
@@ -505,15 +512,13 @@ func verifyAggregatedCommit(
 			return fmt.Errorf("validator %v has a nil PubKey at index %d", val, idx)
 		}
 
-		if commitSig.BlockIDFlag == BlockIDFlagCommit {
-			// first non-empty signature is expected to be the aggregated signature.
+		if commitSig.BlockIDFlag == BlockIDFlagAggCommit || commitSig.BlockIDFlag == BlockIDFlagAggCommitAbsent {
 			if aggSig1 == nil {
 				aggSig1 = commitSig.Signature
 				msg1 = commit.VoteSignBytes(chainID, int32(idx))
 			}
 			pubkeys1 = append(pubkeys1, val.PubKey.(*bls12381.PubKey))
-		} else if verifySigForNil && commitSig.BlockIDFlag == BlockIDFlagNil {
-			// first non-empty signature is expected to be the aggregated signature.
+		} else if verifySigForNil && (commitSig.BlockIDFlag == BlockIDFlagAggNil || commitSig.BlockIDFlag == BlockIDFlagAggNilAbsent) {
 			if aggSig2 == nil {
 				aggSig2 = commitSig.Signature
 				msg2 = commit.VoteSignBytes(chainID, int32(idx))
@@ -522,7 +527,7 @@ func verifyAggregatedCommit(
 		}
 
 		// Only count signatures for block.
-		if commitSig.BlockIDFlag == BlockIDFlagCommit {
+		if commitSig.BlockIDFlag == BlockIDFlagAggCommit || commitSig.BlockIDFlag == BlockIDFlagAggCommitAbsent {
 			talliedVotingPower += val.VotingPower
 		}
 	}
@@ -540,7 +545,10 @@ func verifyAggregatedCommit(
 		return fmt.Errorf("wrong aggregated signature for block: %X (pubkeys: %v)", aggSig1, pubkeys1)
 	}
 
-	if verifySigForNil && aggSig2 != nil {
+	if verifySigForNil {
+		if aggSig2 == nil {
+			return errors.New("missing aggregated signature for nil")
+		}
 		ok = bls12381.VerifyAggregateSignature(aggSig2, pubkeys2, msg2)
 		if !ok {
 			return fmt.Errorf("wrong aggregated signature for nil: %X (pubkeys: %v)", aggSig2, pubkeys2)
