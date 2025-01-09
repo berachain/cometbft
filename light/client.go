@@ -64,7 +64,7 @@ func SequentialVerification() Option {
 // verification is used.
 func SkippingVerification(trustLevel cmtmath.Fraction) Option {
 	return func(c *Client) {
-		c.verificationMode = skipping
+		c.verificationMode = sequential
 		c.trustLevel = trustLevel
 	}
 }
@@ -220,7 +220,7 @@ func NewClientFromTrustedStore(
 	c := &Client{
 		chainID:          chainID,
 		trustingPeriod:   trustingPeriod,
-		verificationMode: skipping,
+		verificationMode: sequential,
 		trustLevel:       DefaultTrustLevel,
 		maxRetryAttempts: defaultMaxRetryAttempts,
 		maxClockDrift:    defaultMaxClockDrift,
