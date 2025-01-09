@@ -8,6 +8,9 @@ BUILD_FLAGS = -mod=readonly -ldflags "$(LD_FLAGS)"
 # allow users to pass additional flags via the conventional LDFLAGS variable
 LD_FLAGS += $(LDFLAGS)
 
+# CGO enabled by default because we always use bls keys.
+CGO_ENABLED=1
+
 # handle nostrip
 ifeq (nostrip,$(findstring nostrip,$(COMETBFT_BUILD_OPTIONS)))
   #prepare for delve
@@ -49,12 +52,6 @@ endif
 ifeq (rocksdb,$(findstring rocksdb,$(COMETBFT_BUILD_OPTIONS)))
   CGO_ENABLED=1
   BUILD_TAGS += rocksdb
-endif
-
-# handle bls12381
-ifeq (bls12381,$(findstring bls12381,$(COMETBFT_BUILD_OPTIONS)))
-  CGO_ENABLED=1
-  BUILD_TAGS += bls12381
 endif
 
 # handle nodebug

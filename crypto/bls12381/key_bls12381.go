@@ -1,5 +1,3 @@
-//go:build bls12381
-
 package bls12381
 
 import (
@@ -222,12 +220,12 @@ func (PubKey) Type() string {
 //
 // XXX: Not a pointer because our JSON encoder (libs/json) does not correctly
 // handle pointers.
-func (pubkey PubKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(pubkey.Bytes())
+func (pubKey PubKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pubKey.Bytes())
 }
 
 // UnmarshalJSON unmarshals the public key from JSON.
-func (pubkey *PubKey) UnmarshalJSON(bz []byte) error {
+func (pubKey *PubKey) UnmarshalJSON(bz []byte) error {
 	var rawBytes []byte
 	if err := json.Unmarshal(bz, &rawBytes); err != nil {
 		return err
@@ -236,6 +234,6 @@ func (pubkey *PubKey) UnmarshalJSON(bz []byte) error {
 	if err != nil {
 		return err
 	}
-	pubkey.pk = pk.pk
+	pubKey.pk = pk.pk
 	return nil
 }

@@ -1,12 +1,11 @@
-//go:build bls12381
-
 package bls12381_test
 
 import (
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cometbft/cometbft/crypto/bls12381"
 )
 
 func TestAggregateAndVerify(t *testing.T) {

@@ -1,5 +1,3 @@
-//go:build bls12381
-
 package bls12381_test
 
 import (
