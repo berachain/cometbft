@@ -527,13 +527,23 @@ func verifyAggregatedCommit(
 				aggSig1 = commitSig.Signature
 				msg1 = commit.VoteSignBytes(chainID, int32(idx))
 			}
-			pubkeys1 = append(pubkeys1, val.PubKey.(*bls12381.PubKey))
+			pk, ok := val.PubKey.(*bls12381.PubKey)
+			if !ok {
+				pk2 := val.PubKey.(bls12381.PubKey)
+				pk = &pk2
+			}
+			pubkeys1 = append(pubkeys1, pk)
 		} else if commitSig.BlockIDFlag == BlockIDFlagAggNil || commitSig.BlockIDFlag == BlockIDFlagAggNilAbsent {
 			if aggSig2 == nil {
 				aggSig2 = commitSig.Signature
 				msg2 = commit.VoteSignBytes(chainID, int32(idx))
 			}
-			pubkeys2 = append(pubkeys2, val.PubKey.(*bls12381.PubKey))
+			pk, ok := val.PubKey.(*bls12381.PubKey)
+			if !ok {
+				pk2 := val.PubKey.(bls12381.PubKey)
+				pk = &pk2
+			}
+			pubkeys2 = append(pubkeys2, pk)
 		}
 
 		if countSig(commitSig) {
