@@ -622,8 +622,11 @@ func TestVoteSet_MakeBLSCommit(t *testing.T) {
 		t.Errorf("error in Commit.ValidateBasic(): %v", err)
 	}
 
+	ignore := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagAbsent }
+	count := func(CommitSig) bool { return true }
+
 	// Verify the aggregated signatures.
-	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 6, true /* verify signatures for nil */, false)
+	err := verifyAggregatedCommit("test_chain_id", vals, commit.ToCommit(), 6, ignore, count, false)
 	require.NoError(t, err)
 }
 

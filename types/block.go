@@ -947,6 +947,17 @@ func (commit *Commit) ValidateBasic() error {
 	return nil
 }
 
+// HasAggregatedSignature returns true if the commit contains an aggregated signature.
+func (commit *Commit) HasAggregatedSignature() bool {
+	for _, sig := range commit.Signatures {
+		if sig.BlockIDFlag == BlockIDFlagAggCommit || sig.BlockIDFlag == BlockIDFlagAggNil ||
+			sig.BlockIDFlag == BlockIDFlagAggCommitAbsent || sig.BlockIDFlag == BlockIDFlagAggNilAbsent {
+			return true
+		}
+	}
+	return false
+}
+
 // MedianTime computes the median time for a Commit based on the associated validator set.
 // The median time is the weighted median of the Timestamp fields of the commit votes,
 // with heights defined by the validator's voting powers.

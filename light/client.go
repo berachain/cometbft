@@ -197,7 +197,7 @@ func NewClient(
 	}
 
 	if c.latestTrustedBlock == nil || c.latestTrustedBlock.Height < trustOptions.Height {
-		c.logger.Info("Downloading trusted light block using options")
+		c.logger.Info("Downloading trusted light block using options", "height", trustOptions.Height)
 		if err := c.initializeWithTrustOptions(ctx, trustOptions); err != nil {
 			return nil, err
 		}
@@ -376,7 +376,7 @@ func (c *Client) initializeWithTrustOptions(ctx context.Context, options TrustOp
 	// 2) Ensure that +2/3 of validators signed correctly.
 	err = l.ValidatorSet.VerifyCommitLight(c.chainID, l.Commit.BlockID, l.Height, l.Commit)
 	if err != nil {
-		return fmt.Errorf("invalid commit: %w", err)
+		return fmt.Errorf("invalid commit %v: %w", l.Commit, err)
 	}
 
 	// 3) Cross-verify with witnesses to ensure everybody has the same state.
