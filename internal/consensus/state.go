@@ -2490,6 +2490,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			"height", vote.Height,
 			"round", vote.Round,
 			"validator", vote.ValidatorAddress.String(),
+			"vote_timestamp", vote.Timestamp,
 			"data", precommits.LogString())
 
 		blockID, ok := precommits.TwoThirdsMajority()
@@ -2546,6 +2547,7 @@ func (cs *State) signVote(
 		Round:            cs.Round,
 		Type:             msgType,
 		BlockID:          types.BlockID{Hash: hash, PartSetHeader: header},
+		Timestamp:        time.Time{},
 	}
 
 	extEnabled := cs.isVoteExtensionsEnabled(vote.Height)
@@ -2662,13 +2664,9 @@ func (cs *State) calculatePrevoteMessageDelayMetrics() {
 		_, val := cs.Validators.GetByAddressMut(v.ValidatorAddress)
 		votingPowerSeen += val.VotingPower
 		if votingPowerSeen >= cs.Validators.TotalVotingPower()*2/3+1 {
-			// cs.metrics.QuorumPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(v.Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
 			break
 		}
 	}
-	// if ps.HasAll() {
-	// cs.metrics.FullPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(pl[len(pl)-1].Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
-	// }
 }
 
 // ---------------------------------------------------------

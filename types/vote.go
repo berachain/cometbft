@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	cmtcons "github.com/cometbft/cometbft/api/cometbft/consensus/v1"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
@@ -48,6 +49,14 @@ func NewConflictingVoteError(vote1, vote2 *Vote) *ErrVoteConflictingVotes {
 	}
 }
 
+type ErrVoteTimestampNotZero struct {
+	Timestamp time.Time
+}
+
+func (err *ErrVoteTimestampNotZero) Error() string {
+	return fmt.Sprintf("Vote time stamp should be 0 and not set: %s", err.Timestamp)
+}
+
 // The vote extension is only valid for non-nil precommits.
 type ErrVoteExtensionInvalid struct {
 	ExtSignature []byte
@@ -72,6 +81,7 @@ type Vote struct {
 	Signature          []byte        `json:"signature"`
 	Extension          []byte        `json:"extension"`
 	ExtensionSignature []byte        `json:"extension_signature"`
+	Timestamp          time.Time     `json:"timestamp"`
 }
 
 // VoteFromProto attempts to convert the given serialization (Protobuf) type to
@@ -94,6 +104,7 @@ func VoteFromProto(pv *cmtproto.Vote) (*Vote, error) {
 		Signature:          pv.Signature,
 		Extension:          pv.Extension,
 		ExtensionSignature: pv.ExtensionSignature,
+		Timestamp:          time.Time{},
 	}, nil
 }
 
@@ -385,6 +396,7 @@ func (vote *Vote) ToProto() *cmtproto.Vote {
 		Signature:          vote.Signature,
 		Extension:          vote.Extension,
 		ExtensionSignature: vote.ExtensionSignature,
+		Timestamp:          vote.Timestamp,
 	}
 }
 
@@ -437,6 +449,10 @@ func SignAndCheckVote(
 		}
 
 		vote.ExtensionSignature = v.ExtensionSignature
+	}
+
+	if !v.Timestamp.Equal(time.Time{}) {
+		return false, &ErrVoteTimestampNotZero{Timestamp: v.Timestamp}
 	}
 
 	return true, nil
