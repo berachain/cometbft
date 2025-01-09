@@ -253,10 +253,11 @@ func (state State) MakeBlock(
 	switch {
 	case state.ConsensusParams.Feature.PbtsEnabled(height):
 		timestamp = cmttime.Now()
-	case height == state.InitialHeight:
-		timestamp = state.LastBlockTime // genesis time
+	// case height == state.InitialHeight:
+	// 	timestamp = state.LastBlockTime // genesis time
 	default:
-		timestamp = lastCommit.MedianTime(state.LastValidators)
+		panic("PBTS has to be enabled")
+		// timestamp = lastCommit.MedianTime(state.LastValidators)
 	}
 
 	// Fill rest of header with state data.

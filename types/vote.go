@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"time"
 
 	cmtcons "github.com/cometbft/cometbft/api/cometbft/consensus/v1"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
@@ -68,7 +67,6 @@ type Vote struct {
 	Height             int64         `json:"height"`
 	Round              int32         `json:"round"`    // assume there will not be greater than 2_147_483_647 rounds
 	BlockID            BlockID       `json:"block_id"` // zero if vote is nil.
-	Timestamp          time.Time     `json:"timestamp"`
 	ValidatorAddress   Address       `json:"validator_address"`
 	ValidatorIndex     int32         `json:"validator_index"`
 	Signature          []byte        `json:"signature"`
@@ -91,7 +89,6 @@ func VoteFromProto(pv *cmtproto.Vote) (*Vote, error) {
 		Height:             pv.Height,
 		Round:              pv.Round,
 		BlockID:            *blockID,
-		Timestamp:          pv.Timestamp,
 		ValidatorAddress:   pv.ValidatorAddress,
 		ValidatorIndex:     pv.ValidatorIndex,
 		Signature:          pv.Signature,
@@ -119,7 +116,6 @@ func (vote *Vote) CommitSig() CommitSig {
 	return CommitSig{
 		BlockIDFlag:      blockIDFlag,
 		ValidatorAddress: vote.ValidatorAddress,
-		Timestamp:        vote.Timestamp,
 		Signature:        vote.Signature,
 	}
 }
@@ -204,7 +200,7 @@ func (vote *Vote) String() string {
 		panic("Unknown vote type")
 	}
 
-	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X %X @ %s}",
+	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X %X @}",
 		vote.ValidatorIndex,
 		cmtbytes.Fingerprint(vote.ValidatorAddress),
 		vote.Height,
@@ -214,7 +210,6 @@ func (vote *Vote) String() string {
 		cmtbytes.Fingerprint(vote.BlockID.Hash),
 		cmtbytes.Fingerprint(vote.Signature),
 		cmtbytes.Fingerprint(vote.Extension),
-		CanonicalTime(vote.Timestamp),
 	)
 }
 
@@ -385,7 +380,6 @@ func (vote *Vote) ToProto() *cmtproto.Vote {
 		Height:             vote.Height,
 		Round:              vote.Round,
 		BlockID:            vote.BlockID.ToProto(),
-		Timestamp:          vote.Timestamp,
 		ValidatorAddress:   vote.ValidatorAddress,
 		ValidatorIndex:     vote.ValidatorIndex,
 		Signature:          vote.Signature,
@@ -444,8 +438,6 @@ func SignAndCheckVote(
 
 		vote.ExtensionSignature = v.ExtensionSignature
 	}
-
-	vote.Timestamp = v.Timestamp
 
 	return true, nil
 }

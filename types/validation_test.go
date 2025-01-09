@@ -81,7 +81,6 @@ func TestValidatorSet_VerifyCommit_All(t *testing.T) {
 					Round:            round,
 					Type:             PrecommitType,
 					BlockID:          tc.blockID,
-					Timestamp:        cmttime.Now(),
 				}
 				if i >= tc.blockVotes {
 					vote.BlockID = BlockID{}

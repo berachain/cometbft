@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
-	"sort"
 	"strconv"
 	"time"
 
@@ -2491,7 +2490,6 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			"height", vote.Height,
 			"round", vote.Round,
 			"validator", vote.ValidatorAddress.String(),
-			"vote_timestamp", vote.Timestamp,
 			"data", precommits.LogString())
 
 		blockID, ok := precommits.TwoThirdsMajority()
@@ -2540,14 +2538,12 @@ func (cs *State) signVote(
 
 	addr := cs.privValidatorPubKey.Address()
 	valIdx, _ := cs.Validators.GetByAddress(addr)
-	timestamp := cs.voteTime(cs.Height)
 
 	vote := &types.Vote{
 		ValidatorAddress: addr,
 		ValidatorIndex:   valIdx,
 		Height:           cs.Height,
 		Round:            cs.Round,
-		Timestamp:        timestamp,
 		Type:             msgType,
 		BlockID:          types.BlockID{Hash: hash, PartSetHeader: header},
 	}
@@ -2571,31 +2567,6 @@ func (cs *State) signVote(
 	}
 
 	return vote, err
-}
-
-func (cs *State) voteTime(height int64) time.Time {
-	if cs.isPBTSEnabled(height) {
-		return cmttime.Now()
-	}
-	now := cmttime.Now()
-	minVoteTime := now
-
-	// Minimum time increment between blocks
-	const timeIota = time.Millisecond
-	// TODO: We should remove next line in case we don't vote for v in case cs.ProposalBlock == nil,
-	// even if cs.LockedBlock != nil. See https://github.com/cometbft/cometbft/tree/main/spec/.
-	if cs.LockedBlock != nil {
-		// See the BFT time spec
-		// https://github.com/cometbft/cometbft/blob/main/spec/consensus/bft-time.md
-		minVoteTime = cs.LockedBlock.Time.Add(timeIota)
-	} else if cs.ProposalBlock != nil {
-		minVoteTime = cs.ProposalBlock.Time.Add(timeIota)
-	}
-
-	if now.After(minVoteTime) {
-		return now
-	}
-	return minVoteTime
 }
 
 // sign the vote and publish on internalMsgQueue
@@ -2686,22 +2657,18 @@ func (cs *State) calculatePrevoteMessageDelayMetrics() {
 	ps := cs.Votes.Prevotes(cs.Round)
 	pl := ps.List()
 
-	sort.Slice(pl, func(i, j int) bool {
-		return pl[i].Timestamp.Before(pl[j].Timestamp)
-	})
-
 	var votingPowerSeen int64
 	for _, v := range pl {
 		_, val := cs.Validators.GetByAddressMut(v.ValidatorAddress)
 		votingPowerSeen += val.VotingPower
 		if votingPowerSeen >= cs.Validators.TotalVotingPower()*2/3+1 {
-			cs.metrics.QuorumPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(v.Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
+			// cs.metrics.QuorumPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(v.Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
 			break
 		}
 	}
-	if ps.HasAll() {
-		cs.metrics.FullPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(pl[len(pl)-1].Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
-	}
+	// if ps.HasAll() {
+	// cs.metrics.FullPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(pl[len(pl)-1].Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
+	// }
 }
 
 // ---------------------------------------------------------

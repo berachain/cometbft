@@ -7,7 +7,7 @@ import (
 	"github.com/cometbft/cometbft/types"
 )
 
-func MakeCommitFromVoteSet(blockID types.BlockID, voteSet *types.VoteSet, validators []types.PrivValidator, now time.Time) (*types.Commit, error) {
+func MakeCommitFromVoteSet(blockID types.BlockID, voteSet *types.VoteSet, validators []types.PrivValidator, _ time.Time) (*types.Commit, error) {
 	// all sign
 	for i := 0; i < len(validators); i++ {
 		pubKey, err := validators[i].GetPubKey()
@@ -21,7 +21,6 @@ func MakeCommitFromVoteSet(blockID types.BlockID, voteSet *types.VoteSet, valida
 			Round:            voteSet.GetRound(),
 			Type:             types.PrecommitType,
 			BlockID:          blockID,
-			Timestamp:        now,
 		}
 
 		v := vote.ToProto()
@@ -63,7 +62,6 @@ func MakeCommit(blockID types.BlockID, height int64, round int32, valSet *types.
 			Round:            round,
 			Type:             types.PrecommitType,
 			BlockID:          blockID,
-			Timestamp:        now,
 		}
 
 		v := vote.ToProto()

@@ -545,7 +545,6 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 					Round:            1,
 					Type:             PrecommitType,
 					BlockID:          blockID,
-					Timestamp:        cmttime.Now(),
 				}
 				v := vote.ToProto()
 				err = vals[i].SignVote(voteSet.ChainID(), v, true)
@@ -683,7 +682,6 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 					Round:            round,
 					Type:             PrecommitType,
 					BlockID:          tc.blockIDs[n],
-					Timestamp:        cmttime.Now(),
 				}
 
 				added, err := signAddVote(vals[vi], vote, voteSet)

@@ -188,7 +188,7 @@ func DefaultVersionParams() VersionParams {
 func DefaultFeatureParams() FeatureParams {
 	return FeatureParams{
 		VoteExtensionsEnableHeight: 0,
-		PbtsEnableHeight:           0,
+		PbtsEnableHeight:           1, // PBTS from start
 	}
 }
 
@@ -435,7 +435,10 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 		}
 
 		if params2.Feature.PbtsEnableHeight != nil {
-			res.Feature.PbtsEnableHeight = params2.Feature.GetPbtsEnableHeight().Value
+			// Disabled because it should be enabled from the beginning
+			if res.Feature.PbtsEnableHeight != 1 {
+				panic("PBTS has to be enabled")
+			}
 		}
 	}
 	if params2.Synchrony != nil {

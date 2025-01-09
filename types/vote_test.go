@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,6 @@ import (
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/libs/protoio"
-	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func examplePrevote() *Vote {
@@ -29,16 +27,10 @@ func examplePrecommit() *Vote {
 }
 
 func exampleVote(t byte) *Vote {
-	stamp, err := time.Parse(TimeFormat, "2017-12-25T03:00:01.234Z")
-	if err != nil {
-		panic(err)
-	}
-
 	return &Vote{
-		Type:      SignedMsgType(t),
-		Height:    12345,
-		Round:     2,
-		Timestamp: stamp,
+		Type:   SignedMsgType(t),
+		Height: 12345,
+		Round:  2,
 		BlockID: BlockID{
 			Hash: tmhash.Sum([]byte("blockID_hash")),
 			PartSetHeader: PartSetHeader{
@@ -71,65 +63,53 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 		0: {
 			"", &Vote{},
 			// NOTE: Height and Round are skipped here. This case needs to be considered while parsing.
-			[]byte{0xd, 0x2a, 0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1},
+			[]byte{0x0},
 		},
 		// with proper (fixed size) height and round (PreCommit):
 		1: {
 			"", &Vote{Height: 1, Round: 1, Type: PrecommitType},
 			[]byte{
-				0x21,                                   // length
+				0x14,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
 				0x2,                                    // PrecommitType
 				0x11,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // height
 				0x19,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // round
-				0x2a, // (field_number << 3) | wire_type
-				// remaining fields (timestamp):
-				0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1,
 			},
 		},
 		// with proper (fixed size) height and round (PreVote):
 		2: {
 			"", &Vote{Height: 1, Round: 1, Type: PrevoteType},
 			[]byte{
-				0x21,                                   // length
+				0x14,                                   // length
 				0x8,                                    // (field_number << 3) | wire_type
 				0x1,                                    // PrevoteType
 				0x11,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // height
 				0x19,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // round
-				0x2a, // (field_number << 3) | wire_type
-				// remaining fields (timestamp):
-				0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1,
 			},
 		},
 		3: {
 			"", &Vote{Height: 1, Round: 1},
 			[]byte{
-				0x1f,                                   // length
+				0x12,                                   // length
 				0x11,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // height
 				0x19,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // round
-				// remaining fields (timestamp):
-				0x2a,
-				0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1,
 			},
 		},
 		// containing non-empty chain_id:
 		4: {
 			"test_chain_id", &Vote{Height: 1, Round: 1},
 			[]byte{
-				0x2e,                                   // length
+				0x21,                                   // length
 				0x11,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // height
 				0x19,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // round
-				// remaining fields:
-				0x2a,                                                                // (field_number << 3) | wire_type
-				0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1, // timestamp
 				// (field_number << 3) | wire_type
 				0x32,
 				0xd, 0x74, 0x65, 0x73, 0x74, 0x5f, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x69, 0x64,
@@ -143,15 +123,12 @@ func TestVoteSignBytesTestVectors(t *testing.T) {
 				Extension: []byte("extension"),
 			},
 			[]byte{
-				0x2e,                                   // length
+				0x21,                                   // length
 				0x11,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // height
 				0x19,                                   // (field_number << 3) | wire_type
 				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // round
 				// remaining fields:
-				0x2a,                                                                // (field_number << 3) | wire_type
-				0xb, 0x8, 0x80, 0x92, 0xb8, 0xc3, 0x98, 0xfe, 0xff, 0xff, 0xff, 0x1, // timestamp
-				// (field_number << 3) | wire_type
 				0x32,
 				0xd, 0x74, 0x65, 0x73, 0x74, 0x5f, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x69, 0x64, // chainID
 			}, // chainID
@@ -250,7 +227,6 @@ func TestVoteExtension(t *testing.T) {
 				ValidatorIndex:   0,
 				Height:           height,
 				Round:            round,
-				Timestamp:        cmttime.Now(),
 				Type:             PrecommitType,
 				BlockID:          makeBlockIDRandom(),
 			}
@@ -313,13 +289,13 @@ func TestVoteVerify(t *testing.T) {
 
 func TestVoteString(t *testing.T) {
 	str := examplePrecommit().String()
-	expected := `Vote{56789:6AF1F4111082 12345/02/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 8B01023386C3 000000000000 657874656E73 @ 2017-12-25T03:00:01.234Z}` //nolint:lll //ignore line length for tests
+	expected := `Vote{56789:6AF1F4111082 12345/02/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 8B01023386C3 000000000000 657874656E73 @}` //nolint:lll //ignore line length for tests
 	if str != expected {
 		t.Errorf("got unexpected string for Vote. Expected:\n%v\nGot:\n%v", expected, str)
 	}
 
 	str2 := examplePrevote().String()
-	expected = `Vote{56789:6AF1F4111082 12345/02/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8B01023386C3 000000000000 000000000000 @ 2017-12-25T03:00:01.234Z}` //nolint:lll //ignore line length for tests
+	expected = `Vote{56789:6AF1F4111082 12345/02/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8B01023386C3 000000000000 000000000000 @}` //nolint:lll //ignore line length for tests
 	if str2 != expected {
 		t.Errorf("got unexpected string for Vote. Expected:\n%v\nGot:\n%v", expected, str2)
 	}

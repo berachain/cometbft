@@ -11,7 +11,6 @@ import (
 	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
-	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
@@ -34,7 +33,6 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 		Height:           height,
 		Round:            round,
 		Type:             PrevoteType,
-		Timestamp:        cmttime.Now(),
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
 	_, err = signAddVote(val0, vote, voteSet)
@@ -55,7 +53,6 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             PrevoteType,
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
@@ -131,7 +128,6 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 		Height:           height,
 		Round:            round,
 		Type:             PrevoteType,
-		Timestamp:        cmttime.Now(),
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
 	// 6 out of 10 voted for nil.
@@ -184,7 +180,6 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		ValidatorIndex:   -1,  // NOTE: must fill in
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             PrevoteType,
 		BlockID:          BlockID{blockHash, blockPartSetHeader},
 	}
@@ -281,7 +276,6 @@ func TestVoteSet_Conflicts(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             PrevoteType,
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
@@ -405,7 +399,6 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             PrecommitType,
 		BlockID:          BlockID{blockHash, blockPartSetHeader},
 	}
@@ -532,7 +525,6 @@ func TestVoteSet_VoteExtensionsEnabled(t *testing.T) {
 				Height:           height,
 				Round:            round,
 				Type:             PrecommitType,
-				Timestamp:        cmttime.Now(),
 				BlockID:          BlockID{blockHash, blockPartSetHeader},
 			}
 			v := vote.ToProto()
@@ -566,7 +558,6 @@ func TestVoteSet_MakeBLSCommit(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             PrecommitType,
 		BlockID:          BlockID{blockHash, blockPartSetHeader},
 	}

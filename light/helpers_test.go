@@ -8,7 +8,6 @@ import (
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/types"
-	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/cometbft/cometbft/version"
 )
 
@@ -107,7 +106,6 @@ func makeVote(header *types.Header, valset *types.ValidatorSet,
 		ValidatorIndex:   idx,
 		Height:           header.Height,
 		Round:            1,
-		Timestamp:        cmttime.Now(),
 		Type:             types.PrecommitType,
 		BlockID:          blockID,
 	}

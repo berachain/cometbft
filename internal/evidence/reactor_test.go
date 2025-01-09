@@ -352,16 +352,10 @@ func (ps peerState) GetHeight() int64 {
 }
 
 func exampleVote(t byte) *types.Vote {
-	stamp, err := time.Parse(types.TimeFormat, "2017-12-25T03:00:01.234Z")
-	if err != nil {
-		panic(err)
-	}
-
 	return &types.Vote{
-		Type:      types.SignedMsgType(t),
-		Height:    3,
-		Round:     2,
-		Timestamp: stamp,
+		Type:   types.SignedMsgType(t),
+		Height: 3,
+		Round:  2,
 		BlockID: types.BlockID{
 			Hash: tmhash.Sum([]byte("blockID_hash")),
 			PartSetHeader: types.PartSetHeader{

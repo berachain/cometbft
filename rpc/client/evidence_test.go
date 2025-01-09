@@ -58,7 +58,6 @@ func makeEvidences(
 		Height:           1,
 		Round:            0,
 		Type:             types.PrevoteType,
-		Timestamp:        timestamp,
 		BlockID: types.BlockID{
 			Hash: tmhash.Sum(cmtrand.Bytes(tmhash.Size)),
 			PartSetHeader: types.PartSetHeader{

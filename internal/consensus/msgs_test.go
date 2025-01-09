@@ -416,7 +416,6 @@ func TestConsMsgsVectors(t *testing.T) {
 		ValidatorIndex:   1,
 		Height:           1,
 		Round:            0,
-		Timestamp:        date,
 		Type:             types.PrecommitType,
 		BlockID:          bi,
 	}

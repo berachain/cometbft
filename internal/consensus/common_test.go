@@ -104,7 +104,6 @@ func (vs *validatorStub) signVote(
 	blockID types.BlockID,
 	voteExtension []byte,
 	extEnabled bool,
-	timestamp time.Time,
 ) (*types.Vote, error) {
 	pubKey, err := vs.PrivValidator.GetPubKey()
 	if err != nil {
@@ -115,7 +114,6 @@ func (vs *validatorStub) signVote(
 		Height:           vs.Height,
 		Round:            vs.Round,
 		BlockID:          blockID,
-		Timestamp:        timestamp,
 		ValidatorAddress: pubKey.Address(),
 		ValidatorIndex:   vs.Index,
 		Extension:        voteExtension,
@@ -128,12 +126,10 @@ func (vs *validatorStub) signVote(
 	// ref: signVote in FilePV, the vote should use the previous vote info when the sign data is the same.
 	if signDataIsEqual(vs.lastVote, v) {
 		v.Signature = vs.lastVote.Signature
-		v.Timestamp = vs.lastVote.Timestamp
 		v.ExtensionSignature = vs.lastVote.ExtensionSignature
 	}
 
 	vote.Signature = v.Signature
-	vote.Timestamp = v.Timestamp
 	vote.ExtensionSignature = v.ExtensionSignature
 
 	if !extEnabled {
@@ -144,8 +140,8 @@ func (vs *validatorStub) signVote(
 }
 
 // Sign vote for type/hash/header.
-func signVoteWithTimestamp(vs *validatorStub, voteType types.SignedMsgType, chainID string,
-	blockID types.BlockID, extEnabled bool, timestamp time.Time,
+func signVoteWith(vs *validatorStub, voteType types.SignedMsgType, chainID string,
+	blockID types.BlockID, extEnabled bool,
 ) *types.Vote {
 	var ext []byte
 	// Only non-nil precommits are allowed to carry vote extensions.
@@ -157,7 +153,7 @@ func signVoteWithTimestamp(vs *validatorStub, voteType types.SignedMsgType, chai
 			ext = []byte("extension")
 		}
 	}
-	v, err := vs.signVote(voteType, chainID, blockID, ext, extEnabled, timestamp)
+	v, err := vs.signVote(voteType, chainID, blockID, ext, extEnabled)
 	if err != nil {
 		panic(fmt.Errorf("failed to sign vote: %v", err))
 	}
@@ -168,7 +164,7 @@ func signVoteWithTimestamp(vs *validatorStub, voteType types.SignedMsgType, chai
 }
 
 func signVote(vs *validatorStub, voteType types.SignedMsgType, chainID string, blockID types.BlockID, extEnabled bool) *types.Vote {
-	return signVoteWithTimestamp(vs, voteType, chainID, blockID, extEnabled, vs.clock.Now())
+	return signVoteWith(vs, voteType, chainID, blockID, extEnabled)
 }
 
 func signVotes(
