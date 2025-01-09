@@ -87,8 +87,6 @@ message Vote {
   int32         round    = 3;
   BlockID       block_id = 4
       [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];  // zero if vote is nil.
- // google.protobuf.Timestamp timestamp = 5
-   //   [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes validator_address = 6;
   int32 validator_index   = 7;
   // Vote signature by the validator if they participated in consensus for the
@@ -101,6 +99,8 @@ message Vote {
   // consensus for the associated block.
   // Only valid for precommit messages.
   bytes extension_signature = 10;
+
+  reserved 5;
 }
 
 // Commit contains the evidence that a block was committed by a set of validators.

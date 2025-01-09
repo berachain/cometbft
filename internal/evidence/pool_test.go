@@ -452,6 +452,7 @@ func defaultTestPool(t *testing.T, height int64) (*evidence.Pool, types.MockPV) 
 	evidenceDB := dbm.NewMemDB()
 	stateStore := initializeValidatorState(val, height)
 	state, _ := stateStore.Load()
+	state.ConsensusParams.Feature.PbtsEnableHeight = 1
 	blockStore, err := initializeBlockStore(dbm.NewMemDB(), state, valAddress)
 	require.NoError(t, err)
 	pool, err := evidence.NewPool(evidenceDB, stateStore, blockStore)
