@@ -59,18 +59,8 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 			votingPowerNeeded, ignore, count, true)
 	}
 
-	// only count the signatures that are for the block
-	count := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagCommit }
-
-	// attempt to batch verify
-	if shouldBatchVerify(vals, commit) {
-		return verifyCommitBatch(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, true, true)
-	}
-
-	// if verification failed or is not supported then fallback to single verification
-	return verifyCommitSingle(chainID, vals, commit, votingPowerNeeded,
-		ignore, count, true, true)
+	proposerKeyType := vals.GetProposer().PubKey.Type()
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // LIGHT CLIENT VERIFICATION METHODS
@@ -108,7 +98,7 @@ func verifyCommitLightInternal(
 	blockID BlockID,
 	height int64,
 	commit *Commit,
-	countAllSignatures bool,
+	_ bool,
 ) error {
 	// run a basic validation of the arguments
 	if err := verifyBasicValsAndCommit(vals, commit, height, blockID); err != nil {
@@ -132,18 +122,8 @@ func verifyCommitLightInternal(
 			votingPowerNeeded, ignore, count, true)
 	}
 
-	// ignore all commit signatures that are not for the block
-	ignore := func(c CommitSig) bool { return c.BlockIDFlag != BlockIDFlagCommit }
-
-	// attempt to batch verify
-	if shouldBatchVerify(vals, commit) {
-		return verifyCommitBatch(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, countAllSignatures, true)
-	}
-
-	// if verification failed or is not supported then fallback to single verification
-	return verifyCommitSingle(chainID, vals, commit, votingPowerNeeded,
-		ignore, count, countAllSignatures, true)
+	proposerKeyType := vals.GetProposer().PubKey.Type()
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // VerifyCommitLightTrusting verifies that trustLevel of the validator set signed
@@ -184,7 +164,7 @@ func verifyCommitLightTrustingInternal(
 	vals *ValidatorSet,
 	commit *Commit,
 	trustLevel cmtmath.Fraction,
-	countAllSignatures bool,
+	_ bool,
 ) error {
 	// sanity checks
 	if vals == nil {
@@ -218,20 +198,8 @@ func verifyCommitLightTrustingInternal(
 			votingPowerNeeded, ignore, count, false)
 	}
 
-	// ignore all commit signatures that are not for the block
-	ignore := func(c CommitSig) bool { return c.BlockIDFlag != BlockIDFlagCommit }
-
-	// attempt to batch verify commit. As the validator set doesn't necessarily
-	// correspond with the validator set that signed the block we need to look
-	// up by address rather than index.
-	if shouldBatchVerify(vals, commit) {
-		return verifyCommitBatch(chainID, vals, commit,
-			votingPowerNeeded, ignore, count, countAllSignatures, false)
-	}
-
-	// attempt with single verification
-	return verifyCommitSingle(chainID, vals, commit, votingPowerNeeded,
-		ignore, count, countAllSignatures, false)
+	proposerKeyType := vals.GetProposer().PubKey.Type()
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // ValidateHash returns an error if the hash is not empty, but its
