@@ -346,34 +346,6 @@ func TestDifferByTimestamp(t *testing.T) {
 		assert.Equal(t, signBytes, types.ProposalSignBytes(chainID, pb))
 		assert.Equal(t, sig, proposal.Signature)
 	}
-
-	// test vote
-	// {
-	// 	voteType := types.PrevoteType
-	// 	blockID := types.BlockID{Hash: randbytes, PartSetHeader: types.PartSetHeader{}}
-	// 	vote := newVote(privVal.Key.Address, height, round, voteType, blockID)
-	// 	v := vote.ToProto()
-	// 	err := privVal.SignVote("mychainid", v, false)
-	// 	require.NoError(t, err, "expected no error signing vote")
-
-	// 	signBytes := types.VoteSignBytes(chainID, v)
-	// 	sig := v.Signature
-	// 	extSig := v.ExtensionSignature
-	// 	timeStamp := vote.Timestamp
-
-	// 	// manipulate the timestamp. should get changed back
-	// 	v.Timestamp = v.Timestamp.Add(time.Millisecond)
-	// 	var emptySig []byte
-	// 	v.Signature = emptySig
-	// 	v.ExtensionSignature = emptySig
-	// 	err = privVal.SignVote("mychainid", v, false)
-	// 	require.NoError(t, err, "expected no error on signing same vote")
-
-	// 	assert.Equal(t, timeStamp, v.Timestamp)
-	// 	assert.Equal(t, signBytes, types.VoteSignBytes(chainID, v))
-	// 	assert.Equal(t, sig, v.Signature)
-	// 	assert.Equal(t, extSig, v.ExtensionSignature)
-	// }
 }
 
 func TestVoteExtensionsAreSignedIfSignExtensionIsTrue(t *testing.T) {
@@ -422,7 +394,6 @@ func TestVoteExtensionsAreSignedIfSignExtensionIsTrue(t *testing.T) {
 
 	err = privVal.SignVote("mychainid", vpb2, true)
 	require.NoError(t, err, "expected no error signing same vote with manipulated timestamp and vote extension")
-	// assert.Equal(t, expectedTimestamp, vpb2.Timestamp)
 
 	vesb3 := types.VoteExtensionSignBytes("mychainid", vpb2)
 	assert.True(t, pubKey.VerifySignature(vesb3, vpb2.ExtensionSignature))

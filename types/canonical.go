@@ -60,9 +60,6 @@ func CanonicalizeVote(chainID string, vote *cmtproto.Vote) cmtproto.CanonicalVot
 		Height:  vote.Height,       // encoded as sfixed64
 		Round:   int64(vote.Round), // encoded as sfixed64
 		BlockID: CanonicalizeBlockID(vote.BlockID),
-		// Timestamp is not included in the canonical vote
-		// because we won't be able to aggregate votes with different timestamps.
-		// Timestamp: vote.Timestamp,
 		ChainID: chainID,
 	}
 }

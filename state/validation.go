@@ -127,13 +127,6 @@ func validateBlock(state State, block *types.Block) error {
 		}
 		if !state.ConsensusParams.Feature.PbtsEnabled(block.Height) {
 			panic("PBTS has to be enabled")
-			// medianTime := block.LastCommit.MedianTime(state.LastValidators)
-			// if !block.Time.Equal(medianTime) {
-			// 	return fmt.Errorf("invalid block time. Expected %v, got %v",
-			// 		medianTime.Format(time.RFC3339Nano),
-			// 		block.Time.Format(time.RFC3339Nano),
-			// 	)
-			// }
 		}
 
 	case block.Height == state.InitialHeight:
