@@ -820,10 +820,10 @@ func (app *Application) verifyAndSum(
 	var sum int64
 	var extCount int
 	for _, vote := range extCommit.Votes {
-		if vote.BlockIdFlag == cmtproto.BlockIDFlagUnknown || vote.BlockIdFlag > cmtproto.BlockIDFlagNil {
+		if vote.BlockIdFlag == cmtproto.BlockIDFlagUnknown || vote.BlockIdFlag > cmtproto.BlockIDFlagAggNilAbsent {
 			return 0, fmt.Errorf("vote with bad blockID flag value at height %d; blockID flag %d", currentHeight, vote.BlockIdFlag)
 		}
-		if vote.BlockIdFlag == cmtproto.BlockIDFlagAbsent || vote.BlockIdFlag == cmtproto.BlockIDFlagNil {
+		if vote.BlockIdFlag == cmtproto.BlockIDFlagAbsent || vote.BlockIdFlag == cmtproto.BlockIDFlagNil || vote.BlockIdFlag == cmtproto.BlockIDFlagAggNil || vote.BlockIdFlag == cmtproto.BlockIDFlagAggNilAbsent {
 			if len(vote.VoteExtension) != 0 {
 				return 0, fmt.Errorf("non-empty vote extension at height %d, for a vote with blockID  flag %d",
 					currentHeight, vote.BlockIdFlag)

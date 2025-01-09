@@ -545,7 +545,9 @@ LOOP:
 		return fmt.Errorf("wrong aggregated signature for block: %X (pubkeys: %v)", aggSig1, pubkeys1)
 	}
 
-	if verifySigForNil {
+	// If we have to verify the aggregated signature for nil and there are
+	// signatures for nil, then verify the aggregated signature for nil.
+	if verifySigForNil && len(pubkeys2) > 0 {
 		if aggSig2 == nil {
 			return errors.New("missing aggregated signature for nil")
 		}
