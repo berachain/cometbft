@@ -1311,7 +1311,7 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 
 	case cs.LastCommit.HasTwoThirdsMajority():
 		// Make the commit from LastCommit.
-		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
+		key, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		canBeAggregated := blsKey &&
 			cs.state.Validators.AllKeysHaveSameType()
 		if canBeAggregated {
@@ -1320,7 +1320,7 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 			}
 			lastExtCommit = cs.LastCommit.MakeBLSCommit()
 		} else {
-			lastExtCommit = cs.LastCommit.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+			panic("last commit's validators keys are not BLS12-381. Found: " + key.Type())
 		}
 
 	default: // This shouldn't happen.
