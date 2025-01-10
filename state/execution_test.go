@@ -293,7 +293,6 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 					Signatures: []types.CommitSig{{
 						BlockIDFlag:      types.BlockIDFlagNil,
 						ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
-						Timestamp:        defaultEvidenceTime,
 						Signature:        crypto.CRandBytes(types.MaxSignatureSize),
 					}},
 				},
