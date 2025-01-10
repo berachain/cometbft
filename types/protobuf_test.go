@@ -8,14 +8,12 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cryptoenc "github.com/cometbft/cometbft/crypto/encoding"
 )
 
 func TestPubKey(t *testing.T) {
-	pvk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk := pvk.PubKey()
+	pk := ed25519.GenPrivKey().PubKey()
 
 	// to proto
 	abciPubKey, err := cryptoenc.PubKeyToProto(pk)
@@ -46,9 +44,7 @@ func TestPubKey_UnknownType(t *testing.T) {
 }
 
 func TestValidatorUpdates(t *testing.T) {
-	pvk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pkEd := pvk.PubKey()
+	pkEd := ed25519.GenPrivKey().PubKey()
 	cmtValExpected := NewValidator(pkEd, 10)
 	abciVal := abci.NewValidatorUpdate(pkEd, 10)
 
@@ -63,9 +59,7 @@ func TestValidatorUpdates(t *testing.T) {
 }
 
 func TestValidator_WithoutPubKey(t *testing.T) {
-	pvk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pkEd := pvk.PubKey()
+	pkEd := ed25519.GenPrivKey().PubKey()
 
 	abciVal := TM2PB.Validator(NewValidator(pkEd, 10))
 

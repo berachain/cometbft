@@ -15,8 +15,7 @@ import (
 
 	"github.com/cometbft/cometbft/abci/server"
 	"github.com/cometbft/cometbft/config"
-	"github.com/cometbft/cometbft/crypto/bls12381"
-
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtnet "github.com/cometbft/cometbft/internal/net"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	"github.com/cometbft/cometbft/libs/log"
@@ -223,8 +222,7 @@ func startSigner(cfg *Config) error {
 	var dialFn privval.SocketDialer
 	switch protocol {
 	case "tcp":
-		pvk1, _ := bls12381.GenPrivKey()
-		dialFn = privval.DialTCPFn(address, 3*time.Second, pvk1)
+		dialFn = privval.DialTCPFn(address, 3*time.Second, ed25519.GenPrivKey())
 	case "unix":
 		dialFn = privval.DialUnixFn(address)
 	default:

@@ -14,7 +14,7 @@ import (
 
 	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	"github.com/cometbft/cometbft/internal/test"
 	sm "github.com/cometbft/cometbft/state"
@@ -124,9 +124,8 @@ func TestFinalizeBlockResponsesSaveLoad1(t *testing.T) {
 
 	abciResponses.TxResults[0] = &abci.ExecTxResult{Data: []byte("foo"), Events: nil}
 	abciResponses.TxResults[1] = &abci.ExecTxResult{Data: []byte("bar"), Log: "ok", Events: nil}
-	pvk1, _ := bls12381.GenPrivKey()
 	abciResponses.ValidatorUpdates = []abci.ValidatorUpdate{
-		abci.NewValidatorUpdate(pvk1.PubKey(), 10),
+		abci.NewValidatorUpdate(ed25519.GenPrivKey().PubKey(), 10),
 	}
 
 	abciResponses.AppHash = make([]byte, 1)
@@ -404,8 +403,7 @@ func genValSetWithPowers(powers []int64) *types.ValidatorSet {
 	totalVotePower := int64(0)
 	for i := 0; i < size; i++ {
 		totalVotePower += powers[i]
-		pvk1, _ := bls12381.GenPrivKey()
-		val := types.NewValidator(pvk1.PubKey(), powers[i])
+		val := types.NewValidator(ed25519.GenPrivKey().PubKey(), powers[i])
 		val.ProposerPriority = cmtrand.Int64()
 		vals[i] = val
 	}
@@ -457,8 +455,7 @@ func TestProposerPriorityDoesNotGetResetToZero(t *testing.T) {
 	tearDown, _, state := setupTestCase(t)
 	defer tearDown(t)
 	val1VotingPower := int64(10)
-	pvk1, _ := bls12381.GenPrivKey()
-	val1PubKey := pvk1.PubKey()
+	val1PubKey := ed25519.GenPrivKey().PubKey()
 	val1 := &types.Validator{Address: val1PubKey.Address(), PubKey: val1PubKey, VotingPower: val1VotingPower}
 
 	state.Validators = types.NewValidatorSet([]*types.Validator{val1})
@@ -481,8 +478,7 @@ func TestProposerPriorityDoesNotGetResetToZero(t *testing.T) {
 	assert.Equal(t, 0+val1VotingPower-curTotal, updatedState.NextValidators.Validators[0].ProposerPriority)
 
 	// add a validator
-	pvk2, _ := bls12381.GenPrivKey()
-	val2PubKey := pvk2.PubKey()
+	val2PubKey := ed25519.GenPrivKey().PubKey()
 	val2VotingPower := int64(100)
 
 	updateAddVal := abci.NewValidatorUpdate(val2PubKey, val2VotingPower)
@@ -570,8 +566,7 @@ func TestProposerPriorityProposerAlternates(t *testing.T) {
 	tearDown, _, state := setupTestCase(t)
 	defer tearDown(t)
 	val1VotingPower := int64(10)
-	pvk1, _ := bls12381.GenPrivKey()
-	val1PubKey := pvk1.PubKey()
+	val1PubKey := ed25519.GenPrivKey().PubKey()
 	val1 := &types.Validator{Address: val1PubKey.Address(), PubKey: val1PubKey, VotingPower: val1VotingPower}
 
 	// reset state validators to above validator
@@ -599,8 +594,7 @@ func TestProposerPriorityProposerAlternates(t *testing.T) {
 	assert.Equal(t, val1PubKey.Address(), updatedState.NextValidators.Proposer.Address)
 
 	// add a validator with the same voting power as the first
-	pvk2, _ := bls12381.GenPrivKey()
-	val2PubKey := pvk2.PubKey()
+	val2PubKey := ed25519.GenPrivKey().PubKey()
 	updateAddVal := abci.NewValidatorUpdate(val2PubKey, val1VotingPower)
 	validatorUpdates, err = types.PB2TM.ValidatorUpdates([]abci.ValidatorUpdate{updateAddVal})
 	require.NoError(t, err)
@@ -735,8 +729,7 @@ func TestLargeGenesisValidator(t *testing.T) {
 	defer tearDown(t)
 
 	genesisVotingPower := types.MaxTotalVotingPower / 1000
-	pvk1, _ := bls12381.GenPrivKey()
-	genesisPubKey := pvk1.PubKey()
+	genesisPubKey := ed25519.GenPrivKey().PubKey()
 	// fmt.Println("genesis addr: ", genesisPubKey.Address())
 	genesisVal := &types.Validator{
 		Address:     genesisPubKey.Address(),
@@ -777,8 +770,7 @@ func TestLargeGenesisValidator(t *testing.T) {
 	// let the genesis validator "unbond",
 	// see how long it takes until the effect wears off and both begin to alternate
 	// see: https://github.com/tendermint/tendermint/issues/2960
-	pvk1, _ = bls12381.GenPrivKey()
-	firstAddedValPubKey := pvk1.PubKey()
+	firstAddedValPubKey := ed25519.GenPrivKey().PubKey()
 	firstAddedValVotingPower := int64(10)
 	firstAddedVal := abci.NewValidatorUpdate(firstAddedValPubKey, firstAddedValVotingPower)
 	validatorUpdates, err := types.PB2TM.ValidatorUpdates([]abci.ValidatorUpdate{firstAddedVal})
@@ -828,8 +820,7 @@ func TestLargeGenesisValidator(t *testing.T) {
 
 	// add 10 validators with the same voting power as the one added directly after genesis:
 	for i := 0; i < 10; i++ {
-		pvk1, _ := bls12381.GenPrivKey()
-		addedPubKey := pvk1.PubKey()
+		addedPubKey := ed25519.GenPrivKey().PubKey()
 		addedVal := abci.NewValidatorUpdate(addedPubKey, firstAddedValVotingPower)
 		validatorUpdates, err := types.PB2TM.ValidatorUpdates([]abci.ValidatorUpdate{addedVal})
 		require.NoError(t, err)
@@ -963,8 +954,7 @@ func TestManyValidatorChangesSaveLoad(t *testing.T) {
 
 	_, valOld := state.Validators.GetByIndex(0)
 	pubkeyOld := valOld.PubKey
-	pvk1, _ := bls12381.GenPrivKey()
-	pubkey := pvk1.PubKey()
+	pubkey := ed25519.GenPrivKey().PubKey()
 
 	// Swap the first validator with a new one (validator set size stays the same).
 	header, blockID, responses := makeHeaderPartsResponsesValPubKeyChange(state, pubkey)

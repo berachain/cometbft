@@ -9,8 +9,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
-
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/internal/async"
 	sc "github.com/cometbft/cometbft/p2p/conn"
 )
@@ -85,9 +84,9 @@ func makeKVStoreConnPair() (fooConn, barConn kvstoreConn) {
 func makeSecretConnPair() (fooSecConn, barSecConn *sc.SecretConnection) {
 	var (
 		fooConn, barConn = makeKVStoreConnPair()
-		fooPrvKey, _     = bls12381.GenPrivKey()
+		fooPrvKey        = ed25519.GenPrivKey()
 		fooPubKey        = fooPrvKey.PubKey()
-		barPrvKey, _     = bls12381.GenPrivKey()
+		barPrvKey        = ed25519.GenPrivKey()
 		barPubKey        = barPrvKey.PubKey()
 	)
 

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 )
 
@@ -14,8 +13,7 @@ import (
 // helper funcs
 
 func newPrivKey() ed25519.PrivKey {
-	pk := ed25519.GenPrivKey()
-	return pk
+	return ed25519.GenPrivKey()
 }
 
 // -------------------------------------------

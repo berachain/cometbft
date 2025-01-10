@@ -58,9 +58,7 @@ func TestPeerSend(t *testing.T) {
 	config := cfg
 
 	// simulate remote peer
-	pvk1, _ := bls12381.GenPrivKey()
-
-	rp := &remotePeer{PrivKey: pvk1, Config: config}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: config}
 	rp.Start()
 	t.Cleanup(rp.Stop)
 
@@ -92,8 +90,7 @@ func createOutboundPeerAndPerformHandshake(
 	msgTypeByChID := map[byte]proto.Message{
 		testCh: &p2p.Message{},
 	}
-
-	pk, _ := bls12381.GenPrivKey()
+	pk := ed25519.GenPrivKey()
 	pc, err := testOutboundPeerConn(addr, config, false, pk)
 	if err != nil {
 		return nil, err

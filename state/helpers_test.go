@@ -9,7 +9,7 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/internal/test"
 	"github.com/cometbft/cometbft/proxy"
 	sm "github.com/cometbft/cometbft/state"
@@ -120,8 +120,7 @@ func makeValidCommit(
 func genValSet(size int) *types.ValidatorSet {
 	vals := make([]*types.Validator, size)
 	for i := 0; i < size; i++ {
-		pvk1, _ := bls12381.GenPrivKey()
-		vals[i] = types.NewValidator(pvk1.PubKey(), 10)
+		vals[i] = types.NewValidator(ed25519.GenPrivKey().PubKey(), 10)
 	}
 	return types.NewValidatorSet(vals)
 }
@@ -172,8 +171,7 @@ func makeHeaderPartsResponsesParams(
 }
 
 func randomGenesisDoc() *types.GenesisDoc {
-	pvk1, _ := bls12381.GenPrivKey()
-	pubkey := pvk1.PubKey()
+	pubkey := ed25519.GenPrivKey().PubKey()
 	return &types.GenesisDoc{
 		GenesisTime: cmttime.Now(),
 		ChainID:     "abc",

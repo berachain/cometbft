@@ -9,12 +9,13 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 	val0 := privValidators[0]
 
 	val0p, err := val0.GetPubKey()
@@ -45,7 +46,7 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 
 func TestVoteSet_AddVote_Bad(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 
 	voteProto := &Vote{
 		ValidatorAddress: nil,
@@ -119,7 +120,7 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 
 func TestVoteSet_2_3Majority(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 10, 1, false, ed25519.KeyType)
 
 	voteProto := &Vote{
 		ValidatorAddress: nil, // NOTE: must fill in
@@ -168,7 +169,7 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 
 func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 100, 1, false, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 100, 1, false, ed25519.KeyType)
 
 	blockHash := crypto.CRandBytes(32)
 	blockPartsTotal := uint32(123)
@@ -266,7 +267,7 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 
 func TestVoteSet_Conflicts(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 4, 1, false, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrevoteType, 4, 1, false, ed25519.KeyType)
 	blockHash1 := cmtrand.Bytes(32)
 	blockHash2 := cmtrand.Bytes(32)
 
@@ -390,7 +391,7 @@ func TestVoteSet_Conflicts(t *testing.T) {
 
 func TestVoteSet_MakeCommit(t *testing.T) {
 	height, round := int64(1), int32(0)
-	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, bls12381.KeyType)
+	voteSet, _, privValidators := randVoteSet(height, round, PrecommitType, 10, 1, true, ed25519.KeyType)
 	blockHash, blockPartSetHeader := crypto.CRandBytes(32), PartSetHeader{123, crypto.CRandBytes(32)}
 
 	voteProto := &Vote{

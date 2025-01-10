@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmttime "github.com/cometbft/cometbft/types/time"
 )
@@ -83,9 +83,7 @@ func TestBasicGenesisDoc(t *testing.T) {
 	_, err := GenesisDocFromJSON(genDocBytes)
 	require.NoError(t, err, "expected no error for good genDoc json")
 
-	pvk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pubkey := pvk.PubKey()
+	pubkey := ed25519.GenPrivKey().PubKey()
 	// create a base gendoc from struct
 	baseGenDoc := &GenesisDoc{
 		ChainID:    "abc",
@@ -161,8 +159,7 @@ func TestGenesisValidatorHash(t *testing.T) {
 }
 
 func randomGenesisDoc() *GenesisDoc {
-	pvk, _ := bls12381.GenPrivKey()
-	pubkey := pvk.PubKey()
+	pubkey := ed25519.GenPrivKey().PubKey()
 	return &GenesisDoc{
 		GenesisTime:     cmttime.Now(),
 		ChainID:         "abc",

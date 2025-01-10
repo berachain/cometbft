@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtnet "github.com/cometbft/cometbft/internal/net"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
@@ -61,11 +60,10 @@ func TestSignerRemoteRetryTCPOnly(t *testing.T) {
 			}
 		}
 	}(ln, attemptCh)
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
+
 	dialerEndpoint := NewSignerDialerEndpoint(
 		log.TestingLogger(),
-		DialTCPFn(ln.Addr().String(), testTimeoutReadWrite, pk),
+		DialTCPFn(ln.Addr().String(), testTimeoutReadWrite, ed25519.GenPrivKey()),
 	)
 	SignerDialerEndpointTimeoutReadWrite(time.Millisecond)(dialerEndpoint)
 	SignerDialerEndpointConnRetries(retries)(dialerEndpoint)
@@ -248,9 +246,7 @@ func newSignerListenerEndpoint(logger log.Logger, addr string, timeoutReadWrite 
 		UnixListenerTimeoutReadWrite(timeoutReadWrite)(unixLn)
 		listener = unixLn
 	} else {
-		pk := ed25519.GenPrivKey()
-
-		tcpLn := NewTCPListener(ln, pk)
+		tcpLn := NewTCPListener(ln, ed25519.GenPrivKey())
 		TCPListenerTimeoutAccept(testTimeoutAccept)(tcpLn)
 		TCPListenerTimeoutReadWrite(timeoutReadWrite)(tcpLn)
 		listener = tcpLn
