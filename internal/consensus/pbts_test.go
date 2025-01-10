@@ -7,12 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	// "github.com/stretchr/testify/mock".
 	"github.com/stretchr/testify/require"
 
 	"github.com/cometbft/cometbft/abci/example/kvstore"
-	// abci "github.com/cometbft/cometbft/abci/types"
-	// abcimocks "github.com/cometbft/cometbft/abci/types/mocks".
 	"github.com/cometbft/cometbft/internal/test"
 	cmtpubsub "github.com/cometbft/cometbft/libs/pubsub"
 	"github.com/cometbft/cometbft/types"

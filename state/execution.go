@@ -270,8 +270,6 @@ func (blockExec *BlockExecutor) applyBlock(state State, blockID types.BlockID, b
 	fail.Fail() // XXX
 
 	// validate the validator updates and convert to CometBFT types
-	fmt.Println("abciResponse.ValidatorUpdates", abciResponse.ValidatorUpdates)
-	fmt.Println("state.ConsensusParams.Validator", state.ConsensusParams.Validator)
 	err = validateValidatorUpdates(abciResponse.ValidatorUpdates, state.ConsensusParams.Validator)
 	if err != nil {
 		return state, fmt.Errorf("error in validator updates: %w", err)

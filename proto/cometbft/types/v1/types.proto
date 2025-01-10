@@ -88,7 +88,7 @@ message Vote {
   BlockID       block_id = 4
       [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];  // zero if vote is nil.
   google.protobuf.Timestamp timestamp = 5
-     [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+      [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes validator_address = 6;
   int32 validator_index   = 7;
   // Vote signature by the validator if they participated in consensus for the

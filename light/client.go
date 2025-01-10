@@ -64,6 +64,7 @@ func SequentialVerification() Option {
 // verification is used.
 func SkippingVerification(trustLevel cmtmath.Fraction) Option {
 	return func(c *Client) {
+		// XXX: skipping verification doesn't (yet) work with BLS12-381 keys.
 		c.verificationMode = sequential
 		c.trustLevel = trustLevel
 	}
