@@ -677,13 +677,14 @@ func (cs CommitSig) ValidateBasic() error {
 		return fmt.Errorf("unknown BlockIDFlag: %v", cs.BlockIDFlag)
 	}
 
+	if !cs.Timestamp.IsZero() {
+		return errors.New("time is present")
+	}
+
 	switch cs.BlockIDFlag {
 	case BlockIDFlagAbsent:
 		if len(cs.ValidatorAddress) != 0 {
 			return errors.New("validator address is present")
-		}
-		if !cs.Timestamp.IsZero() {
-			return errors.New("time is present")
 		}
 		if len(cs.Signature) != 0 {
 			return errors.New("signature is present")
