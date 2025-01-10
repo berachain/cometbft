@@ -1371,6 +1371,8 @@ func timelyProposalMargins(s types.SynchronyParams, r int32) (time.Duration, tim
 
 	// cs.ProposalReceiveTime - cs.Proposal.Timestamp >= -1 * Precision
 	// cs.ProposalReceiveTime - cs.Proposal.Timestamp <= MessageDelay + Precision
+	fmt.Println("xxx", sp.MessageDelay, sp.Precision, sp.MessageDelay+sp.Precision)
+	fmt.Printf("yyy %x,%x,%x", int64(sp.MessageDelay), int64(sp.Precision), int64(sp.MessageDelay+sp.Precision))
 	return -sp.Precision, sp.MessageDelay + sp.Precision
 }
 
@@ -1383,10 +1385,6 @@ func (cs *State) timelyProposalMargins() (time.Duration, time.Duration) {
 }
 
 func (cs *State) proposalIsTimely() bool {
-	if cs.Proposal.Round > 10 {
-		return true
-	}
-
 	sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Proposal.Round)
 	return cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)
 }

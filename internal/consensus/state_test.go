@@ -81,12 +81,12 @@ func TestTest(t *testing.T) {
 	// }
 
 	originalSP := types.DefaultSynchronyParams()
-	t.Log(originalSP.InRound(10))
-	t.Log(originalSP.InRound(100))
+	// t.Log(originalSP.InRound(10))
+	// t.Log(originalSP.InRound(100))
 	t.Log(originalSP.InRound(303))
 
-	t.Log(timelyProposalMargins(originalSP, 10))
-	t.Log(timelyProposalMargins(originalSP, 100))
+	// t.Log(timelyProposalMargins(originalSP, 10))
+	// t.Log(timelyProposalMargins(originalSP, 100))
 	t.Log(timelyProposalMargins(originalSP, 303))
 }
 

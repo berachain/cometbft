@@ -135,9 +135,11 @@ type SynchronyParams struct {
 // parameters are set or become insufficient to preserve liveness. Refer to
 // https://github.com/cometbft/cometbft/issues/2184 for more details.
 func (sp SynchronyParams) InRound(round int32) SynchronyParams {
+	msgDelay := math.Pow(1.1, float64(round)) * float64(sp.MessageDelay)
+	fmt.Println("InRound", msgDelay, time.Duration(msgDelay), int64(time.Duration(msgDelay)), math.MaxInt64)
 	return SynchronyParams{
 		Precision:    sp.Precision,
-		MessageDelay: time.Duration(math.Pow(1.1, float64(round)) * float64(sp.MessageDelay)),
+		MessageDelay: time.Duration(msgDelay),
 	}
 }
 
