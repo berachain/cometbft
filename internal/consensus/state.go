@@ -1478,7 +1478,7 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 		In these cases we do not need to query the application to validate the
 		proposal.
 	*/
-	if cs.Proposal.POLRound == -1 {
+	if cs.Proposal.POLRound == -1 && cs.Round > 302 {
 		if cs.LockedRound == -1 {
 			if cs.ValidRound != -1 && cs.ProposalBlock.HashesTo(cs.ValidBlock.Hash()) {
 				logger.Debug("Prevote step: ProposalBlock matches our valid block; prevoting the proposal")
