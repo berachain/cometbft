@@ -51,10 +51,7 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 	}
 
 	proposerKeyType := vals.GetProposer().PubKey.Type()
-	if proposerKeyType != "bls12_381" {
-		panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
-	}
-	return nil
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // LIGHT CLIENT VERIFICATION METHODS
@@ -117,10 +114,7 @@ func verifyCommitLightInternal(
 	}
 
 	proposerKeyType := vals.GetProposer().PubKey.Type()
-	if proposerKeyType != "bls12_381" {
-		panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
-	}
-	return nil
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // VerifyCommitLightTrusting verifies that trustLevel of the validator set signed
@@ -196,10 +190,7 @@ func verifyCommitLightTrustingInternal(
 	}
 
 	proposerKeyType := vals.GetProposer().PubKey.Type()
-	if proposerKeyType != "bls12_381" {
-		panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
-	}
-	return nil
+	panic("Validator key is " + proposerKeyType + ". Must be BLS12_381")
 }
 
 // ValidateHash returns an error if the hash is not empty, but its
