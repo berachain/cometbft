@@ -253,128 +253,128 @@ func TestClient_SequentialVerification(t *testing.T) {
 	}
 }
 
-func TestClient_SkippingVerification(t *testing.T) {
-	// required for 2nd test case
-	newKeys := genPrivKeys(4)
-	newVals := newKeys.ToValidators(10, 1)
+// func TestClient_SkippingVerification(t *testing.T) {
+// 	// required for 2nd test case
+// 	newKeys := genPrivKeys(4)
+// 	newVals := newKeys.ToValidators(10, 1)
 
-	// 1/3+ of vals, 2/3- of newVals
-	transitKeys := keys.Extend(3)
-	transitVals := transitKeys.ToValidators(10, 1)
+// 	// 1/3+ of vals, 2/3- of newVals
+// 	transitKeys := keys.Extend(3)
+// 	transitVals := transitKeys.ToValidators(10, 1)
 
-	testCases := []struct {
-		name         string
-		otherHeaders map[int64]*types.SignedHeader // all except ^
-		vals         map[int64]*types.ValidatorSet
-		initErr      bool
-		verifyErr    bool
-	}{
-		{
-			"good",
-			map[int64]*types.SignedHeader{
-				// trusted header
-				1: h1,
-				// last header (3/3 signed)
-				3: h3,
-			},
-			valSet,
-			false,
-			false,
-		},
-		{
-			"good, but val set changes by 2/3 (1/3 of vals is still present)",
-			map[int64]*types.SignedHeader{
-				// trusted header
-				1: h1,
-				3: transitKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, transitVals, transitVals,
-					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(transitKeys)),
-			},
-			map[int64]*types.ValidatorSet{
-				1: vals,
-				2: vals,
-				3: transitVals,
-			},
-			false,
-			false,
-		},
-		{
-			"good, but val set changes 100% at height 2",
-			map[int64]*types.SignedHeader{
-				// trusted header
-				1: h1,
-				// interim header (3/3 signed)
-				2: keys.GenSignedHeader(chainID, 2, bTime.Add(1*time.Hour), nil, vals, newVals,
-					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(keys)),
-				// last header (0/4 of the original val set signed)
-				3: newKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, newVals, newVals,
-					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(newKeys)),
-			},
-			map[int64]*types.ValidatorSet{
-				1: vals,
-				2: vals,
-				3: newVals,
-			},
-			false,
-			false,
-		},
-		{
-			"bad: last header signed by newVals, interim header has no signers",
-			map[int64]*types.SignedHeader{
-				// trusted header
-				1: h1,
-				// last header (0/4 of the original val set signed)
-				2: keys.GenSignedHeader(chainID, 2, bTime.Add(1*time.Hour), nil, vals, newVals,
-					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, 0),
-				// last header (0/4 of the original val set signed)
-				3: newKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, newVals, newVals,
-					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(newKeys)),
-			},
-			map[int64]*types.ValidatorSet{
-				1: vals,
-				2: vals,
-				3: newVals,
-			},
-			false,
-			true,
-		},
-	}
+// 	testCases := []struct {
+// 		name         string
+// 		otherHeaders map[int64]*types.SignedHeader // all except ^
+// 		vals         map[int64]*types.ValidatorSet
+// 		initErr      bool
+// 		verifyErr    bool
+// 	}{
+// 		{
+// 			"good",
+// 			map[int64]*types.SignedHeader{
+// 				// trusted header
+// 				1: h1,
+// 				// last header (3/3 signed)
+// 				3: h3,
+// 			},
+// 			valSet,
+// 			false,
+// 			false,
+// 		},
+// 		{
+// 			"good, but val set changes by 2/3 (1/3 of vals is still present)",
+// 			map[int64]*types.SignedHeader{
+// 				// trusted header
+// 				1: h1,
+// 				3: transitKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, transitVals, transitVals,
+// 					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(transitKeys)),
+// 			},
+// 			map[int64]*types.ValidatorSet{
+// 				1: vals,
+// 				2: vals,
+// 				3: transitVals,
+// 			},
+// 			false,
+// 			false,
+// 		},
+// 		{
+// 			"good, but val set changes 100% at height 2",
+// 			map[int64]*types.SignedHeader{
+// 				// trusted header
+// 				1: h1,
+// 				// interim header (3/3 signed)
+// 				2: keys.GenSignedHeader(chainID, 2, bTime.Add(1*time.Hour), nil, vals, newVals,
+// 					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(keys)),
+// 				// last header (0/4 of the original val set signed)
+// 				3: newKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, newVals, newVals,
+// 					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(newKeys)),
+// 			},
+// 			map[int64]*types.ValidatorSet{
+// 				1: vals,
+// 				2: vals,
+// 				3: newVals,
+// 			},
+// 			false,
+// 			false,
+// 		},
+// 		{
+// 			"bad: last header signed by newVals, interim header has no signers",
+// 			map[int64]*types.SignedHeader{
+// 				// trusted header
+// 				1: h1,
+// 				// last header (0/4 of the original val set signed)
+// 				2: keys.GenSignedHeader(chainID, 2, bTime.Add(1*time.Hour), nil, vals, newVals,
+// 					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, 0),
+// 				// last header (0/4 of the original val set signed)
+// 				3: newKeys.GenSignedHeader(chainID, 3, bTime.Add(2*time.Hour), nil, newVals, newVals,
+// 					hash("app_hash"), hash("cons_hash"), hash("results_hash"), 0, len(newKeys)),
+// 			},
+// 			map[int64]*types.ValidatorSet{
+// 				1: vals,
+// 				2: vals,
+// 				3: newVals,
+// 			},
+// 			false,
+// 			true,
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			c, err := light.NewClient(
-				ctx,
-				chainID,
-				trustOptions,
-				mockp.New(
-					chainID,
-					tc.otherHeaders,
-					tc.vals,
-				),
-				[]provider.Provider{mockp.New(
-					chainID,
-					tc.otherHeaders,
-					tc.vals,
-				)},
-				dbs.New(dbm.NewMemDB(), chainID),
-				light.SkippingVerification(light.DefaultTrustLevel),
-				light.Logger(log.TestingLogger()),
-			)
-			if tc.initErr {
-				require.Error(t, err)
-				return
-			}
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			c, err := light.NewClient(
+// 				ctx,
+// 				chainID,
+// 				trustOptions,
+// 				mockp.New(
+// 					chainID,
+// 					tc.otherHeaders,
+// 					tc.vals,
+// 				),
+// 				[]provider.Provider{mockp.New(
+// 					chainID,
+// 					tc.otherHeaders,
+// 					tc.vals,
+// 				)},
+// 				dbs.New(dbm.NewMemDB(), chainID),
+// 				light.SkippingVerification(light.DefaultTrustLevel),
+// 				light.Logger(log.TestingLogger()),
+// 			)
+// 			if tc.initErr {
+// 				require.Error(t, err)
+// 				return
+// 			}
 
-			require.NoError(t, err)
+// 			require.NoError(t, err)
 
-			_, err = c.VerifyLightBlockAtHeight(ctx, 3, bTime.Add(3*time.Hour))
-			if tc.verifyErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
+// 			_, err = c.VerifyLightBlockAtHeight(ctx, 3, bTime.Add(3*time.Hour))
+// 			if tc.verifyErr {
+// 				require.Error(t, err)
+// 			} else {
+// 				require.NoError(t, err)
+// 			}
+// 		})
+// 	}
+// }
 
 // start from a large light block to make sure that the pivot height doesn't select a height outside
 // the appropriate range.

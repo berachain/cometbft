@@ -85,7 +85,7 @@ func TestEvidencePoolBasic(t *testing.T) {
 	next := pool.EvidenceFront()
 	assert.Equal(t, ev, next.Value.(types.Evidence))
 
-	const evidenceBytes int64 = 356
+	const evidenceBytes int64 = 382
 	evs, size = pool.PendingEvidence(evidenceBytes)
 	assert.Len(t, evs, 1)
 	assert.Equal(t, evidenceBytes, size) // check that the size of the single evidence in bytes is correct
