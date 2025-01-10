@@ -18,12 +18,14 @@ GOARM ?=
 ifeq (linux/arm,$(findstring linux/arm,$(TARGETPLATFORM)))
 	GOOS=linux
 	GOARCH=arm
+	CC=arm-linux-gnueabi-gcc
 	GOARM=7
 endif
 
 ifeq (linux/arm/v6,$(findstring linux/arm/v6,$(TARGETPLATFORM)))
 	GOOS=linux
 	GOARCH=arm
+	CC=arm-linux-gnueabi-gcc
 	GOARM=6
 endif
 
