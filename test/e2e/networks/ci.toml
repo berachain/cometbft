@@ -17,7 +17,6 @@ abci_protocol = "builtin"
 prometheus = true
 peer_gossip_intraloop_sleep_duration = "50ms"
 abci_tests_enabled = true
-key_type = "bls12_381"
 
 [validators]
 validator01 = 100
