@@ -221,7 +221,7 @@ func NewClientFromTrustedStore(
 	c := &Client{
 		chainID:          chainID,
 		trustingPeriod:   trustingPeriod,
-		verificationMode: sequential,
+		verificationMode: sequential, // XXX: skipping verification doesn't (yet) work with BLS12-381 keys.
 		trustLevel:       DefaultTrustLevel,
 		maxRetryAttempts: defaultMaxRetryAttempts,
 		maxClockDrift:    defaultMaxClockDrift,
