@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	blst "github.com/supranational/blst/bindings/go"
 
@@ -236,4 +237,8 @@ func (pubKey *PubKey) UnmarshalJSON(bz []byte) error {
 	}
 	pubKey.pk = pk.pk
 	return nil
+}
+
+func (pubKey PubKey) String() string {
+	return fmt.Sprintf("PubKey{0x%X}", pubKey.Bytes())
 }
