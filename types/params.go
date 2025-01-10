@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"math"
 	"time"
@@ -174,9 +175,10 @@ func DefaultEvidenceParams() EvidenceParams {
 // only ed25519 pubkeys.
 func DefaultValidatorParams() ValidatorParams {
 	params := ValidatorParams{
-		PubKeyTypes: []string{ABCIPubKeyTypeEd25519},
+		PubKeyTypes: []string{ABCIPubKeyTypeBls12381},
 	}
-	if bls12381.Enabled {
+	// If we are running tests, enable ed25519.
+	if flag.Lookup("test.v") != nil {
 		params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeBls12381)
 	}
 	return params
@@ -282,12 +284,19 @@ func (params ConsensusParams) ValidateBasic() error {
 		return errors.New("len(Validator.PubKeyTypes) must be greater than 0")
 	}
 
-	// Check if keyType is a known ABCIPubKeyType
-	for i := 0; i < len(params.Validator.PubKeyTypes); i++ {
-		keyType := params.Validator.PubKeyTypes[i]
-		if _, ok := ABCIPubKeyTypesToNames[keyType]; !ok {
-			return fmt.Errorf("params.Validator.PubKeyTypes[%d], %s, is an unknown pubkey type",
-				i, keyType)
+	// If we are running in production, we only allow BLS keys
+	if flag.Lookup("test.v") == nil {
+		if !(len(params.Validator.PubKeyTypes) == 1 && params.Validator.PubKeyTypes[0] == ABCIPubKeyTypeBls12381) {
+			return errors.New("only BLS key type is allowed")
+		}
+	} else { // Otherwise, we allow all key types
+		// Check if keyType is a known ABCIPubKeyType
+		for i := 0; i < len(params.Validator.PubKeyTypes); i++ {
+			keyType := params.Validator.PubKeyTypes[i]
+			if _, ok := ABCIPubKeyTypesToNames[keyType]; !ok {
+				return fmt.Errorf("params.Validator.PubKeyTypes[%d], %s, is an unknown pubkey type",
+					i, keyType)
+			}
 		}
 	}
 
