@@ -18,7 +18,7 @@ import (
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	cfg "github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	"github.com/cometbft/cometbft/internal/test"
 	"github.com/cometbft/cometbft/libs/log"
@@ -620,7 +620,8 @@ func TestPruningService(t *testing.T) {
 	state.ConsensusParams.Evidence.MaxAgeNumBlocks = 400
 	state.ConsensusParams.Evidence.MaxAgeDuration = 1 * time.Minute
 
-	pk := ed25519.GenPrivKey().PubKey()
+	pvk1, _ := bls12381.GenPrivKey()
+	pk := pvk1.PubKey()
 
 	// Generate a bunch of state data.
 	// This is needed because the pruning is expecting to load the state from the database thus

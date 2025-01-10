@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	"github.com/cometbft/cometbft/internal/test"
@@ -135,7 +135,7 @@ func TestBroadcastEvidence_DuplicateVoteEvidence(t *testing.T) {
 		err = client.WaitForHeight(c, status.SyncInfo.LatestBlockHeight+2, nil)
 		require.NoError(t, err)
 
-		ed25519pub := pv.Key.PubKey.(ed25519.PubKey)
+		ed25519pub := pv.Key.PubKey.(bls12381.PubKey)
 		rawpub := ed25519pub.Bytes()
 		result2, err := c.ABCIQuery(context.Background(), "/val", rawpub)
 		require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestBroadcastEvidence_DuplicateVoteEvidence(t *testing.T) {
 		require.NoError(t, err, "Error reading query result, value %v", qres.Value)
 
 		require.EqualValues(t, rawpub, v.PubKeyBytes, "Stored PubKey not equal with expected, value %v", string(qres.Value))
-		require.EqualValues(t, ed25519.KeyType, v.PubKeyType, "Stored PubKeyType not equal with expected, value %v", string(qres.Value))
+		require.EqualValues(t, bls12381.KeyType, v.PubKeyType, "Stored PubKeyType not equal with expected, value %v", string(qres.Value))
 		require.Equal(t, int64(9), v.Power, "Stored Power not equal with expected, value %v", string(qres.Value))
 
 		for _, fake := range fakes {

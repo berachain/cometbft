@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 )
 
 func getDialerTestCases(t *testing.T) []dialerTestCase {
@@ -18,10 +18,12 @@ func getDialerTestCases(t *testing.T) []dialerTestCase {
 	require.NoError(t, err)
 	unixAddr := "unix://" + unixFilePath
 
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
 	return []dialerTestCase{
 		{
 			addr:   tcpAddr,
-			dialer: DialTCPFn(tcpAddr, testTimeoutReadWrite, ed25519.GenPrivKey()),
+			dialer: DialTCPFn(tcpAddr, testTimeoutReadWrite, pk),
 		},
 		{
 			addr:   unixAddr,
@@ -33,16 +35,20 @@ func getDialerTestCases(t *testing.T) []dialerTestCase {
 func TestIsConnTimeoutForFundamentalTimeouts(t *testing.T) {
 	// Generate a networking timeout
 	tcpAddr := GetFreeLocalhostAddrPort()
-	dialer := DialTCPFn(tcpAddr, time.Millisecond, ed25519.GenPrivKey())
-	_, err := dialer()
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	dialer := DialTCPFn(tcpAddr, time.Millisecond, pk)
+	_, err = dialer()
 	require.Error(t, err)
 	assert.True(t, IsConnTimeout(err))
 }
 
 func TestIsConnTimeoutForWrappedConnTimeouts(t *testing.T) {
 	tcpAddr := GetFreeLocalhostAddrPort()
-	dialer := DialTCPFn(tcpAddr, time.Millisecond, ed25519.GenPrivKey())
-	_, err := dialer()
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	dialer := DialTCPFn(tcpAddr, time.Millisecond, pk)
+	_, err = dialer()
 	require.Error(t, err)
 	err = fmt.Errorf("%v: %w", err, ErrConnectionTimeout)
 	assert.True(t, IsConnTimeout(err))

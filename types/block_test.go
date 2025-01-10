@@ -15,7 +15,7 @@ import (
 
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/internal/bits"
@@ -35,7 +35,7 @@ func TestBlockAddEvidence(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestBlockValidateBasic(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
+	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 	commit := extCommit.ToCommit()
@@ -127,7 +127,7 @@ func TestBlockMakePartSetWithEvidence(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func TestBlockHashesTo(t *testing.T) {
 
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
+	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -228,7 +228,7 @@ func TestNilDataHashDoesntCrash(t *testing.T) {
 func TestCommit(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, ed25519.KeyType)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), true)
 	require.NoError(t, err)
 
@@ -433,7 +433,7 @@ func TestMaxHeaderBytes(t *testing.T) {
 func randCommit(now time.Time) *Commit {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, bls12381.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, now, false)
 	if err != nil {
 		panic(err)
@@ -608,7 +608,7 @@ func TestExtendedCommitToVoteSet(t *testing.T) {
 			lastID := makeBlockIDRandom()
 			h := int64(3)
 
-			voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, ed25519.KeyType)
+			voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, bls12381.KeyType)
 			extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), true)
 			require.NoError(t, err)
 
@@ -668,7 +668,7 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		voteSet, valSet, vals := randVoteSet(height-1, round, PrecommitType, tc.numValidators, 1, false, ed25519.KeyType)
+		voteSet, valSet, vals := randVoteSet(height-1, round, PrecommitType, tc.numValidators, 1, false, bls12381.KeyType)
 
 		vi := int32(0)
 		for n := range tc.blockIDs {

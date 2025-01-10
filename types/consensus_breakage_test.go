@@ -9,7 +9,7 @@ import (
 
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 )
 
@@ -114,7 +114,11 @@ func deterministicValidatorSet(t *testing.T) *ValidatorSet {
 
 	pkBytes, err := hex.DecodeString("D9838D11F68AE4679BD91BC2693CDF62FAABAEA7B4290A70ED5F200B4B67881C")
 	require.NoError(t, err)
-	pk := ed25519.PubKey(pkBytes)
+
+	pk, err := bls12381.NewPublicKeyFromBytes(pkBytes)
+	if err != nil {
+		panic("error in deterministic key creation")
+	}
 	val := NewValidator(pk, 1)
 	return NewValidatorSet([]*Validator{val})
 }
@@ -138,7 +142,7 @@ func deterministicLastCommit() *Commit {
 				BlockIDFlag:      BlockIDFlagCommit,
 				ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
 				Timestamp:        time.Unix(1515151515, 0),
-				Signature:        make([]byte, ed25519.SignatureSize),
+				Signature:        make([]byte, bls12381.SignatureLength),
 			},
 		},
 	}

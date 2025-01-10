@@ -14,7 +14,7 @@ import (
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
@@ -201,7 +201,8 @@ func BenchmarkValidatorSetCopy(b *testing.B) {
 	b.StopTimer()
 	vset := NewValidatorSet([]*Validator{})
 	for i := 0; i < 1000; i++ {
-		privKey := ed25519.GenPrivKey()
+
+		privKey, _ := bls12381.GenPrivKey()
 		pubKey := privKey.PubKey()
 		val := NewValidator(pubKey, 10)
 		err := vset.UpdateWithChangeSet([]*Validator{val})
@@ -341,7 +342,8 @@ func TestProposerSelection3(t *testing.T) {
 	}
 
 	for i := 0; i < 4; i++ {
-		pk := ed25519.GenPrivKey().PubKey()
+		pvk, _ := bls12381.GenPrivKey()
+		pk := pvk.PubKey()
 		vals[i].PubKey = pk
 		vals[i].Address = pk.Address()
 	}
@@ -402,9 +404,11 @@ func newValidator(address []byte, power int64) *Validator {
 }
 
 func randPubKey() crypto.PubKey {
-	pubKey := make(ed25519.PubKey, ed25519.PubKeySize)
+
+	pubKey := make([]byte, bls12381.PubKeySize)
 	copy(pubKey, cmtrand.Bytes(32))
-	return ed25519.PubKey(cmtrand.Bytes(32))
+	pk, _ := bls12381.NewPublicKeyFromBytes(cmtrand.Bytes(32))
+	return pk
 }
 
 func randValidator(totalVotingPower int64) *Validator {

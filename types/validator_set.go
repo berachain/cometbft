@@ -11,7 +11,8 @@ import (
 	"strings"
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
+
 	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
@@ -990,7 +991,7 @@ func ValidatorSetFromExistingValidators(valz []*Validator) (*ValidatorSet, error
 //
 // EXPOSED FOR TESTING.
 func RandValidatorSet(numValidators int, votingPower int64) (*ValidatorSet, []PrivValidator) {
-	return RandValidatorSetWithKeyType(numValidators, votingPower, ed25519.KeyType)
+	return RandValidatorSetWithKeyType(numValidators, votingPower, bls12381.KeyType)
 }
 
 // EXPOSED FOR TESTING.

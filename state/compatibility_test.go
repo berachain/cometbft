@@ -20,7 +20,7 @@ import (
 	typesv1 "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	typesv1beta1 "github.com/cometbft/cometbft/api/cometbft/types/v1beta1"
 	typesv1beta2 "github.com/cometbft/cometbft/api/cometbft/types/v1beta2"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	sm "github.com/cometbft/cometbft/state"
 )
 
@@ -602,7 +602,7 @@ func newV1Beta3ResponsesFinalizeBlock() abciv1beta3.ResponseFinalizeBlock {
 	}}
 
 	validatorUpdates := []abciv1beta1.ValidatorUpdate{{
-		PubKey: cryptov1.PublicKey{Sum: &cryptov1.PublicKey_Ed25519{Ed25519: make([]byte, ed25519.PubKeySize)}},
+		PubKey: cryptov1.PublicKey{Sum: &cryptov1.PublicKey_Ed25519{Ed25519: make([]byte, bls12381.PubKeySize)}},
 		Power:  int64(10),
 	}}
 
@@ -617,7 +617,7 @@ func newV1Beta3ResponsesFinalizeBlock() abciv1beta3.ResponseFinalizeBlock {
 			MaxBytes:        int64(10000),
 		},
 		Validator: &typesv1.ValidatorParams{
-			PubKeyTypes: []string{ed25519.KeyType},
+			PubKeyTypes: []string{bls12381.KeyType},
 		},
 		Version: &typesv1.VersionParams{
 			App: uint64(10),
