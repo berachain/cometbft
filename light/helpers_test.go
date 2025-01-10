@@ -5,7 +5,8 @@ import (
 
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
+
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/types"
 	"github.com/cometbft/cometbft/version"
@@ -24,7 +25,11 @@ type privKeys []crypto.PrivKey
 func genPrivKeys(n int) privKeys {
 	res := make(privKeys, n)
 	for i := range res {
-		res[i] = ed25519.GenPrivKey()
+		var err error
+		res[i], err = bls12381.GenPrivKey()
+		if err != nil {
+			panic("error creating privkey")
+		}
 	}
 	return res
 }

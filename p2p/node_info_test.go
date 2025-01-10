@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 )
 
 func TestNodeInfoValidate(t *testing.T) {
@@ -66,7 +66,9 @@ func TestNodeInfoValidate(t *testing.T) {
 		{"Good RPCAddress", func(ni *DefaultNodeInfo) { ni.Other.RPCAddress = "0.0.0.0:26657" }, false},
 	}
 
-	nodeKey := NodeKey{PrivKey: ed25519.GenPrivKey()}
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	nodeKey := NodeKey{PrivKey: pk}
 	name := "testing"
 
 	// test case passes
@@ -88,8 +90,12 @@ func TestNodeInfoValidate(t *testing.T) {
 }
 
 func TestNodeInfoCompatible(t *testing.T) {
-	nodeKey1 := NodeKey{PrivKey: ed25519.GenPrivKey()}
-	nodeKey2 := NodeKey{PrivKey: ed25519.GenPrivKey()}
+	pk1, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	nodeKey1 := NodeKey{PrivKey: pk1}
+	pk2, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	nodeKey2 := NodeKey{PrivKey: pk2}
 	name := "testing"
 
 	var newTestChannel byte = 0x2

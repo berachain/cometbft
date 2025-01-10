@@ -11,9 +11,10 @@ import (
 	"time"
 
 	tmp2p "github.com/cometbft/cometbft/api/cometbft/p2p/v1"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/libs/protoio"
 	"github.com/cometbft/cometbft/p2p/conn"
+	"github.com/stretchr/testify/require"
 )
 
 var defaultNodeName = "host_peer"
@@ -35,10 +36,12 @@ func newMultiplexTransport(
 }
 
 func TestTransportMultiplexConnFilter(t *testing.T) {
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
 	mt := newMultiplexTransport(
 		emptyNodeInfo(),
 		NodeKey{
-			PrivKey: ed25519.GenPrivKey(),
+			PrivKey: pk,
 		},
 	)
 	id := mt.nodeKey.ID()
@@ -89,10 +92,12 @@ func TestTransportMultiplexConnFilter(t *testing.T) {
 }
 
 func TestTransportMultiplexConnFilterTimeout(t *testing.T) {
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
 	mt := newMultiplexTransport(
 		emptyNodeInfo(),
 		NodeKey{
-			PrivKey: ed25519.GenPrivKey(),
+			PrivKey: pk,
 		},
 	)
 	id := mt.nodeKey.ID()
@@ -138,7 +143,9 @@ func TestTransportMultiplexConnFilterTimeout(t *testing.T) {
 }
 
 func TestTransportMultiplexMaxIncomingConnections(t *testing.T) {
-	pv := ed25519.GenPrivKey()
+	pv, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+
 	id := PubKeyToID(pv.PubKey())
 	mt := newMultiplexTransport(
 		testNodeInfo(
@@ -242,7 +249,7 @@ func TestTransportMultiplexAcceptMultiple(t *testing.T) {
 
 func testDialer(dialAddr NetAddress, errc chan error) {
 	var (
-		pv     = ed25519.GenPrivKey()
+		pv, _  = bls12381.GenPrivKey()
 		dialer = newMultiplexTransport(
 			testNodeInfo(PubKeyToID(pv.PubKey()), defaultNodeName),
 			NodeKey{
@@ -265,12 +272,12 @@ func TestTransportMultiplexAcceptNonBlocking(t *testing.T) {
 	mt := testSetupMultiplexTransport(t)
 
 	var (
-		fastNodePV   = ed25519.GenPrivKey()
-		fastNodeInfo = testNodeInfo(PubKeyToID(fastNodePV.PubKey()), "fastnode")
-		errc         = make(chan error)
-		fastc        = make(chan struct{})
-		slowc        = make(chan struct{})
-		slowdonec    = make(chan struct{})
+		fastNodePV, _ = bls12381.GenPrivKey()
+		fastNodeInfo  = testNodeInfo(PubKeyToID(fastNodePV.PubKey()), "fastnode")
+		errc          = make(chan error)
+		fastc         = make(chan struct{})
+		slowc         = make(chan struct{})
+		slowdonec     = make(chan struct{})
 	)
 
 	// Simulate slow Peer.
@@ -299,15 +306,18 @@ func TestTransportMultiplexAcceptNonBlocking(t *testing.T) {
 			errc <- errors.New("fast peer timed out")
 		}
 
-		sc, err := upgradeSecretConn(c, 200*time.Millisecond, ed25519.GenPrivKey())
+		pv, err := bls12381.GenPrivKey()
+		require.NoError(t, err)
+		sc, err := upgradeSecretConn(c, 200*time.Millisecond, pv)
 		if err != nil {
 			errc <- err
 			return
 		}
-
+		pv, err = bls12381.GenPrivKey()
+		require.NoError(t, err)
 		_, err = handshake(sc, 200*time.Millisecond,
 			testNodeInfo(
-				PubKeyToID(ed25519.GenPrivKey().PubKey()),
+				PubKeyToID(pv.PubKey()),
 				"slow_peer",
 			))
 		if err != nil {
@@ -359,7 +369,7 @@ func TestTransportMultiplexValidateNodeInfo(t *testing.T) {
 
 	go func() {
 		var (
-			pv     = ed25519.GenPrivKey()
+			pv, _  = bls12381.GenPrivKey()
 			dialer = newMultiplexTransport(
 				testNodeInfo(PubKeyToID(pv.PubKey()), ""), // Should not be empty
 				NodeKey{
@@ -399,17 +409,22 @@ func TestTransportMultiplexRejectMissmatchID(t *testing.T) {
 	errc := make(chan error)
 
 	go func() {
+		pk, err := bls12381.GenPrivKey()
+		require.NoError(t, err)
+		pk2, err := bls12381.GenPrivKey()
+		require.NoError(t, err)
+
 		dialer := newMultiplexTransport(
 			testNodeInfo(
-				PubKeyToID(ed25519.GenPrivKey().PubKey()), "dialer",
+				PubKeyToID(pk.PubKey()), "dialer",
 			),
 			NodeKey{
-				PrivKey: ed25519.GenPrivKey(),
+				PrivKey: pk2,
 			},
 		)
 		addr := NewNetAddress(mt.nodeKey.ID(), mt.listener.Addr())
 
-		_, err := dialer.Dial(*addr, peerConfig{})
+		_, err = dialer.Dial(*addr, peerConfig{})
 		if err != nil {
 			errc <- err
 			return
@@ -436,7 +451,7 @@ func TestTransportMultiplexDialRejectWrongID(t *testing.T) {
 	mt := testSetupMultiplexTransport(t)
 
 	var (
-		pv     = ed25519.GenPrivKey()
+		pv, _  = bls12381.GenPrivKey()
 		dialer = newMultiplexTransport(
 			testNodeInfo(PubKeyToID(pv.PubKey()), ""), // Should not be empty
 			NodeKey{
@@ -445,10 +460,12 @@ func TestTransportMultiplexDialRejectWrongID(t *testing.T) {
 		)
 	)
 
-	wrongID := PubKeyToID(ed25519.GenPrivKey().PubKey())
+	pv, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	wrongID := PubKeyToID(pv.PubKey())
 	addr := NewNetAddress(wrongID, mt.listener.Addr())
 
-	_, err := dialer.Dial(*addr, peerConfig{})
+	_, err = dialer.Dial(*addr, peerConfig{})
 	if err != nil {
 		t.Logf("connection failed: %v", err)
 		if e, ok := err.(ErrRejected); ok {
@@ -468,7 +485,7 @@ func TestTransportMultiplexRejectIncompatible(t *testing.T) {
 
 	go func() {
 		var (
-			pv     = ed25519.GenPrivKey()
+			pv, _  = bls12381.GenPrivKey()
 			dialer = newMultiplexTransport(
 				testNodeInfoWithNetwork(PubKeyToID(pv.PubKey()), "dialer", "incompatible-network"),
 				NodeKey{
@@ -568,7 +585,7 @@ func TestTransportHandshake(t *testing.T) {
 	}
 
 	var (
-		peerPV       = ed25519.GenPrivKey()
+		peerPV, _    = bls12381.GenPrivKey()
 		peerNodeInfo = testNodeInfo(PubKeyToID(peerPV.PubKey()), defaultNodeName)
 	)
 
@@ -618,10 +635,12 @@ func TestTransportHandshake(t *testing.T) {
 }
 
 func TestTransportAddChannel(t *testing.T) {
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
 	mt := newMultiplexTransport(
 		emptyNodeInfo(),
 		NodeKey{
-			PrivKey: ed25519.GenPrivKey(),
+			PrivKey: pk,
 		},
 	)
 	testChannel := byte(0x01)
@@ -636,9 +655,9 @@ func TestTransportAddChannel(t *testing.T) {
 func testSetupMultiplexTransport(t *testing.T) *MultiplexTransport {
 	t.Helper()
 	var (
-		pv = ed25519.GenPrivKey()
-		id = PubKeyToID(pv.PubKey())
-		mt = newMultiplexTransport(
+		pv, _ = bls12381.GenPrivKey()
+		id    = PubKeyToID(pv.PubKey())
+		mt    = newMultiplexTransport(
 			testNodeInfo(
 				id, "transport",
 			),

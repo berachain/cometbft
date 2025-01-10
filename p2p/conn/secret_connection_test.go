@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/internal/async"
 	cmtos "github.com/cometbft/cometbft/internal/os"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
@@ -122,7 +122,8 @@ func TestSecretConnectionReadWrite(t *testing.T) {
 	genNodeRunner := func(nodeConn kvstoreConn, nodeWrites []string, nodeReads *[]string) async.Task {
 		return func(_ int) (any, bool, error) {
 			// Initiate cryptographic private key and secret connection through nodeConn.
-			nodePrvKey := ed25519.GenPrivKey()
+			nodePrvKey, err := bls12381.GenPrivKey()
+			require.NoError(t, err)
 			nodeSecretConn, err := MakeSecretConnection(nodeConn, nodePrvKey)
 			if err != nil {
 				t.Errorf("failed to establish SecretConnection for node: %v", err)
@@ -262,12 +263,17 @@ func TestNilPubkey(t *testing.T) {
 	fooConn, barConn := makeKVStoreConnPair()
 	defer fooConn.Close()
 	defer barConn.Close()
-	fooPrvKey := ed25519.GenPrivKey()
-	barPrvKey := privKeyWithNilPubKey{ed25519.GenPrivKey()}
+
+	fooPrvKey, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+
+	pk, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	barPrvKey := privKeyWithNilPubKey{pk}
 
 	go MakeSecretConnection(fooConn, fooPrvKey) //nolint:errcheck // ignore for tests
 
-	_, err := MakeSecretConnection(barConn, barPrvKey)
+	_, err = MakeSecretConnection(barConn, barPrvKey)
 	require.Error(t, err)
 	assert.Equal(t, "encoding: unsupported key <nil>", err.Error())
 }
@@ -322,11 +328,12 @@ func makeKVStoreConnPair() (fooConn, barConn kvstoreConn) {
 
 func makeSecretConnPair(tb testing.TB) (fooSecConn, barSecConn *SecretConnection) {
 	tb.Helper()
+
 	var (
 		fooConn, barConn = makeKVStoreConnPair()
-		fooPrvKey        = ed25519.GenPrivKey()
+		fooPrvKey, _     = bls12381.GenPrivKey()
 		fooPubKey        = fooPrvKey.PubKey()
-		barPrvKey        = ed25519.GenPrivKey()
+		barPrvKey, _     = bls12381.GenPrivKey()
 		barPubKey        = barPrvKey.PubKey()
 	)
 
