@@ -63,7 +63,7 @@ type PrivKey struct {
 	sk *blst.SecretKey
 }
 
-// GenPrivKeyFromSecret generates a new random key using `secret` for the seed
+// GenPrivKeyFromSecret generates a new random key using `secret` for the seed.
 func GenPrivKeyFromSecret(secret []byte) (*PrivKey, error) {
 	if len(secret) != 32 {
 		seed := sha256.Sum256(secret) // We need 32 bytes
