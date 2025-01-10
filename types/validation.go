@@ -374,10 +374,7 @@ func verifyAggregatedCommit(
 			}
 			pk, ok := val.PubKey.(*bls12381.PubKey)
 			if !ok {
-				pk2, ok2 := val.PubKey.(bls12381.PubKey)
-				if !ok2 {
-					panic("Validator key is " + val.PubKey.Type() + ". Must be BLS12_381")
-				}
+				pk2 := val.PubKey.(bls12381.PubKey)
 				pk = &pk2
 			}
 			pubkeys1 = append(pubkeys1, pk)
@@ -388,10 +385,7 @@ func verifyAggregatedCommit(
 			}
 			pk, ok := val.PubKey.(*bls12381.PubKey)
 			if !ok {
-				pk2, ok2 := val.PubKey.(bls12381.PubKey)
-				if !ok2 {
-					panic("Validator key is " + val.PubKey.Type() + ". Must be BLS12_381")
-				}
+				pk2 := val.PubKey.(bls12381.PubKey)
 				pk = &pk2
 			}
 			pubkeys2 = append(pubkeys2, pk)
