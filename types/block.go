@@ -590,11 +590,11 @@ const (
 	BlockIDFlagNil
 	// BlockIDFlagAggCommit - voted for the Commit.BlockID and contains aggregated signature..
 	BlockIDFlagAggCommit
-	// BlockIDFlagAggCommitAbsent - voted for the Commit.BlockID and contains aggregated signature..
+	// BlockIDFlagAggCommitAbsent - voted for the Commit.BlockID; aggregated signature in another entry.
 	BlockIDFlagAggCommitAbsent
 	// BlockIDFlagAggNil - voted for nil and contains aggregated signature..
 	BlockIDFlagAggNil
-	// BlockIDFlagAggNilAbsent - voted for nil and contains aggregated signature..
+	// BlockIDFlagAggNilAbsent - voted for nil; aggregated signature in another entry.
 	BlockIDFlagAggNilAbsent
 )
 

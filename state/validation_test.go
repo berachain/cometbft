@@ -32,7 +32,7 @@ func TestValidateBlockHeader(t *testing.T) {
 
 	cp := test.ConsensusParams()
 	pbtsEnableHeight := int64(1)
-	cp.Feature.PbtsEnableHeight = 1
+	cp.Feature.PbtsEnableHeight = pbtsEnableHeight
 
 	state, stateDB, privVals := makeStateWithParams(3, 1, cp, chainID)
 	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
