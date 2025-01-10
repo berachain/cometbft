@@ -4,11 +4,20 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cometbft/cometbft/crypto/batch"
 	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmterrors "github.com/cometbft/cometbft/types/errors"
 )
+
+const batchVerifyThreshold = 2
+
+func shouldBatchVerify(vals *ValidatorSet, commit *Commit) bool {
+	return len(commit.Signatures) >= batchVerifyThreshold &&
+		batch.SupportsBatchVerifier(vals.GetProposer().PubKey) &&
+		vals.AllKeysHaveSameType()
+}
 
 // isAggregatedCommit returns true if the commit is an aggregated.
 func isAggregatedCommit(vals *ValidatorSet, commit *Commit) bool {
@@ -203,6 +212,120 @@ func ValidateHash(h []byte) error {
 		)
 	}
 	return nil
+}
+
+// Batch verification
+
+// verifyCommitBatch batch verifies commits.  This routine is equivalent
+// to verifyCommitSingle in behavior, just faster iff every signature in the
+// batch is valid.
+//
+// Note: The caller is responsible for checking to see if this routine is
+// usable via `shouldVerifyBatch(vals, commit)`.
+func verifyCommitBatch(
+	chainID string,
+	vals *ValidatorSet,
+	commit *Commit,
+	votingPowerNeeded int64,
+	ignoreSig func(CommitSig) bool,
+	countSig func(CommitSig) bool,
+	countAllSignatures bool,
+	lookUpByIndex bool,
+) error {
+	var (
+		val                *Validator
+		valIdx             int32
+		seenVals           = make(map[int32]int, len(commit.Signatures))
+		batchSigIdxs       = make([]int, 0, len(commit.Signatures))
+		talliedVotingPower int64
+	)
+	// attempt to create a batch verifier
+	bv, ok := batch.CreateBatchVerifier(vals.GetProposer().PubKey)
+	// re-check if batch verification is supported
+	if !ok || len(commit.Signatures) < batchVerifyThreshold {
+		// This should *NEVER* happen.
+		return errors.New("unsupported signature algorithm or insufficient signatures for batch verification")
+	}
+
+	for idx, commitSig := range commit.Signatures {
+		// skip over signatures that should be ignored
+		if ignoreSig(commitSig) {
+			continue
+		}
+
+		// If the vals and commit have a 1-to-1 correspondence we can retrieve
+		// them by index else we need to retrieve them by address
+		if lookUpByIndex {
+			val = vals.Validators[idx]
+		} else {
+			valIdx, val = vals.GetByAddressMut(commitSig.ValidatorAddress)
+
+			// if the signature doesn't belong to anyone in the validator set
+			// then we just skip over it
+			if val == nil {
+				continue
+			}
+
+			// because we are getting validators by address we need to make sure
+			// that the same validator doesn't commit twice
+			if firstIndex, ok := seenVals[valIdx]; ok {
+				secondIndex := idx
+				return fmt.Errorf("double vote from %v (%d and %d)", val, firstIndex, secondIndex)
+			}
+			seenVals[valIdx] = idx
+		}
+
+		// Validate signature.
+		voteSignBytes := commit.VoteSignBytes(chainID, int32(idx))
+
+		// add the key, sig and message to the verifier
+		if err := bv.Add(val.PubKey, voteSignBytes, commitSig.Signature); err != nil {
+			return err
+		}
+		batchSigIdxs = append(batchSigIdxs, idx)
+
+		// If this signature counts then add the voting power of the validator
+		// to the tally
+		if countSig(commitSig) {
+			talliedVotingPower += val.VotingPower
+		}
+
+		// if we don't need to verify all signatures and already have sufficient
+		// voting power we can break from batching and verify all the signatures
+		if !countAllSignatures && talliedVotingPower > votingPowerNeeded {
+			break
+		}
+	}
+
+	// ensure that we have batched together enough signatures to exceed the
+	// voting power needed else there is no need to even verify
+	if got, needed := talliedVotingPower, votingPowerNeeded; got <= needed {
+		return ErrNotEnoughVotingPowerSigned{Got: got, Needed: needed}
+	}
+
+	// attempt to verify the batch.
+	ok, validSigs := bv.Verify()
+	if ok {
+		// success
+		return nil
+	}
+
+	// one or more of the signatures is invalid, find and return the first
+	// invalid signature.
+	for i, ok := range validSigs {
+		if !ok {
+			// go back from the batch index to the commit.Signatures index
+			idx := batchSigIdxs[i]
+			sig := commit.Signatures[idx]
+			return fmt.Errorf("wrong signature (#%d): %X", idx, sig)
+		}
+	}
+
+	// execution reaching here is a bug, and one of the following has
+	// happened:
+	//  * non-zero tallied voting power, empty batch (impossible?)
+	//  * bv.Verify() returned `false, []bool{true, ..., true}` (BUG)
+	return errors.New("BUG: batch verification failed with no invalid signatures")
 }
 
 // Single Verification
