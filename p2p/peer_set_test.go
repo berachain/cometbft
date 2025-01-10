@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/service"
 )
 
@@ -40,11 +40,7 @@ func newMockPeer(ip net.IP) *mockPeer {
 	if ip == nil {
 		ip = net.IP{127, 0, 0, 1}
 	}
-	pk, err := bls12381.GenPrivKey()
-	if err != nil {
-		panic("err creating privkey")
-	}
-	nodeKey := NodeKey{PrivKey: pk}
+	nodeKey := NodeKey{PrivKey: ed25519.GenPrivKey()}
 	return &mockPeer{
 		ip: ip,
 		id: nodeKey.ID(),

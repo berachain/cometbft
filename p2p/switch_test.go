@@ -21,7 +21,7 @@ import (
 
 	p2pproto "github.com/cometbft/cometbft/api/cometbft/p2p/v1"
 	"github.com/cometbft/cometbft/config"
-	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/log"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
 	"github.com/cometbft/cometbft/p2p/conn"
@@ -254,9 +254,7 @@ func TestSwitchPeerFilter(t *testing.T) {
 	})
 
 	// simulate remote peer
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	t.Cleanup(rp.Stop)
 
@@ -305,9 +303,7 @@ func TestSwitchPeerFilterTimeout(t *testing.T) {
 	})
 
 	// simulate remote peer
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -338,9 +334,7 @@ func TestSwitchPeerFilterDuplicate(t *testing.T) {
 	})
 
 	// simulate remote peer
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -391,9 +385,7 @@ func TestSwitchStopsNonPersistentPeerOnError(t *testing.T) {
 	})
 
 	// simulate remote peer
-	pk, _ := bls12381.GenPrivKey()
-
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -486,9 +478,7 @@ func TestSwitchReconnectsToOutboundPersistentPeer(t *testing.T) {
 	})
 
 	// 1. simulate failure by closing connection
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -508,10 +498,8 @@ func TestSwitchReconnectsToOutboundPersistentPeer(t *testing.T) {
 	assert.Equal(t, 1, sw.Peers().Size()) // new peer instance
 
 	// 2. simulate first time dial failure
-	pk, err = bls12381.GenPrivKey()
-	require.NoError(t, err)
 	rp = &remotePeer{
-		PrivKey: pk,
+		PrivKey: ed25519.GenPrivKey(),
 		Config:  cfg,
 		// Use different interface to prevent duplicate IP filter, this will break
 		// beyond two peers.
@@ -540,10 +528,7 @@ func TestSwitchReconnectsToInboundPersistentPeer(t *testing.T) {
 	})
 
 	// 1. simulate failure by closing the connection
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
-
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -575,10 +560,7 @@ func TestSwitchDialPeersAsync(t *testing.T) {
 		}
 	})
 
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
-
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 
@@ -627,10 +609,7 @@ func TestSwitchAcceptRoutine(t *testing.T) {
 		unconditionalPeerIDs = make([]string, unconditionalPeersNum)
 	)
 	for i := 0; i < unconditionalPeersNum; i++ {
-		pk, err := bls12381.GenPrivKey()
-		require.NoError(t, err)
-		peer := &remotePeer{PrivKey: pk, Config: cfg}
-
+		peer := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 		peer.Start()
 		unconditionalPeers[i] = peer
 		unconditionalPeerIDs[i] = string(peer.ID())
@@ -653,10 +632,7 @@ func TestSwitchAcceptRoutine(t *testing.T) {
 	// 1. check we connect up to MaxNumInboundPeers
 	peers := make([]*remotePeer, 0)
 	for i := 0; i < cfg.MaxNumInboundPeers; i++ {
-		pk, err := bls12381.GenPrivKey()
-		require.NoError(t, err)
-		peer := &remotePeer{PrivKey: pk, Config: cfg}
-
+		peer := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 		peers = append(peers, peer)
 		peer.Start()
 		c, err := peer.Dial(sw.NetAddress())
@@ -676,10 +652,7 @@ func TestSwitchAcceptRoutine(t *testing.T) {
 	assert.Equal(t, cfg.MaxNumInboundPeers, sw.Peers().Size())
 
 	// 2. check we close new connections if we already have MaxNumInboundPeers peers
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	peer := &remotePeer{PrivKey: pk, Config: cfg}
-
+	peer := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	peer.Start()
 	conn, err := peer.Dial(sw.NetAddress())
 	require.NoError(t, err)
@@ -812,10 +785,7 @@ func TestSwitchInitPeerIsNotCalledBeforeRemovePeer(t *testing.T) {
 	})
 
 	// add peer
-	pk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
-
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	defer rp.Stop()
 	_, err = rp.Dial(sw.NetAddress())

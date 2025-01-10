@@ -15,8 +15,7 @@ import (
 	p2p "github.com/cometbft/cometbft/api/cometbft/p2p/v1"
 	"github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/bls12381"
-
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/libs/bytes"
 	"github.com/cometbft/cometbft/libs/log"
 	cmtconn "github.com/cometbft/cometbft/p2p/conn"
@@ -26,9 +25,7 @@ func TestPeerBasic(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
 	// simulate remote peer
-	pk, _ := bls12381.GenPrivKey()
-
-	rp := &remotePeer{PrivKey: pk, Config: cfg}
+	rp := &remotePeer{PrivKey: ed25519.GenPrivKey(), Config: cfg}
 	rp.Start()
 	t.Cleanup(rp.Stop)
 

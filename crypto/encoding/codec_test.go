@@ -8,6 +8,8 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/bls12381"
+	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/secp256k1"
 )
 
 type unsupportedPubKey struct{}
@@ -18,11 +20,8 @@ func (unsupportedPubKey) VerifySignature([]byte, []byte) bool { return false }
 func (unsupportedPubKey) Type() string                        { return "unsupportedPubKey" }
 
 func TestPubKeyToFromProto(t *testing.T) {
-
-	// bls12381
-	privk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk := privk.PubKey()
+	// ed25519
+	pk := ed25519.GenPrivKey().PubKey()
 	proto, err := PubKeyToProto(pk)
 	require.NoError(t, err)
 
@@ -30,10 +29,8 @@ func TestPubKeyToFromProto(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, pk, pubkey)
 
-	// bls12381
-	privk, err = bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk = privk.PubKey()
+	// secp256k1
+	pk = secp256k1.GenPrivKey().PubKey()
 	proto, err = PubKeyToProto(pk)
 	require.NoError(t, err)
 
@@ -65,27 +62,23 @@ func TestPubKeyToFromProto(t *testing.T) {
 }
 
 func TestPubKeyFromTypeAndBytes(t *testing.T) {
-	// bls12381
-	privk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk := privk.PubKey()
+	// ed25519
+	pk := ed25519.GenPrivKey().PubKey()
 	pubkey, err := PubKeyFromTypeAndBytes(pk.Type(), pk.Bytes())
 	assert.NoError(t, err)
 	assert.Equal(t, pk, pubkey)
 
-	// bls12381 invalid size
+	// ed25519 invalid size
 	_, err = PubKeyFromTypeAndBytes(pk.Type(), pk.Bytes()[:10])
 	assert.Error(t, err)
 
-	// bls12381
-	privk, err = bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk = privk.PubKey()
+	// secp256k1
+	pk = secp256k1.GenPrivKey().PubKey()
 	pubkey, err = PubKeyFromTypeAndBytes(pk.Type(), pk.Bytes())
 	assert.NoError(t, err)
 	assert.Equal(t, pk, pubkey)
 
-	// bls12381 invalid size
+	// secp256k1 invalid size
 	_, err = PubKeyFromTypeAndBytes(pk.Type(), pk.Bytes()[:10])
 	assert.Error(t, err)
 
@@ -102,6 +95,7 @@ func TestPubKeyFromTypeAndBytes(t *testing.T) {
 		_, err = PubKeyFromTypeAndBytes(pk.Type(), pk.Bytes()[:10])
 		assert.Error(t, err)
 	} else {
-		panic("bls has to be enabled")
+		_, err = PubKeyFromTypeAndBytes(bls12381.KeyType, []byte{})
+		assert.Error(t, err)
 	}
 }

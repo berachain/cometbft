@@ -11,7 +11,6 @@ import (
 	privproto "github.com/cometbft/cometbft/api/cometbft/privval/v1"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/types"
@@ -51,9 +50,7 @@ func exampleProposal() *types.Proposal {
 
 //nolint:lll // ignore line length for tests
 func TestPrivvalVectors(t *testing.T) {
-	privk, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
-	pk := privk.PubKey()
+	pk := ed25519.GenPrivKeyFromSecret([]byte("it's a secret")).PubKey()
 
 	// Generate a simple vote
 	vote := exampleVote()

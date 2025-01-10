@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/bls12381"
-
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 )
 
@@ -45,12 +44,11 @@ func TestNodeKeySaveAs(t *testing.T) {
 
 	assert.NoFileExists(t, filePath)
 
-	privKey, err := bls12381.GenPrivKey()
-	require.NoError(t, err)
+	privKey := ed25519.GenPrivKey()
 	nodeKey := &NodeKey{
 		PrivKey: privKey,
 	}
-	err = nodeKey.SaveAs(filePath)
+	err := nodeKey.SaveAs(filePath)
 	require.NoError(t, err)
 	assert.FileExists(t, filePath)
 }
