@@ -42,7 +42,8 @@ func TestAggregateAndVerify(t *testing.T) {
 
 	pubKeys := make([]*bls12381.PubKey, len(privateKeys))
 	for i, privKey := range privateKeys {
-		pubKeys[i] = privKey.PubKey().(*bls12381.PubKey)
+		pubKey := privKey.PubKey().(bls12381.PubKey)
+		pubKeys[i] = &pubKey
 	}
 
 	// Verify aggregated signature

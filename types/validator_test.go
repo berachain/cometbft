@@ -8,10 +8,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 )
 
 func TestValidatorProtoBuf(t *testing.T) {
 	val, _ := RandValidator(true, 100)
+
+	// FIXME: we have to do this manual conversion because val's PubKey is set to
+	// type bls12381.PubKey, but we expect it to be of type *bls12381.PubKey.
+	// The long-term solution is to revisit the method bls12381.PubKey() to make it
+	// return a *bls12381.PubKey.
+	valPubKey := val.PubKey.(bls12381.PubKey)
+	val.PubKey = &valPubKey
+
 	testCases := []struct {
 		msg      string
 		v1       *Validator
