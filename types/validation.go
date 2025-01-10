@@ -13,7 +13,7 @@ import (
 
 const batchVerifyThreshold = 2
 
-var ErrInvalidAggCommit = errors.New("commit has an aggregated signature, but was not created by vals with BLS12-381 keys")
+var ErrInvalidAggCommit = errors.New("commit has aggregated signature flags, but was not created by vals with BLS12-381 keys")
 
 func shouldBatchVerify(vals *ValidatorSet, commit *Commit) bool {
 	return len(commit.Signatures) >= batchVerifyThreshold &&
@@ -502,6 +502,8 @@ func verifyAggregatedCommit(
 		talliedVotingPower int64
 		aggSig1, aggSig2   []byte
 		msg1, msg2         []byte
+
+		aggSig1Found, aggSig2Found bool
 	)
 
 	pubkeys1 := make([]*bls12381.PubKey, 0, len(commit.Signatures))
@@ -539,21 +541,51 @@ func verifyAggregatedCommit(
 			return fmt.Errorf("validator %v has a nil PubKey at index %d", val, idx)
 		}
 
-		if commitSig.BlockIDFlag == BlockIDFlagAggCommit || commitSig.BlockIDFlag == BlockIDFlagAggCommitAbsent {
-			if aggSig1 == nil {
-				aggSig1 = commitSig.Signature
-				msg1 = commit.VoteSignBytes(chainID, int32(idx))
+		switch commitSig.BlockIDFlag {
+		case BlockIDFlagAggCommit:
+			if aggSig1Found {
+				return errors.New("multiple aggregated signatures for block")
 			}
+
+			aggSig1 = commitSig.Signature
+			msg1 = commit.VoteSignBytes(chainID, int32(idx))
+			aggSig1Found = true
+
 			pk, ok := val.PubKey.(*bls12381.PubKey)
 			if !ok {
 				pk2 := val.PubKey.(bls12381.PubKey)
 				pk = &pk2
 			}
 			pubkeys1 = append(pubkeys1, pk)
-		} else if commitSig.BlockIDFlag == BlockIDFlagAggNil || commitSig.BlockIDFlag == BlockIDFlagAggNilAbsent {
-			if aggSig2 == nil {
-				aggSig2 = commitSig.Signature
-				msg2 = commit.VoteSignBytes(chainID, int32(idx))
+		case BlockIDFlagAggCommitAbsent:
+			if !aggSig1Found {
+				return fmt.Errorf("aggregated signature for block absent %d but no previously defined aggregated signature", idx)
+			}
+
+			pk, ok := val.PubKey.(*bls12381.PubKey)
+			if !ok {
+				pk2 := val.PubKey.(bls12381.PubKey)
+				pk = &pk2
+			}
+			pubkeys1 = append(pubkeys1, pk)
+		case BlockIDFlagAggNil:
+			if aggSig2Found {
+				return errors.New("multiple aggregated signatures for nil")
+			}
+
+			aggSig2 = commitSig.Signature
+			msg2 = commit.VoteSignBytes(chainID, int32(idx))
+			aggSig2Found = true
+
+			pk, ok := val.PubKey.(*bls12381.PubKey)
+			if !ok {
+				pk2 := val.PubKey.(bls12381.PubKey)
+				pk = &pk2
+			}
+			pubkeys2 = append(pubkeys2, pk)
+		case BlockIDFlagAggNilAbsent:
+			if !aggSig2Found {
+				return fmt.Errorf("aggregated signature for nil absent %d but no previously defined aggregated signature", idx)
 			}
 			pk, ok := val.PubKey.(*bls12381.PubKey)
 			if !ok {
@@ -561,6 +593,8 @@ func verifyAggregatedCommit(
 				pk = &pk2
 			}
 			pubkeys2 = append(pubkeys2, pk)
+		default:
+			return fmt.Errorf("wrong block ID flag %d for sig %d (expected aggregated signature flags)", commitSig.BlockIDFlag, idx)
 		}
 
 		if countSig(commitSig) {
@@ -572,6 +606,11 @@ func verifyAggregatedCommit(
 	// voting power needed else there is no need to even verify
 	if got, needed := talliedVotingPower, votingPowerNeeded; got <= needed {
 		return ErrNotEnoughVotingPowerSigned{Got: got, Needed: needed}
+	}
+
+	// Additional guard.
+	if !aggSig1Found {
+		return errors.New("missing aggregated signature for block")
 	}
 
 	// Since we are above the voting power threshold needed, we know `aggSig1`,
