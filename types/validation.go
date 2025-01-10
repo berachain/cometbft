@@ -13,6 +13,8 @@ import (
 
 const batchVerifyThreshold = 2
 
+var ErrInvalidAggCommit = errors.New("commit has an aggregated signature, but was not created by vals with BLS12-381 keys")
+
 func shouldBatchVerify(vals *ValidatorSet, commit *Commit) bool {
 	return len(commit.Signatures) >= batchVerifyThreshold &&
 		batch.SupportsBatchVerifier(vals.GetProposer().PubKey) &&
@@ -57,6 +59,11 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 
 		return verifyAggregatedCommit(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, true)
+	}
+
+	// Guard against invalid aggregated commits.
+	if commit.HasAggregatedSignature() {
+		return ErrInvalidAggCommit
 	}
 
 	// only count the signatures that are for the block
@@ -130,6 +137,11 @@ func verifyCommitLightInternal(
 
 		return verifyAggregatedCommit(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, true)
+	}
+
+	// Guard against invalid aggregated commits.
+	if commit.HasAggregatedSignature() {
+		return ErrInvalidAggCommit
 	}
 
 	// ignore all commit signatures that are not for the block
@@ -216,6 +228,11 @@ func verifyCommitLightTrustingInternal(
 
 		return verifyAggregatedCommit(chainID, vals, commit,
 			votingPowerNeeded, ignore, count, false)
+	}
+
+	// Guard against invalid aggregated commits.
+	if commit.HasAggregatedSignature() {
+		return ErrInvalidAggCommit
 	}
 
 	// ignore all commit signatures that are not for the block
