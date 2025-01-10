@@ -1139,10 +1139,10 @@ func (ec *ExtendedCommit) addSigsToVoteSet(voteSet *VoteSet) {
 			continue // OK, some precommits can be missing.
 		}
 		vote := ec.GetExtendedVote(int32(idx))
-		if err := vote.ValidateBasic(); err != nil {
+		if err := vote.ValidateBasic(false); err != nil {
 			panic(fmt.Errorf("failed to validate vote reconstructed from LastCommit: %w", err))
 		}
-		added, err := voteSet.AddVote(vote)
+		added, err := voteSet.AddVote(vote, false)
 		if !added || err != nil {
 			panic(fmt.Errorf("failed to reconstruct vote set from extended commit: %w", err))
 		}
@@ -1159,10 +1159,12 @@ func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) *VoteSet {
 			continue // OK, some precommits can be missing.
 		}
 		vote := commit.GetVote(int32(idx))
-		if err := vote.ValidateBasic(); err != nil {
+		if err := vote.ValidateBasic(true); err != nil {
 			panic(fmt.Errorf("failed to validate vote reconstructed from commit: %w", err))
 		}
-		added, err := voteSet.AddVote(vote)
+
+		// NOTE: commit is always an aggregate commit!
+		added, err := voteSet.AddVote(vote, true)
 		if !added || err != nil {
 			panic(fmt.Errorf("failed to reconstruct vote set from commit: %w", err))
 		}

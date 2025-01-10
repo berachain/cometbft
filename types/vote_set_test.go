@@ -536,7 +536,7 @@ func TestVoteSet_VoteExtensionsEnabled(t *testing.T) {
 				vote.ExtensionSignature = v.ExtensionSignature
 			}
 
-			added, err := voteSet.AddVote(vote)
+			added, err := voteSet.AddVote(vote, false)
 			if tc.exepectError {
 				require.Error(t, err)
 				require.False(t, added)

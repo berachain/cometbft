@@ -2320,7 +2320,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		added, err = cs.LastCommit.AddVote(vote)
+		added, err = cs.LastCommit.AddVote(vote, false)
 		if !added {
 			// If the vote wasn't added but there's no error, its a duplicate vote
 			if err == nil {

@@ -148,7 +148,7 @@ func (hvs *HeightVoteSet) AddVote(vote *types.Vote, peerID p2p.ID, extEnabled bo
 		voteSet = hvs.getVoteSet(vote.Round, vote.Type)
 		hvs.peerCatchupRounds[peerID] = append(rndz, vote.Round)
 	}
-	added, err = voteSet.AddVote(vote)
+	added, err = voteSet.AddVote(vote, false)
 	return added, err
 }
 

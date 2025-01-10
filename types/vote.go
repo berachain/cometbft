@@ -224,11 +224,16 @@ func (vote *Vote) String() string {
 	)
 }
 
-func (vote *Vote) verifyAndReturnProto(chainID string, pubKey crypto.PubKey) (*cmtproto.Vote, error) {
+func (vote *Vote) verifyAndReturnProto(chainID string, pubKey crypto.PubKey, skipSigVerification bool) (*cmtproto.Vote, error) {
 	if !bytes.Equal(pubKey.Address(), vote.ValidatorAddress) {
 		return nil, ErrVoteInvalidValidatorAddress
 	}
 	v := vote.ToProto()
+
+	if skipSigVerification {
+		return v, nil
+	}
+
 	if !pubKey.VerifySignature(VoteSignBytes(chainID, v), vote.Signature) {
 		return nil, ErrVoteInvalidSignature
 	}
@@ -238,8 +243,8 @@ func (vote *Vote) verifyAndReturnProto(chainID string, pubKey crypto.PubKey) (*c
 // Verify checks whether the signature associated with this vote corresponds to
 // the given chain ID and public key. This function does not validate vote
 // extension signatures - to do so, use VerifyWithExtension instead.
-func (vote *Vote) Verify(chainID string, pubKey crypto.PubKey) error {
-	_, err := vote.verifyAndReturnProto(chainID, pubKey)
+func (vote *Vote) Verify(chainID string, pubKey crypto.PubKey, skipSigVerification bool) error {
+	_, err := vote.verifyAndReturnProto(chainID, pubKey, skipSigVerification)
 	return err
 }
 
@@ -248,7 +253,8 @@ func (vote *Vote) Verify(chainID string, pubKey crypto.PubKey) error {
 // given chain ID and public key. We only verify vote extension signatures for
 // precommits.
 func (vote *Vote) VerifyVoteAndExtension(chainID string, pubKey crypto.PubKey) error {
-	v, err := vote.verifyAndReturnProto(chainID, pubKey)
+
+	v, err := vote.verifyAndReturnProto(chainID, pubKey, false)
 	if err != nil {
 		return err
 	}
@@ -286,7 +292,7 @@ func (vote *Vote) VerifyExtension(chainID string, pubKey crypto.PubKey) error {
 // ValidateBasic checks whether the vote is well-formed. It does not, however,
 // check vote extensions - for vote validation with vote extension validation,
 // use ValidateWithExtension.
-func (vote *Vote) ValidateBasic() error {
+func (vote *Vote) ValidateBasic(skipSigVerification bool) error {
 	if !IsVoteTypeValid(vote.Type) {
 		return errors.New("invalid Type")
 	}
@@ -320,8 +326,12 @@ func (vote *Vote) ValidateBasic() error {
 	if vote.ValidatorIndex < 0 {
 		return errors.New("negative ValidatorIndex")
 	}
-	if len(vote.Signature) == 0 {
-		return errors.New("signature is missing")
+
+	// vote.Signature sometimes it's not there.
+	if !skipSigVerification {
+		if len(vote.Signature) == 0 {
+			return errors.New("signature is missing")
+		}
 	}
 
 	if len(vote.Signature) > MaxSignatureSize {
