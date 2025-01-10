@@ -179,7 +179,7 @@ func DefaultValidatorParams() ValidatorParams {
 	}
 	// If we are running tests, enable ed25519.
 	if flag.Lookup("test.v") != nil {
-		params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeBls12381)
+		params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeEd25519)
 	}
 	return params
 }
