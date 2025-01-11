@@ -2631,11 +2631,8 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 	cs.enterPrecommit(height, commit.Round)
 
 	cs.enterCommit(height, commit.Round)
-	// TODO Enable back. Does Commit have something similar? If not implement HasAll() for Commit
-	// skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
-	// if skipTimeoutCommit && commit.HasAll() {
-	// 	cs.enterNewRound(cs.Height, 0)
-	// }
+	// We skip timeoutCommit as this function is hit only when the node is late
+	cs.enterNewRound(cs.Height, 0)
 
 	return added, err
 }

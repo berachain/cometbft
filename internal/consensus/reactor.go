@@ -943,7 +943,6 @@ func getEntireCommitToSend(logger log.Logger,
 		// }
 	}
 	return nil
-
 }
 
 func pickVoteToSend(
@@ -1712,6 +1711,7 @@ func init() {
 	cmtjson.RegisterType(&ProposalPOLMessage{}, "tendermint/ProposalPOL")
 	cmtjson.RegisterType(&BlockPartMessage{}, "tendermint/BlockPart")
 	cmtjson.RegisterType(&VoteMessage{}, "tendermint/Vote")
+	cmtjson.RegisterType(&CommitMessage{}, "tendermint/Commit")
 	cmtjson.RegisterType(&HasVoteMessage{}, "tendermint/HasVote")
 	cmtjson.RegisterType(&HasProposalBlockPartMessage{}, "tendermint/HasProposalBlockPart")
 	cmtjson.RegisterType(&VoteSetMaj23Message{}, "tendermint/VoteSetMaj23")
