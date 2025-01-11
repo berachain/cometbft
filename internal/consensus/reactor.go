@@ -304,6 +304,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			case types.PrevoteType:
 				ourVotes = votes.Prevotes(msg.Round).BitArrayByBlockID(msg.BlockID)
 			case types.PrecommitType:
+				// No need to check Votes.Commit, we are dealing with VoteSetMaj23Message.
 				ourVotes = votes.Precommits(msg.Round).BitArrayByBlockID(msg.BlockID)
 			default:
 				panic("Bad VoteSetBitsMessage field Type. Forgot to add a check in ValidateBasic?")
@@ -387,6 +388,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 				case types.PrevoteType:
 					ourVotes = votes.Prevotes(msg.Round).BitArrayByBlockID(msg.BlockID)
 				case types.PrecommitType:
+					// No need to check Votes.Commit, we are dealing with VoteSetBitsMessage.
 					ourVotes = votes.Precommits(msg.Round).BitArrayByBlockID(msg.BlockID)
 				default:
 					panic("Bad VoteSetBitsMessage field Type. Forgot to add a check in ValidateBasic?")
@@ -757,6 +759,7 @@ OUTER_LOOP:
 			rs := conR.getRoundState()
 			prs := ps.GetRoundState()
 			if rs.Height == prs.Height {
+				// No need to check rs.Votes.Commit, as this is for an ongoing consensus.
 				if maj23, ok := rs.Votes.Precommits(prs.Round).TwoThirdsMajority(); ok {
 					peer.TrySend(p2p.Envelope{
 						ChannelID: StateChannel,
@@ -1001,6 +1004,7 @@ func pickVoteCurrentHeight(
 	}
 	// If there are precommits to send...
 	if prs.Step <= cstypes.RoundStepPrecommitWait && prs.Round != -1 && prs.Round <= rs.Round {
+		// No need to check rs.Votes.Commit, as this is dealing with individual votes.
 		if vote := ps.PickVoteToSend(rs.Votes.Precommits(prs.Round), rng); vote != nil {
 			logger.Debug("Picked rs.Precommits(prs.Round) to send", "round", prs.Round)
 			return vote

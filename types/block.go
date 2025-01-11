@@ -1031,7 +1031,6 @@ func (commit *Commit) Hash() cmtbytes.HexBytes {
 // Wrapping a Commit as an ExtendedCommit is useful when an API
 // requires an ExtendedCommit wire type but does not
 // need the VoteExtension data.
-// TODO probably remove this function
 func (commit *Commit) WrappedExtendedCommit() *ExtendedCommit {
 	cs := make([]ExtendedCommitSig, len(commit.Signatures))
 	for idx, s := range commit.Signatures {

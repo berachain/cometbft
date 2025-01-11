@@ -694,14 +694,18 @@ func (cs *State) updateToState(state sm.State) {
 	case state.LastBlockHeight == 0: // Very first commit should be empty.
 		cs.LastCommit = (*types.VoteSet)(nil)
 	case cs.CommitRound > -1 && cs.Votes != nil: // Otherwise, use cs.Votes
-		if !cs.Votes.Precommits(cs.CommitRound).HasTwoThirdsMajority() {
-			panic(fmt.Sprintf(
-				"wanted to form a commit, but precommits (H/R: %d/%d) didn't have 2/3+: %v",
-				state.LastBlockHeight, cs.CommitRound, cs.Votes.Precommits(cs.CommitRound),
-			))
-		}
+		if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+			cs.LastCommit = commit
+		} else {
+			if !cs.Votes.Precommits(cs.CommitRound).HasTwoThirdsMajority() {
+				panic(fmt.Sprintf(
+					"wanted to form a commit, but precommits (H/R: %d/%d) didn't have 2/3+: %v",
+					state.LastBlockHeight, cs.CommitRound, cs.Votes.Precommits(cs.CommitRound),
+				))
+			}
 
-		cs.LastCommit = cs.Votes.Precommits(cs.CommitRound)
+			cs.LastCommit = cs.Votes.Precommits(cs.CommitRound)
+		}
 
 	case cs.LastCommit == nil:
 		// NOTE: when consensus starts, it has no votes. reconstructLastCommit
@@ -1339,7 +1343,7 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		if !ok {
 			return nil, fmt.Errorf("last commit is neither a VoteSet nor a Commit")
 		}
-		// TODO This will need to be extended to support vote extensions.
+		// XXX This will need to be extended to support vote extensions.
 		lastExtCommit = lastCommitAsCommit.WrappedExtendedCommit()
 
 	default: // This shouldn't happen.
@@ -1749,7 +1753,7 @@ func (cs *State) enterPrecommitWait(height int64, round int32) {
 		return
 	}
 
-	if !cs.Votes.Precommits(round).HasTwoThirdsAny() {
+	if cs.Votes.GetCommit(round) == nil && !cs.Votes.Precommits(round).HasTwoThirdsAny() {
 		panic(fmt.Sprintf(
 			"entering precommit wait step (%v/%v), but precommits does not have any +2/3 votes",
 			height, round,
@@ -1794,9 +1798,15 @@ func (cs *State) enterCommit(height int64, commitRound int32) {
 		cs.tryFinalizeCommit(height)
 	}()
 
-	blockID, ok := cs.Votes.Precommits(commitRound).TwoThirdsMajority()
-	if !ok || blockID.IsNil() {
-		panic("RunActionCommit() expects +2/3 precommits")
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(commitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(commitRound).TwoThirdsMajority()
+		if !ok || blockID.IsNil() {
+			panic("RunActionCommit() expects +2/3 precommits")
+		}
 	}
 
 	// The Locked* fields no longer matter.
@@ -1839,10 +1849,16 @@ func (cs *State) tryFinalizeCommit(height int64) {
 		panic(fmt.Sprintf("tryFinalizeCommit() cs.Height: %v vs height: %v", cs.Height, height))
 	}
 
-	blockID, ok := cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
-	if !ok || blockID.IsNil() {
-		logger.Error("Failed attempt to finalize commit; there was no +2/3 majority or +2/3 was for nil")
-		return
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		if !ok || blockID.IsNil() {
+			logger.Error("Failed attempt to finalize commit; there was no +2/3 majority or +2/3 was for nil")
+			return
+		}
 	}
 
 	if !cs.ProposalBlock.HashesTo(blockID.Hash) {
@@ -1871,14 +1887,20 @@ func (cs *State) finalizeCommit(height int64) {
 		return
 	}
 
-	cs.calculatePrevoteMessageDelayMetrics()
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		cs.calculatePrevoteMessageDelayMetrics()
 
-	blockID, ok := cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		if !ok {
+			panic("cannot finalize commit; commit does not have 2/3 majority")
+		}
+	}
 	block, blockParts := cs.ProposalBlock, cs.ProposalBlockParts
 
-	if !ok {
-		panic("cannot finalize commit; commit does not have 2/3 majority")
-	}
 	if !blockParts.HasHeader(blockID.PartSetHeader) {
 		panic("expected ProposalBlockParts header to be commit header")
 	}
@@ -1902,9 +1924,14 @@ func (cs *State) finalizeCommit(height int64) {
 
 	// Save to blockStore.
 	if cs.blockStore.Height() < block.Height {
-		// NOTE: the seenCommit is local justification to commit this block,
-		// but may differ from the LastCommit included in the next block
-		seenExtendedCommit := cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+		var seenExtendedCommit *types.ExtendedCommit
+		if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+			seenExtendedCommit = commit.WrappedExtendedCommit()
+		} else {
+			// NOTE: the seenCommit is local justification to commit this block,
+			// but may differ from the LastCommit included in the next block
+			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+		}
 		if cs.isVoteExtensionsEnabled(block.Height) {
 			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit)
 		} else {
@@ -2509,6 +2536,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 		}
 
 	case types.PrecommitType:
+		// No need to check cs.Votes.Commit() as this is about adding votes
 		precommits := cs.Votes.Precommits(vote.Round)
 		cs.Logger.Debug("Added vote to precommit",
 			"height", vote.Height,
@@ -2540,6 +2568,63 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 	default:
 		panic(fmt.Sprintf("unexpected vote type %v", vote.Type))
 	}
+
+	return added, err
+}
+
+func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err error) {
+	cs.Logger.Debug(
+		"Adding whole commit",
+		"commit_height", commit.Height,
+		"commit_round", commit.Round,
+		"commit_blockId", commit.BlockID,
+		"cs_height", cs.Height,
+		"cs_round", cs.Round,
+	)
+
+	if commit.Height < cs.Height {
+		// cs.metrics.MarkLateCommit() TODO Implement
+	}
+
+	// Height mismatch is ignored.
+	// Not necessarily a bad peer, but not favorable behavior.
+	if commit.Height != cs.Height {
+		cs.Logger.Debug("Commit ignored and not added",
+			"commit_height", commit.Height,
+			"cs_height", cs.Height,
+			"peer", peerID)
+		return added, err
+	}
+
+	// Check to see if the chain is configured to extend votes.
+	extEnabled := cs.isVoteExtensionsEnabled(commit.Height)
+	if extEnabled {
+		// We don't support receiving commits with vote extensions enabled ATM.
+		cs.Logger.Error("Received commit with vote extension for height %v (extensions disabled) from peer ID %s", commit.Height, peerID)
+		return added, err
+	}
+
+	// TODO: double check that we have fully validated the commit at this function's caller
+
+	height := cs.Height
+	cs.Votes.SetCommit(commit)
+
+	// TODO We need something similar for Commits
+	// if err := cs.eventBus.PublishEventVote(types.EventDataVote{Vote: vote}); err != nil {
+	// 	return added, err
+	// }
+	// cs.evsw.FireEvent(types.EventVote, vote)
+
+	// Executed as Commit could be from a higher round
+	cs.enterNewRound(height, commit.Round)
+	cs.enterPrecommit(height, commit.Round)
+
+	cs.enterCommit(height, commit.Round)
+	// TODO Enable back. Does Commit have something similar? If not implement HasAll() for Commit
+	// skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
+	// if skipTimeoutCommit && commit.HasAll() {
+	// 	cs.enterNewRound(cs.Height, 0)
+	// }
 
 	return added, err
 }
