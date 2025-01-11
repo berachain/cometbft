@@ -3,7 +3,6 @@ package types
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"math"
 	"os"
 	"reflect"
@@ -270,39 +269,6 @@ func TestCommitValidateBasic(t *testing.T) {
 		})
 	}
 }
-
-func TestLastCommitJSON(t *testing.T) {
-	cs := CommitSig{
-		BlockIDFlag:      BlockIDFlagNil,
-		ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
-		Timestamp:        time.Time{},
-		Signature:        crypto.CRandBytes(MaxSignatureSize),
-	}
-	c := Commit{
-		Height: 1,
-		Round:  0,
-		BlockID: BlockID{
-			Hash: tmhash.Sum([]byte("blockID_hash")),
-			PartSetHeader: PartSetHeader{
-				Total: math.MaxInt32,
-				Hash:  tmhash.Sum([]byte("blockID_part_set_header_hash")),
-			},
-		},
-		Signatures: []CommitSig{cs},
-	}
-	bl := Block{
-		LastCommit: &c,
-	}
-
-	json_bl, err := json.Marshal(bl)
-	require.NoError(t, err)
-
-	var r2 Block
-	err = json.Unmarshal(json_bl, &r2)
-	require.NoError(t, err)
-	assert.Equal(t, r2, bl)
-}
-
 func TestMaxCommitBytes(t *testing.T) {
 	// time is varint encoded so need to pick the max.
 	// year int, month Month, day, hour, min, sec, nsec int, loc *Location

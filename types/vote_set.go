@@ -834,4 +834,5 @@ type VoteSetReader interface {
 	BitArray() *bits.BitArray
 	GetByIndex(idx int32) (*Vote, error)
 	IsCommit() bool
+	MarshalJSON() ([]byte, error)
 }

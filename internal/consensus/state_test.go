@@ -8,10 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/cometbft/cometbft/abci/example/kvstore"
 	abci "github.com/cometbft/cometbft/abci/types"
 	abcimocks "github.com/cometbft/cometbft/abci/types/mocks"
@@ -21,11 +17,15 @@ import (
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 	"github.com/cometbft/cometbft/internal/test"
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
+
 	"github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/libs/protoio"
 	cmtpubsub "github.com/cometbft/cometbft/libs/pubsub"
 	p2pmock "github.com/cometbft/cometbft/p2p/mock"
 	"github.com/cometbft/cometbft/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 /*
@@ -71,6 +71,14 @@ x * TestHalt1 - if we see +2/3 precommits after timing out into new round, we sh
 
 // ----------------------------------------------------------------------------------------------------
 // ProposeSuite
+
+func TestStateJSONMarshalling(t *testing.T) {
+	cs1, _ := randState(4)
+	cs1.LastCommit = &types.Commit{Height: 1, Round: 0, BlockID: cs1.state.LastBlockID}
+	_, err := cs1.GetRoundStateJSON()
+	require.NoError(t, err)
+
+}
 
 func TestStateProposerSelection0(t *testing.T) {
 	cs1, vss := randState(4)
