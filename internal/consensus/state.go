@@ -962,11 +962,13 @@ func (cs *State) handleMsg(mi msgInfo) {
 
 	case *CommitMessage:
 
-		added, err := cs.AddCommit(msg.Commit, peerID)
-		if added {
-			// XXX Add stats about received commit
-			// cs.statsMsgQueue <- mi
-		}
+		_, err := cs.AddCommit(msg.Commit, peerID)
+
+		// XXX The function above returnes `added`
+		// If this boolean is tru we should implement
+		// stats for commit messages
+		// cs.statsMsgQueue <- mi
+
 		if err != nil {
 			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit, "err", err)
 		}
