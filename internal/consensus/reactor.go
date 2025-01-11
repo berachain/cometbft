@@ -942,7 +942,6 @@ func sendEntireCommit(logger log.Logger,
 		// }
 	}
 	return nil
-
 }
 
 func pickVoteToSend(
