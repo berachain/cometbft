@@ -1292,7 +1292,7 @@ func (ps *PeerState) SendProposalSetHasProposal(
 
 // sendCommit sends the aggregated commit to the peer.
 func (ps *PeerState) sendCommit(commit *types.Commit) bool {
-	ps.logger.Info("Sending commit message", "ps", ps, "commit", commit)
+	ps.logger.Debug("Sending commit message", "ps", ps, "commit", commit)
 	return ps.peer.Send(p2p.Envelope{
 		ChannelID: VoteChannel,
 		Message: &cmtcons.Commit{

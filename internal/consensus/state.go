@@ -884,7 +884,6 @@ func (cs *State) receiveRoutine(maxSteps int) {
 
 // state transitions on complete-proposal, 2/3-any, 2/3-one.
 func (cs *State) handleMsg(mi msgInfo) {
-	cs.Logger.Info("Handling msg")
 	cs.mtx.Lock()
 	defer cs.mtx.Unlock()
 	var (
