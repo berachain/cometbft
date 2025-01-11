@@ -962,9 +962,15 @@ func (cs *State) handleMsg(mi msgInfo) {
 
 	case *CommitMessage:
 		cs.Logger.Info("XX received cmt message")
-		panic("RECEIVED COMMIT MESSAGE")
 		// TODO Commit has been validated Validate Basic when unmarshalling, but need to validate the the commit itself
-		//cs.AddCommit(aggCommit)
+		added, err := cs.AddCommit(msg.Commit, peerID)
+		if added {
+			cs.statsMsgQueue <- mi
+		}
+		if err != nil {
+			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit)
+		}
+
 	default:
 		cs.Logger.Error("Unknown msg type", "type", fmt.Sprintf("%T", msg))
 		return
