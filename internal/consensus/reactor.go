@@ -694,18 +694,19 @@ OUTER_LOOP:
 				"vote", vote,
 			)
 		} else {
-			if c := sendEntireCommit(logger, conR.conS, rs, ps, prs, rng); c != nil {
-				commit, ok := (*c).(*types.Commit)
-				if !ok {
-					panic("Wrong type,got")
+			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs, rng); c != nil {
+				if commit, ok := (c).(*types.Commit); ok {
+
+					if ps.sendCommit(commit) {
+						logger.Info("XXX SENT COMMIT")
+						continue OUTER_LOOP
+					}
+					logger.Error("Failed to send commit to peer",
+						"height", prs.Height,
+						"commit", commit)
+				} else {
+					logger.Error("Commit should have been returned, instead unknown type.")
 				}
-				if ps.sendCommit(commit) {
-					logger.Info("XXX SENT COMMIT")
-					continue OUTER_LOOP
-				}
-				logger.Info("XX Failed to send commit to peer",
-					"height", prs.Height,
-					"commit", commit)
 			}
 		}
 
@@ -906,13 +907,13 @@ func pickPartForCatchup(
 	return part
 }
 
-func sendEntireCommit(logger log.Logger,
+func getEntireCommitToSend(logger log.Logger,
 	conS *State,
 	rs *cstypes.RoundState,
 	ps *PeerState,
 	prs *cstypes.PeerRoundState,
 	rng *rand.Rand,
-) *types.VoteSetReader {
+) types.VoteSetReader {
 	// Catchup logic
 	// If peer is lagging by more than 1, send Commit.
 	blockStoreBase := conS.blockStore.Base()
@@ -934,7 +935,7 @@ func sendEntireCommit(logger log.Logger,
 		if commit == nil {
 			return nil
 		}
-		return &commit
+		return commit
 		// TODO we cannot pick a vote. Here is the place where we need to send the whole commit.
 		// if vote := ps.PickVoteToSend(commit, rng); vote != nil {
 		// 	logger.Debug("Picked Catchup commit to send", "height", prs.Height)
@@ -1298,8 +1299,7 @@ func (ps *PeerState) SendProposalSetHasProposal(
 	}
 }
 
-// sendCommit sends the vote to the peer.
-// Returns true and marks the peer as having the vote if the vote was sent.
+// sendCommit sends the aggregated commit to the peer.
 func (ps *PeerState) sendCommit(commit *types.Commit) bool {
 	ps.logger.Info("Sending commit message", "ps", ps, "commit", commit)
 	return ps.peer.Send(p2p.Envelope{
@@ -1309,8 +1309,8 @@ func (ps *PeerState) sendCommit(commit *types.Commit) bool {
 		},
 	})
 
-	// TODO Set COMMIT TO PEER
-	// ps.SetHasVote(vote)
+	// XXX Good to have: mark the commit as received in the peer state
+	// ps.SetHasVote(vote) alternative
 }
 
 // sendVoteSetHasVote sends the vote to the peer.
@@ -1907,7 +1907,7 @@ func (m *BlockPartMessage) String() string {
 
 // -------------------------------------
 
-// VoteMessage is sent when voting for a proposal (or lack thereof).
+// CommitMessage is sent when voting for a proposal (or lack thereof).
 type CommitMessage struct {
 	Commit *types.Commit
 }
