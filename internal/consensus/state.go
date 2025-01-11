@@ -884,7 +884,6 @@ func (cs *State) receiveRoutine(maxSteps int) {
 
 // state transitions on complete-proposal, 2/3-any, 2/3-one.
 func (cs *State) handleMsg(mi msgInfo) {
-	cs.Logger.Info("Handling msg")
 	cs.mtx.Lock()
 	defer cs.mtx.Unlock()
 	var (
@@ -1930,7 +1929,7 @@ func (cs *State) finalizeCommit(height int64) {
 		} else {
 			// NOTE: the seenCommit is local justification to commit this block,
 			// but may differ from the LastCommit included in the next block
-			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeBLSCommit()
 		}
 		if cs.isVoteExtensionsEnabled(block.Height) {
 			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit)
