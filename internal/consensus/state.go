@@ -626,7 +626,7 @@ func (cs *State) votesFromExtendedCommit(state sm.State) (*types.VoteSet, error)
 	return vs, nil
 }
 
-func (cs *State) votesFromSeenCommit(state sm.State) (*types.VoteSet, error) {
+func (cs *State) votesFromSeenCommit(state sm.State) (types.VoteSetReader, error) {
 	commit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	if commit == nil {
 		commit = cs.blockStore.LoadBlockCommit(state.LastBlockHeight)
@@ -638,10 +638,8 @@ func (cs *State) votesFromSeenCommit(state sm.State) (*types.VoteSet, error) {
 		return nil, fmt.Errorf("heights don't match in votesFromSeenCommit %v!=%v",
 			commit.Height, state.LastBlockHeight)
 	}
-	vs := commit.ToVoteSet(state.ChainID, state.LastValidators)
-	if !vs.HasTwoThirdsMajority() {
-		return nil, ErrCommitQuorumNotMet
-	}
+	vs := commit
+	// TODO possibly verify aggregated commit, but I think not needed as coming from our store
 	return vs, nil
 }
 
@@ -955,6 +953,9 @@ func (cs *State) handleMsg(mi msgInfo) {
 		// the peer is sending us CatchupCommit precommits.
 		// We could make note of this and help filter in broadcastHasVoteMessage().
 
+		// case *CommitMessage:
+		// TODO Commit has been validated Validate Basic when unmarshalling, but need to validate the the commit itself
+		// cs.AddCommit(aggCommit)
 	default:
 		cs.Logger.Error("Unknown msg type", "type", fmt.Sprintf("%T", msg))
 		return
@@ -1303,13 +1304,17 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 
 	// TODO(sergio): wouldn't it be easier if CreateProposalBlock accepted cs.LastCommit directly?
 	var lastExtCommit *types.ExtendedCommit
+	lastCommitAsVs, ok := cs.LastCommit.(*types.VoteSet)
 	switch {
 	case cs.Height == cs.state.InitialHeight:
 		// We're creating a proposal for the first block.
 		// The commit is empty, but not nil.
 		lastExtCommit = &types.ExtendedCommit{}
 
-	case cs.LastCommit.HasTwoThirdsMajority():
+		// TODO two cases based on the type:
+		// commit: change this by verifying the commit (again, out of caution), and return the same error
+		// voteset: business as usual
+	case ok && lastCommitAsVs.HasTwoThirdsMajority():
 		// Make the commit from LastCommit.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		canBeAggregated := blsKey &&
@@ -1318,10 +1323,19 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 			if !cs.isPBTSEnabled(cs.Height) {
 				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
 			}
-			lastExtCommit = cs.LastCommit.MakeBLSCommit()
+			lastExtCommit = lastCommitAsVs.MakeBLSCommit()
 		} else {
-			lastExtCommit = cs.LastCommit.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+			lastExtCommit = lastCommitAsVs.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
 		}
+	case !ok:
+		// TODO TBH, I don't think we need this case. We can just do nothing (default case),
+		// which simulates a slow proposal
+		lastCommitAsCommit, ok := cs.LastCommit.(*types.Commit)
+		if !ok {
+			return nil, fmt.Errorf("last commit is neither a VoteSet nor a Commit")
+		}
+		// TODO This will need to be extended to support vote extensions.
+		lastExtCommit = lastCommitAsCommit.WrappedExtendedCommit()
 
 	default: // This shouldn't happen.
 		return nil, ErrProposalWithoutPreviousCommit
@@ -2320,7 +2334,12 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		added, err = cs.LastCommit.AddVote(vote)
+		lastCommitAsVs, ok := cs.LastCommit.(*types.VoteSet)
+		if !ok {
+			cs.Logger.Debug("Cannot add precommit vote to a commit; precommit ignored", "vote", vote)
+			return added, err
+		}
+		added, err = lastCommitAsVs.AddVote(vote)
 		if !added {
 			// If the vote wasn't added but there's no error, its a duplicate vote
 			if err == nil {
@@ -2329,7 +2348,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		cs.Logger.Debug("Added vote to last precommits", "last_commit", cs.LastCommit.StringShort())
+		cs.Logger.Debug("Added vote to last precommits", "last_commit", lastCommitAsVs.StringShort())
 		if err := cs.eventBus.PublishEventVote(types.EventDataVote{Vote: vote}); err != nil {
 			return added, err
 		}
@@ -2338,7 +2357,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 
 		// if we can skip timeoutCommit and have all the votes now,
 		skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
-		if skipTimeoutCommit && cs.LastCommit.HasAll() {
+		if skipTimeoutCommit && lastCommitAsVs.HasAll() {
 			// go straight to new round (skip timeout commit)
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
 			cs.enterNewRound(cs.Height, 0)

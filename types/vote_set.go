@@ -393,13 +393,13 @@ func (voteSet *VoteSet) BitArrayByBlockID(blockID BlockID) *bits.BitArray {
 
 // NOTE: if validator has conflicting votes, returns "canonical" vote
 // Implements VoteSetReader.
-func (voteSet *VoteSet) GetByIndex(valIndex int32) *Vote {
+func (voteSet *VoteSet) GetByIndex(valIndex int32) (*Vote, error) {
 	if voteSet == nil {
-		return nil
+		return nil, nil
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
-	return voteSet.votes[valIndex]
+	return voteSet.votes[valIndex], nil
 }
 
 // List returns a copy of the list of votes stored by the VoteSet.
@@ -832,6 +832,6 @@ type VoteSetReader interface {
 	Type() byte
 	Size() int
 	BitArray() *bits.BitArray
-	GetByIndex(idx int32) *Vote
+	GetByIndex(idx int32) (*Vote, error)
 	IsCommit() bool
 }

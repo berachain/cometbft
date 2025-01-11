@@ -359,7 +359,8 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasVoteFromPeer(msg.Vote, height, valSize, lastCommitSize)
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
-
+		// case *CommitMessage:
+		// TODO Send it to the queue like VoteMessage
 		default:
 			// don't punish (leave room for soft upgrades)
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
@@ -913,7 +914,7 @@ func pickVoteToSend(
 	if blockStoreBase > 0 && prs.Height != 0 && rs.Height >= prs.Height+2 && prs.Height >= blockStoreBase {
 		// Load the block's extended commit for prs.Height,
 		// which contains precommit signatures for prs.Height.
-		var ec *types.ExtendedCommit
+		var commit types.VoteSetReader
 		var veEnabled bool
 		func() {
 			conS.mtx.RLock()
@@ -921,22 +922,19 @@ func pickVoteToSend(
 			veEnabled = conS.state.ConsensusParams.Feature.VoteExtensionsEnabled(prs.Height)
 		}()
 		if veEnabled {
-			ec = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
+			commit = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
 		} else {
-			c := conS.blockStore.LoadBlockCommit(prs.Height)
-			if c == nil {
-				return nil
-			}
-			ec = c.WrappedExtendedCommit()
+			commit = conS.blockStore.LoadBlockCommit(prs.Height)
 		}
-		if ec == nil {
+		if commit == nil {
 			return nil
 		}
 
-		if vote := ps.PickVoteToSend(ec, rng); vote != nil {
-			logger.Debug("Picked Catchup commit to send", "height", prs.Height)
-			return vote
-		}
+		// TODO we cannot pick a vote. Here is the place where we need to send the whole commit.
+		// if vote := ps.PickVoteToSend(commit, rng); vote != nil {
+		// 	logger.Debug("Picked Catchup commit to send", "height", prs.Height)
+		// 	return vote
+		// }
 	}
 	return nil
 }
@@ -1307,8 +1305,13 @@ func (ps *PeerState) PickVoteToSend(votes types.VoteSetReader, rng *rand.Rand) *
 		return nil // Not something worth sending
 	}
 	if index, ok := votes.BitArray().Sub(psVotes).PickRandom(rng); ok {
-		vote := votes.GetByIndex(int32(index))
-		if vote == nil {
+		vote, err := votes.GetByIndex(int32(index))
+		if err != nil {
+			// Corner case: last commit is a "reconstructed commit" (so not a VoteSet)
+			// coming from switchToConsensus. In this case, we can't pick a vote.
+			// Simplest solution is to do nothing and let the catchup logic fix it later.
+			ps.logger.Debug("votes.GetByIndex returned error", "votes", votes, "index", index, "err", err)
+		} else if vote == nil {
 			ps.logger.Error("votes.GetByIndex returned nil", "votes", votes, "index", index)
 		}
 		return vote

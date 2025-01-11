@@ -19,7 +19,6 @@ import (
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
-	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/cometbft/cometbft/version"
 )
 
@@ -866,11 +865,14 @@ type Commit struct {
 	BlockID    BlockID     `json:"block_id"`
 	Signatures []CommitSig `json:"signatures"`
 
+	bitArray *bits.BitArray
 	// Memoized in first call to corresponding method.
 	// NOTE: can't memoize in constructor because constructor isn't used for
 	// unmarshaling.
 	hash cmtbytes.HexBytes
 }
+
+var _ VoteSetReader = (*Commit)(nil)
 
 // Clone creates a deep copy of this commit.
 func (commit *Commit) Clone() *Commit {
@@ -879,6 +881,56 @@ func (commit *Commit) Clone() *Commit {
 	commCopy := *commit
 	commCopy.Signatures = sigs
 	return &commCopy
+}
+
+// Type returns the vote type of the commit, which is always
+// VoteTypePrecommit
+// Implements VoteSetReader.
+func (*Commit) Type() byte { return byte(PrecommitType) }
+
+// GetHeight returns height of the commit.
+// Implements VoteSetReader.
+func (commit *Commit) GetHeight() int64 { return commit.Height }
+
+// GetRound returns height of the commit.
+// Implements VoteSetReader.
+func (commit *Commit) GetRound() int32 { return commit.Round }
+
+// Size returns the number of signatures in the commit.
+// Implements VoteSetReader.
+func (commit *Commit) Size() int {
+	if commit == nil {
+		return 0
+	}
+	return len(commit.Signatures)
+}
+
+// BitArray returns a BitArray of which validators voted for BlockID or nil in
+// this extended commit.
+// Implements VoteSetReader.
+func (commit *Commit) BitArray() *bits.BitArray {
+	if commit.bitArray == nil {
+		initialBitFn := func(i int) bool {
+			// TODO: need to check the BlockID otherwise we could be counting conflicts,
+			//       not just the one with +2/3 !
+			return commit.Signatures[i].BlockIDFlag != BlockIDFlagAbsent
+		}
+		commit.bitArray = bits.NewBitArrayFromFn(len(commit.Signatures), initialBitFn)
+	}
+	return commit.bitArray
+}
+
+// GetByIndex returns the vote corresponding to a given validator index.
+// Panics if `index >= extCommit.Size()`.
+// Implements VoteSetReader.
+func (commit *Commit) GetByIndex(valIdx int32) (*Vote, error) {
+	return nil, fmt.Errorf("cannot get vote by index from Commit %v", commit.StringIndented("  "))
+}
+
+// IsCommit returns true if there is at least one signature.
+// Implements VoteSetReader.
+func (commit *Commit) IsCommit() bool {
+	return len(commit.Signatures) != 0
 }
 
 // GetVote converts the CommitSig for the given valIdx to a Vote. Commits do
@@ -914,16 +966,9 @@ func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 	return VoteSignBytes(chainID, v)
 }
 
-// Size returns the number of signatures in the commit.
-func (commit *Commit) Size() int {
-	if commit == nil {
-		return 0
-	}
-	return len(commit.Signatures)
-}
-
 // ValidateBasic performs basic validation that doesn't involve state data.
 // Does not actually check the cryptographic signatures.
+// TODO check all callsites to see if we need a full validation as well
 func (commit *Commit) ValidateBasic() error {
 	if commit.Height < 0 {
 		return errors.New("negative Height")
@@ -960,32 +1005,6 @@ func (commit *Commit) HasAggregatedSignature() bool {
 	return false
 }
 
-// MedianTime computes the median time for a Commit based on the associated validator set.
-// The median time is the weighted median of the Timestamp fields of the commit votes,
-// with heights defined by the validator's voting powers.
-// The BFT Time algorithm ensures that the computed median time is always picked among
-// the timestamps produced by honest processes, i.e., faulty processes cannot arbitrarily
-// increase or decrease the median time.
-// See: https://github.com/cometbft/cometbft/blob/main/spec/consensus/bft-time.md
-func (commit *Commit) MedianTime(validators *ValidatorSet) time.Time {
-	weightedTimes := make([]*cmttime.WeightedTime, len(commit.Signatures))
-	totalVotingPower := int64(0)
-
-	for i, commitSig := range commit.Signatures {
-		if commitSig.BlockIDFlag == BlockIDFlagAbsent {
-			continue
-		}
-		_, validator := validators.GetByAddressMut(commitSig.ValidatorAddress)
-		// If there's no condition, TestValidateBlockCommit panics; not needed normally.
-		if validator != nil {
-			totalVotingPower += validator.VotingPower
-			weightedTimes[i] = cmttime.NewWeightedTime(commitSig.Timestamp, validator.VotingPower)
-		}
-	}
-
-	return cmttime.WeightedMedian(weightedTimes, totalVotingPower)
-}
-
 // Hash returns the hash of the commit.
 func (commit *Commit) Hash() cmtbytes.HexBytes {
 	if commit == nil {
@@ -1012,6 +1031,7 @@ func (commit *Commit) Hash() cmtbytes.HexBytes {
 // Wrapping a Commit as an ExtendedCommit is useful when an API
 // requires an ExtendedCommit wire type but does not
 // need the VoteExtension data.
+// TODO probably remove this function
 func (commit *Commit) WrappedExtendedCommit() *ExtendedCommit {
 	cs := make([]ExtendedCommitSig, len(commit.Signatures))
 	for idx, s := range commit.Signatures {
@@ -1113,6 +1133,8 @@ type ExtendedCommit struct {
 	bitArray *bits.BitArray
 }
 
+var _ VoteSetReader = (*ExtendedCommit)(nil)
+
 // Clone creates a deep copy of this extended commit.
 func (ec *ExtendedCommit) Clone() *ExtendedCommit {
 	sigs := make([]ExtendedCommitSig, len(ec.ExtendedSignatures))
@@ -1152,7 +1174,8 @@ func (ec *ExtendedCommit) addSigsToVoteSet(voteSet *VoteSet) {
 // ToVoteSet constructs a VoteSet from the Commit and validator set.
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
-func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) *VoteSet {
+/*
+func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) VoteSetReader {
 	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, PrecommitType, vals)
 	for idx, cs := range commit.Signatures {
 		if cs.BlockIDFlag == BlockIDFlagAbsent {
@@ -1169,6 +1192,7 @@ func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) *VoteSet {
 	}
 	return voteSet
 }
+*/
 
 // EnsureExtensions validates that a vote extensions signature is present for
 // every ExtendedCommitSig in the ExtendedCommit.
@@ -1254,8 +1278,8 @@ func (ec *ExtendedCommit) BitArray() *bits.BitArray {
 // GetByIndex returns the vote corresponding to a given validator index.
 // Panics if `index >= extCommit.Size()`.
 // Implements VoteSetReader.
-func (ec *ExtendedCommit) GetByIndex(valIdx int32) *Vote {
-	return ec.GetExtendedVote(valIdx)
+func (ec *ExtendedCommit) GetByIndex(valIdx int32) (*Vote, error) {
+	return ec.GetExtendedVote(valIdx), nil
 }
 
 // IsCommit returns true if there is at least one signature.
