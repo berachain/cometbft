@@ -344,9 +344,7 @@ func (cs *State) OnStart() error {
 
 	LOOP:
 		for {
-			cs.Logger.Info("XXX Catchup start")
 			err := cs.catchupReplay(cs.Height)
-			cs.Logger.Info("XXX Catchup stop")
 			switch {
 			case err == nil:
 				break LOOP
@@ -2613,7 +2611,10 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 	}
 
 	// TODO: double check that we have fully validated the commit at this function's caller
-
+	err = cs.Validators.VerifyCommit(cs.state.ChainID, commit.BlockID, cs.Height, commit)
+	if err != nil {
+		panic(err)
+	}
 	height := cs.Height
 	cs.Votes.SetCommit(commit)
 

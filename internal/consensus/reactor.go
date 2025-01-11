@@ -362,8 +362,6 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 		case *CommitMessage:
 			cs := conR.conS
-			cs.Logger.Info("XX Received ")
-			// TODO setHasAggregatedVoteFromPeer
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
 		default:
@@ -698,7 +696,6 @@ OUTER_LOOP:
 				if commit, ok := (c).(*types.Commit); ok {
 
 					if ps.sendCommit(commit) {
-						logger.Info("XXX SENT COMMIT")
 						continue OUTER_LOOP
 					}
 					logger.Error("Failed to send commit to peer",
