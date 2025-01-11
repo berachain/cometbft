@@ -2608,7 +2608,7 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 		return added, err
 	}
 
-	if !types.IsAggregatedCommit(cs.Validators, commit) {
+	if !commit.HasAggregatedSignature() {
 		// Only accept aggregated commits
 		cs.Logger.Error("Received non aggregated commit for height %v from peer ID %s", commit.Height, peerID)
 		return added, err

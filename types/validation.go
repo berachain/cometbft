@@ -21,8 +21,8 @@ func shouldBatchVerify(vals *ValidatorSet, commit *Commit) bool {
 		vals.AllKeysHaveSameType()
 }
 
-// IsAggregatedCommit returns true if the commit is an aggregated.
-func IsAggregatedCommit(vals *ValidatorSet, commit *Commit) bool {
+// isAggregatedCommit returns true if the commit is an aggregated.
+func isAggregatedCommit(vals *ValidatorSet, commit *Commit) bool {
 	_, ok := vals.GetProposer().PubKey.(*bls12381.PubKey)
 	_, ok2 := vals.GetProposer().PubKey.(bls12381.PubKey)
 	return (ok || ok2) && vals.AllKeysHaveSameType() && commit.HasAggregatedSignature()
@@ -51,7 +51,7 @@ func VerifyCommit(chainID string, vals *ValidatorSet, blockID BlockID,
 	ignore := func(c CommitSig) bool { return c.BlockIDFlag == BlockIDFlagAbsent }
 
 	// attempt to verify aggregated commit
-	if IsAggregatedCommit(vals, commit) {
+	if isAggregatedCommit(vals, commit) {
 		// only count the signatures that are for the block
 		count := func(c CommitSig) bool {
 			return c.BlockIDFlag == BlockIDFlagAggCommit || c.BlockIDFlag == BlockIDFlagAggCommitAbsent
@@ -129,7 +129,7 @@ func verifyCommitLightInternal(
 	count := func(_ CommitSig) bool { return true }
 
 	// attempt to verify aggregated commit
-	if IsAggregatedCommit(vals, commit) {
+	if isAggregatedCommit(vals, commit) {
 		// ignore all commit signatures that are not for the block
 		ignore := func(c CommitSig) bool {
 			return !(c.BlockIDFlag == BlockIDFlagAggCommit || c.BlockIDFlag == BlockIDFlagAggCommitAbsent)
@@ -220,7 +220,7 @@ func verifyCommitLightTrustingInternal(
 	count := func(_ CommitSig) bool { return true }
 
 	// attempt to verify aggregated commit
-	if IsAggregatedCommit(vals, commit) {
+	if isAggregatedCommit(vals, commit) {
 		// ignore all commit signatures that are not for the block
 		ignore := func(c CommitSig) bool {
 			return !(c.BlockIDFlag == BlockIDFlagAggCommit || c.BlockIDFlag == BlockIDFlagAggCommitAbsent)
