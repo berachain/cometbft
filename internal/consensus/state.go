@@ -961,12 +961,7 @@ func (cs *State) handleMsg(mi msgInfo) {
 		// We could make note of this and help filter in broadcastHasVoteMessage().
 
 	case *CommitMessage:
-		cs.Logger.Info("XX received cmt message")
-		// TODO Commit has been validated Validate Basic when unmarshalling, but need to validate the the commit itself
-		err := cs.Validators.VerifyCommit(cs.state.ChainID, cs.state.LastBlockID, cs.Height, msg.Commit)
-		if err != nil {
-			panic("failed to validate comit")
-		}
+
 		added, err := cs.AddCommit(msg.Commit, peerID)
 		if added {
 			// XXX Add stats about received commit
