@@ -1330,7 +1330,8 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 	case ok && lastCommitAsVs.HasTwoThirdsMajority():
 		// Make the commit from LastCommit.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
-		canBeAggregated := blsKey &&
+		_, blsKey2 := cs.privValidatorPubKey.(bls12381.PubKey)
+		canBeAggregated := (blsKey || blsKey2) &&
 			cs.state.Validators.AllKeysHaveSameType()
 		if canBeAggregated {
 			if !cs.isPBTSEnabled(cs.Height) {
@@ -2604,13 +2605,13 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 	extEnabled := cs.isVoteExtensionsEnabled(commit.Height)
 	if extEnabled {
 		// We don't support receiving commits with vote extensions enabled ATM.
-		cs.Logger.Error("Received commit with vote extension for height %v (extensions disabled) from peer ID %s", commit.Height, peerID)
+		cs.Logger.Error("Received commit with vote extensions enabled", "height", commit.Height, "peer_ID", peerID)
 		return added, err
 	}
 
 	if !commit.HasAggregatedSignature() {
 		// Only accept aggregated commits
-		cs.Logger.Error("Received non aggregated commit for height %v from peer ID %s", commit.Height, peerID)
+		cs.Logger.Error("Received non aggregated commit", "commit", commit.Height, "peer_ID", peerID, "commit", commit)
 		return added, err
 	}
 	// No need to check blockID. If the commit is valid, 2/3 of the voting power has signed it.

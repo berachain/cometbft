@@ -865,11 +865,12 @@ type Commit struct {
 	BlockID    BlockID     `json:"block_id"`
 	Signatures []CommitSig `json:"signatures"`
 
-	bitArray *bits.BitArray
 	// Memoized in first call to corresponding method.
 	// NOTE: can't memoize in constructor because constructor isn't used for
 	// unmarshaling.
-	hash cmtbytes.HexBytes
+	hash     cmtbytes.HexBytes
+	bitArray *bits.BitArray
+	mtx      cmtsync.Mutex // Protects hash and bitArray.
 }
 
 var _ VoteSetReader = (*Commit)(nil)
@@ -878,8 +879,12 @@ var _ VoteSetReader = (*Commit)(nil)
 func (commit *Commit) Clone() *Commit {
 	sigs := make([]CommitSig, len(commit.Signatures))
 	copy(sigs, commit.Signatures)
-	commCopy := *commit
-	commCopy.Signatures = sigs
+	commCopy := Commit{
+		Height:     commit.Height,
+		Round:      commit.Round,
+		BlockID:    commit.BlockID,
+		Signatures: sigs,
+	}
 	return &commCopy
 }
 
@@ -909,6 +914,8 @@ func (commit *Commit) Size() int {
 // this extended commit.
 // Implements VoteSetReader.
 func (commit *Commit) BitArray() *bits.BitArray {
+	commit.mtx.Lock()
+	defer commit.mtx.Unlock()
 	if commit.bitArray == nil {
 		initialBitFn := func(i int) bool {
 			// TODO: need to check the BlockID otherwise we could be counting conflicts,
@@ -1010,6 +1017,8 @@ func (commit *Commit) Hash() cmtbytes.HexBytes {
 	if commit == nil {
 		return nil
 	}
+	commit.mtx.Lock()
+	defer commit.mtx.Unlock()
 	if commit.hash == nil {
 		bs := make([][]byte, len(commit.Signatures))
 		for i, commitSig := range commit.Signatures {
@@ -1055,6 +1064,9 @@ func (commit *Commit) StringIndented(indent string) string {
 	for i, commitSig := range commit.Signatures {
 		commitSigStrings[i] = commitSig.String()
 	}
+	commit.mtx.Lock()
+	hash := commit.hash
+	commit.mtx.Unlock()
 	return fmt.Sprintf(`Commit{
 %s  Height:     %d
 %s  Round:      %d
@@ -1067,7 +1079,7 @@ func (commit *Commit) StringIndented(indent string) string {
 		indent, commit.BlockID,
 		indent,
 		indent, strings.Join(commitSigStrings, "\n"+indent+"    "),
-		indent, commit.hash)
+		indent, hash)
 }
 
 // ToProto converts Commit to protobuf.
