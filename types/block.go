@@ -975,7 +975,6 @@ func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 
 // ValidateBasic performs basic validation that doesn't involve state data.
 // Does not actually check the cryptographic signatures.
-// TODO check all callsites to see if we need a full validation as well
 func (commit *Commit) ValidateBasic() error {
 	if commit.Height < 0 {
 		return errors.New("negative Height")

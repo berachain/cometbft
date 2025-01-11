@@ -1324,9 +1324,6 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		// The commit is empty, but not nil.
 		lastExtCommit = &types.ExtendedCommit{}
 
-		// TODO two cases based on the type:
-		// commit: change this by verifying the commit (again, out of caution), and return the same error
-		// voteset: business as usual
 	case ok && lastCommitAsVs.HasTwoThirdsMajority():
 		// Make the commit from LastCommit.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
@@ -1342,8 +1339,6 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 			lastExtCommit = lastCommitAsVs.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
 		}
 	case !ok:
-		// TODO TBH, I don't think we need this case. We can just do nothing (default case),
-		// which simulates a slow proposal
 		lastCommitAsCommit, ok := cs.LastCommit.(*types.Commit)
 		if !ok {
 			return nil, fmt.Errorf("last commit is neither a VoteSet nor a Commit")

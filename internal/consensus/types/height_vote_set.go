@@ -178,7 +178,6 @@ func (hvs *HeightVoteSet) GetCommit(round int32) *types.Commit {
 func (hvs *HeightVoteSet) SetCommit(commit *types.Commit) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
-	// TODO: check if it's already set? Not sure
 	hvs.commit = commit
 }
 
