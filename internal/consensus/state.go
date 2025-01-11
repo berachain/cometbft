@@ -961,12 +961,10 @@ func (cs *State) handleMsg(mi msgInfo) {
 	case *CommitMessage:
 
 		_, err := cs.AddCommit(msg.Commit, peerID)
-
-		// XXX The function above returnes `added`
-		// If this boolean is tru we should implement
+		// XXX The function above returns `added`
+		// If this boolean is true we should implement
 		// stats for commit messages
 		// cs.statsMsgQueue <- mi
-
 		if err != nil {
 			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit, "err", err)
 		}
@@ -2610,7 +2608,12 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 		return added, err
 	}
 
-	// TODO: double check that we have fully validated the commit at this function's caller
+	if !types.IsAggregatedCommit(cs.Validators, commit) {
+		// Only accept aggregated commits
+		cs.Logger.Error("Received non aggregated commit for height %v from peer ID %s", commit.Height, peerID)
+		return added, err
+	}
+	// No need to check blockID. If the commit is valid, 2/3 of the voting power has signed it.
 	err = cs.Validators.VerifyCommit(cs.state.ChainID, commit.BlockID, cs.Height, commit)
 	if err != nil {
 		panic(err)
