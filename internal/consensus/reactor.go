@@ -705,7 +705,7 @@ OUTER_LOOP:
 						"height", prs.Height,
 						"commit", commit)
 				} else {
-					logger.Error("Commit should have been returned, instead unknown type.")
+					logger.Error("Commit should have been returned, instead unknown type %T.", c)
 				}
 			}
 		}
@@ -936,11 +936,6 @@ func getEntireCommitToSend(logger log.Logger,
 			return nil
 		}
 		return commit
-		// TODO we cannot pick a vote. Here is the place where we need to send the whole commit.
-		// if vote := ps.PickVoteToSend(commit, rng); vote != nil {
-		// 	logger.Debug("Picked Catchup commit to send", "height", prs.Height)
-		// 	return vote
-		// }
 	}
 	return nil
 }
