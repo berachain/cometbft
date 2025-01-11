@@ -93,6 +93,7 @@ func (m *Message) Unwrap() (proto.Message, error) {
 
 	case *Message_Vote:
 		return m.GetVote(), nil
+
 	case *Message_Commit:
 		return m.GetCommit(), nil
 
