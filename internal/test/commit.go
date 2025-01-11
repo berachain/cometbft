@@ -29,7 +29,7 @@ func MakeCommitFromVoteSet(blockID types.BlockID, voteSet *types.VoteSet, valida
 			return nil, err
 		}
 		vote.Signature = v.Signature
-		if _, err := voteSet.AddVote(vote, false); err != nil {
+		if _, err := voteSet.AddVote(vote); err != nil {
 			return nil, err
 		}
 	}

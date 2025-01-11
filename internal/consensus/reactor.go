@@ -1863,7 +1863,7 @@ type VoteMessage struct {
 
 // ValidateBasic checks whether the vote within the message is well-formed.
 func (m *VoteMessage) ValidateBasic() error {
-	return m.Vote.ValidateBasic(false)
+	return m.Vote.ValidateBasic()
 }
 
 // String returns a string representation.

@@ -197,13 +197,13 @@ func TestSignVote(t *testing.T) {
 			err := privVal.SignVote(chainID, v, false)
 			require.NoError(t, err, "expected no error signing vote")
 			vote.Signature = v.Signature
-			err = vote.ValidateBasic(false)
+			err = vote.ValidateBasic()
 			require.NoError(t, err)
 
 			// Verify vote signature
 			pubKey, err := privVal.GetPubKey()
 			require.NoError(t, err)
-			err = vote.Verify(chainID, pubKey, false)
+			err = vote.Verify(chainID, pubKey)
 			require.NoError(t, err)
 
 			// try to sign the same vote again; should be fine

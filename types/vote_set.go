@@ -156,18 +156,18 @@ func (voteSet *VoteSet) Size() int {
 // NOTE: vote should not be mutated after adding.
 // NOTE: VoteSet must not be nil
 // NOTE: Vote must not be nil.
-func (voteSet *VoteSet) AddVote(vote *Vote, skipSigVerification bool) (added bool, err error) {
+func (voteSet *VoteSet) AddVote(vote *Vote) (added bool, err error) {
 	if voteSet == nil {
 		panic("AddVote() on nil VoteSet")
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
 
-	return voteSet.addVote(vote, skipSigVerification)
+	return voteSet.addVote(vote)
 }
 
 // NOTE: Validates as much as possible before attempting to verify the signature.
-func (voteSet *VoteSet) addVote(vote *Vote, skipSigVerification bool) (added bool, err error) {
+func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 	if vote == nil {
 		return false, ErrVoteNil
 	}
@@ -221,7 +221,7 @@ func (voteSet *VoteSet) addVote(vote *Vote, skipSigVerification bool) (added boo
 			return false, fmt.Errorf("failed to verify extended vote with ChainID %s and PubKey %s: %w", voteSet.chainID, val.PubKey, err)
 		}
 	} else {
-		if err := vote.Verify(voteSet.chainID, val.PubKey, skipSigVerification); err != nil {
+		if err := vote.Verify(voteSet.chainID, val.PubKey); err != nil {
 			return false, fmt.Errorf("failed to verify vote with ChainID %s and PubKey %s: %w", voteSet.chainID, val.PubKey, err)
 		}
 		if len(vote.ExtensionSignature) > 0 || len(vote.Extension) > 0 {

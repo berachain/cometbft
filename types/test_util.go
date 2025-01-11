@@ -50,7 +50,7 @@ func signAddVote(privVal PrivValidator, vote *Vote, voteSet *VoteSet) (bool, err
 	if _, err := SignAndCheckVote(vote, privVal, voteSet.ChainID(), voteSet.extensionsEnabled); err != nil {
 		return false, err
 	}
-	return voteSet.AddVote(vote, false)
+	return voteSet.AddVote(vote)
 }
 
 func MakeVote(

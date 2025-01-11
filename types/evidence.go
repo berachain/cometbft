@@ -132,10 +132,10 @@ func (dve *DuplicateVoteEvidence) ValidateBasic() error {
 	if dve.VoteA == nil || dve.VoteB == nil {
 		return fmt.Errorf("one or both of the votes are empty %v, %v", dve.VoteA, dve.VoteB)
 	}
-	if err := dve.VoteA.ValidateBasic(false); err != nil {
+	if err := dve.VoteA.ValidateBasic(); err != nil {
 		return fmt.Errorf("invalid VoteA: %w", err)
 	}
-	if err := dve.VoteB.ValidateBasic(false); err != nil {
+	if err := dve.VoteB.ValidateBasic(); err != nil {
 		return fmt.Errorf("invalid VoteB: %w", err)
 	}
 	// Enforce Votes are lexicographically sorted on blockID
@@ -172,7 +172,7 @@ func DuplicateVoteEvidenceFromProto(pb *cmtproto.DuplicateVoteEvidence) (*Duplic
 		if err != nil {
 			return nil, err
 		}
-		if err = vA.ValidateBasic(false); err != nil {
+		if err = vA.ValidateBasic(); err != nil {
 			return nil, err
 		}
 	}
@@ -184,7 +184,7 @@ func DuplicateVoteEvidenceFromProto(pb *cmtproto.DuplicateVoteEvidence) (*Duplic
 		if err != nil {
 			return nil, err
 		}
-		if err = vB.ValidateBasic(false); err != nil {
+		if err = vB.ValidateBasic(); err != nil {
 			return nil, err
 		}
 	}
