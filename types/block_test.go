@@ -291,7 +291,6 @@ func TestLastCommitJSON(t *testing.T) {
 		Signatures: []CommitSig{cs},
 	}
 	bl := Block{
-
 		LastCommit: &c,
 	}
 
