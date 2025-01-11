@@ -359,8 +359,12 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasVoteFromPeer(msg.Vote, height, valSize, lastCommitSize)
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
-		// case *CommitMessage:
-		// TODO Send it to the queue like VoteMessage
+		case *CommitMessage:
+			cs := conR.conS
+			cs.Logger.Info("XX Received ")
+			// TODO setHasAggregatedVoteFromPeer
+			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
+
 		default:
 			// don't punish (leave room for soft upgrades)
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
@@ -687,6 +691,20 @@ OUTER_LOOP:
 				"height", prs.Height,
 				"vote", vote,
 			)
+		} else {
+			if c := sendEntireCommit(logger, conR.conS, rs, ps, prs, rng); c != nil {
+				commit, ok := (*c).(*types.Commit)
+				if !ok {
+					panic("Wrong type,got")
+				}
+				if ps.sendCommit(commit) {
+					logger.Info("XXX SENT COMMIT")
+					continue OUTER_LOOP
+				}
+				logger.Info("XX Failed to send commit to peer",
+					"height", prs.Height,
+					"commit", commit)
+			}
 		}
 
 		if sleeping == 0 {
@@ -885,6 +903,45 @@ func pickPartForCatchup(
 	return part
 }
 
+func sendEntireCommit(logger log.Logger,
+	conS *State,
+	rs *cstypes.RoundState,
+	ps *PeerState,
+	prs *cstypes.PeerRoundState,
+	rng *rand.Rand,
+) *types.VoteSetReader {
+	// Catchup logic
+	// If peer is lagging by more than 1, send Commit.
+	blockStoreBase := conS.blockStore.Base()
+	if blockStoreBase > 0 && prs.Height != 0 && rs.Height >= prs.Height+2 && prs.Height >= blockStoreBase {
+		// Load the block's extended commit for prs.Height,
+		// which contains precommit signatures for prs.Height.
+		var commit types.VoteSetReader
+		var veEnabled bool
+		func() {
+			conS.mtx.RLock()
+			defer conS.mtx.RUnlock()
+			veEnabled = conS.state.ConsensusParams.Feature.VoteExtensionsEnabled(prs.Height)
+		}()
+		if veEnabled {
+			commit = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
+		} else {
+			commit = conS.blockStore.LoadBlockCommit(prs.Height)
+		}
+		if commit == nil {
+			return nil
+		}
+		return &commit
+		// TODO we cannot pick a vote. Here is the place where we need to send the whole commit.
+		// if vote := ps.PickVoteToSend(commit, rng); vote != nil {
+		// 	logger.Debug("Picked Catchup commit to send", "height", prs.Height)
+		// 	return vote
+		// }
+	}
+	return nil
+
+}
+
 func pickVoteToSend(
 	logger log.Logger,
 	conS *State,
@@ -908,34 +965,6 @@ func pickVoteToSend(
 		}
 	}
 
-	// Catchup logic
-	// If peer is lagging by more than 1, send Commit.
-	blockStoreBase := conS.blockStore.Base()
-	if blockStoreBase > 0 && prs.Height != 0 && rs.Height >= prs.Height+2 && prs.Height >= blockStoreBase {
-		// Load the block's extended commit for prs.Height,
-		// which contains precommit signatures for prs.Height.
-		var commit types.VoteSetReader
-		var veEnabled bool
-		func() {
-			conS.mtx.RLock()
-			defer conS.mtx.RUnlock()
-			veEnabled = conS.state.ConsensusParams.Feature.VoteExtensionsEnabled(prs.Height)
-		}()
-		if veEnabled {
-			commit = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
-		} else {
-			commit = conS.blockStore.LoadBlockCommit(prs.Height)
-		}
-		if commit == nil {
-			return nil
-		}
-
-		// TODO we cannot pick a vote. Here is the place where we need to send the whole commit.
-		// if vote := ps.PickVoteToSend(commit, rng); vote != nil {
-		// 	logger.Debug("Picked Catchup commit to send", "height", prs.Height)
-		// 	return vote
-		// }
-	}
 	return nil
 }
 
@@ -1263,6 +1292,21 @@ func (ps *PeerState) SendProposalSetHasProposal(
 			},
 		})
 	}
+}
+
+// sendCommit sends the vote to the peer.
+// Returns true and marks the peer as having the vote if the vote was sent.
+func (ps *PeerState) sendCommit(commit *types.Commit) bool {
+	ps.logger.Info("Sending commit message", "ps", ps, "commit", commit)
+	return ps.peer.Send(p2p.Envelope{
+		ChannelID: VoteChannel,
+		Message: &cmtcons.Commit{
+			Commit: commit.ToProto(),
+		},
+	})
+
+	// TODO Set COMMIT TO PEER
+	// ps.SetHasVote(vote)
 }
 
 // sendVoteSetHasVote sends the vote to the peer.
@@ -1860,6 +1904,23 @@ func (m *BlockPartMessage) String() string {
 // -------------------------------------
 
 // VoteMessage is sent when voting for a proposal (or lack thereof).
+type CommitMessage struct {
+	Commit *types.Commit
+}
+
+// ValidateBasic checks whether the vote within the message is well-formed.
+func (m *CommitMessage) ValidateBasic() error {
+	return m.Commit.ValidateBasic()
+}
+
+// String returns a string representation.
+func (m *CommitMessage) String() string {
+	return fmt.Sprintf("[Commit with aggregated signatures %v]", m.Commit)
+}
+
+// -------------------------------------
+
+// VoteMessage is sent when voting for a proposal (or lack thereof).
 type VoteMessage struct {
 	Vote *types.Vote
 }
@@ -2010,4 +2071,5 @@ var (
 	_ types.Wrapper = &cmtcons.ProposalPOL{}
 	_ types.Wrapper = &cmtcons.VoteSetBits{}
 	_ types.Wrapper = &cmtcons.VoteSetMaj23{}
+	_ types.Wrapper = &cmtcons.Commit{}
 )

@@ -344,7 +344,9 @@ func (cs *State) OnStart() error {
 
 	LOOP:
 		for {
+			cs.Logger.Info("XXX Catchup start")
 			err := cs.catchupReplay(cs.Height)
+			cs.Logger.Info("XXX Catchup stop")
 			switch {
 			case err == nil:
 				break LOOP
@@ -880,6 +882,7 @@ func (cs *State) receiveRoutine(maxSteps int) {
 
 // state transitions on complete-proposal, 2/3-any, 2/3-one.
 func (cs *State) handleMsg(mi msgInfo) {
+	cs.Logger.Info("Handling msg")
 	cs.mtx.Lock()
 	defer cs.mtx.Unlock()
 	var (
@@ -953,9 +956,11 @@ func (cs *State) handleMsg(mi msgInfo) {
 		// the peer is sending us CatchupCommit precommits.
 		// We could make note of this and help filter in broadcastHasVoteMessage().
 
-		// case *CommitMessage:
+	case *CommitMessage:
+		cs.Logger.Info("XX received cmt message")
+		panic("RECEIVED COMMIT MESSAGE")
 		// TODO Commit has been validated Validate Basic when unmarshalling, but need to validate the the commit itself
-		// cs.AddCommit(aggCommit)
+		//cs.AddCommit(aggCommit)
 	default:
 		cs.Logger.Error("Unknown msg type", "type", fmt.Sprintf("%T", msg))
 		return

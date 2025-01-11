@@ -77,6 +77,11 @@ func MsgToWrappedProto(msg Message) (cmtcons.Message, error) {
 			Vote: vote,
 		}}
 
+	case *CommitMessage:
+		commit := msg.Commit.ToProto()
+		pb.Sum = &cmtcons.Message_Commit{Commit: &cmtcons.Commit{
+			Commit: commit,
+		}}
 	case *HasVoteMessage:
 		pb.Sum = &cmtcons.Message_HasVote{HasVote: &cmtcons.HasVote{
 			Height: msg.Height,
@@ -199,6 +204,17 @@ func MsgFromProto(p proto.Message) (Message, error) {
 
 		pb = &VoteMessage{
 			Vote: vote,
+		}
+	case *cmtcons.Commit:
+		// Commit validation will be handled in the vote message ValidateBasic
+		// call below.
+		commit, err := types.CommitFromProto(msg.Commit)
+		if err != nil {
+			return nil, cmterrors.ErrMsgToProto{MessageName: "Commit", Err: err}
+		}
+
+		pb = &CommitMessage{
+			Commit: commit,
 		}
 	case *cmtcons.HasVote:
 		pb = &HasVoteMessage{
