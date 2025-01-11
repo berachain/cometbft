@@ -183,16 +183,19 @@ func TestByzantinePrevoteEquivocation(t *testing.T) {
 		}
 
 		var extCommit *types.ExtendedCommit
+		lc, ok := lazyProposer.LastCommit.(*types.VoteSet)
 		switch {
 		case lazyProposer.Height == lazyProposer.state.InitialHeight:
 			// We're creating a proposal for the first block.
 			// The commit is empty, but not nil.
 			extCommit = &types.ExtendedCommit{}
-		case lazyProposer.LastCommit.HasTwoThirdsMajority():
+		case ok && lc.HasTwoThirdsMajority():
 			// Make the commit from LastCommit
 			// Vote extensions are enabled by default for test units
 			veHeightParam := lazyProposer.state.ConsensusParams.Feature
-			extCommit = lazyProposer.LastCommit.MakeExtendedCommit(veHeightParam)
+			if lastC, ok := lazyProposer.LastCommit.(*types.VoteSet); ok {
+				extCommit = lastC.MakeExtendedCommit(veHeightParam)
+			}
 		default: // This shouldn't happen.
 			lazyProposer.Logger.Error("enterPropose: Cannot propose anything: No commit for the previous block")
 			return
