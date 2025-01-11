@@ -242,7 +242,11 @@ func TestCommit(t *testing.T) {
 	require.NotNil(t, extCommit.BitArray())
 	assert.Equal(t, bits.NewBitArray(10).Size(), extCommit.BitArray().Size())
 
-	assert.Equal(t, voteSet.GetByIndex(0), extCommit.GetByIndex(0))
+	vote1, err := voteSet.GetByIndex(0)
+	require.NoError(t, err)
+	vote2, err := extCommit.GetByIndex(0)
+	require.NoError(t, err)
+	assert.Equal(t, vote1, vote2)
 	assert.True(t, extCommit.IsCommit())
 }
 
@@ -564,7 +568,8 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 			ec := voteSet.MakeExtendedCommit(p)
 
 			for i := int32(0); int(i) < len(vals); i++ {
-				vote1 := voteSet.GetByIndex(i)
+				vote1, err := voteSet.GetByIndex(i)
+				require.NoError(t, err)
 				vote2 := ec.GetExtendedVote(i)
 
 				vote1bz, err := vote1.ToProto().Marshal()
@@ -614,7 +619,8 @@ func TestExtendedCommitToVoteSet(t *testing.T) {
 
 			if !testCase.includeExtension {
 				for i := 0; i < len(vals); i++ {
-					v := voteSet.GetByIndex(int32(i))
+					v, err := voteSet.GetByIndex(int32(i))
+					require.NoError(t, err)
 					v.Extension = nil
 					v.ExtensionSignature = nil
 					extCommit.ExtendedSignatures[i].Extension = nil
@@ -631,8 +637,10 @@ func TestExtendedCommitToVoteSet(t *testing.T) {
 			}
 
 			for i := int32(0); int(i) < len(vals); i++ {
-				vote1 := voteSet.GetByIndex(i)
-				vote2 := voteSet2.GetByIndex(i)
+				vote1, err := voteSet.GetByIndex(i)
+				require.NoError(t, err)
+				vote2, err := voteSet2.GetByIndex(i)
+				require.NoError(t, err)
 				vote3 := extCommit.GetExtendedVote(i)
 
 				vote1bz, err := vote1.ToProto().Marshal()

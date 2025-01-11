@@ -166,7 +166,8 @@ func TestValidatorSet_VerifyCommit_CheckAllSignatures(t *testing.T) {
 	require.NoError(t, valSet.VerifyCommit(chainID, blockID, h, commit))
 
 	// malleate 4th signature
-	vote := voteSet.GetByIndex(3)
+	vote, err := voteSet.GetByIndex(3)
+	require.NoError(t, err)
 	v := vote.ToProto()
 	err = vals[3].SignVote("CentaurusA", v, true)
 	require.NoError(t, err)
@@ -197,7 +198,8 @@ func TestValidatorSet_VerifyCommitLight_ReturnsAsSoonAsMajOfVotingPowerSignedIff
 	require.NoError(t, err)
 
 	// malleate 4th signature (3 signatures are enough for 2/3+)
-	vote := voteSet.GetByIndex(3)
+	vote, err := voteSet.GetByIndex(3)
+	require.NoError(t, err)
 	v := vote.ToProto()
 	err = vals[3].SignVote("CentaurusA", v, true)
 	require.NoError(t, err)
@@ -232,7 +234,8 @@ func TestValidatorSet_VerifyCommitLightTrusting_ReturnsAsSoonAsTrustLevelSignedI
 	require.NoError(t, err)
 
 	// malleate 3rd signature (2 signatures are enough for 1/3+ trust level)
-	vote := voteSet.GetByIndex(2)
+	vote, err := voteSet.GetByIndex(2)
+	require.NoError(t, err)
 	v := vote.ToProto()
 	err = vals[2].SignVote("CentaurusA", v, true)
 	require.NoError(t, err)
