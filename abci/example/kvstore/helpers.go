@@ -8,7 +8,6 @@ import (
 
 	"github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/bls12381"
-	// "github.com/cometbft/cometbft/crypto/ed25519"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 )
 
