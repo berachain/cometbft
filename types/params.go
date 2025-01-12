@@ -2,7 +2,6 @@ package types
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"math"
 	"time"
@@ -177,10 +176,11 @@ func DefaultValidatorParams() ValidatorParams {
 	params := ValidatorParams{
 		PubKeyTypes: []string{ABCIPubKeyTypeBls12381},
 	}
-	// If we are running tests, enable ed25519.
-	if flag.Lookup("test.v") != nil {
-		params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeEd25519)
-	}
+	// TODO Clean up
+	// // If we are running tests, enable ed25519.
+	// if flag.Lookup("test.v") != nil {
+	// 	params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeEd25519)
+	// }
 	return params
 }
 
@@ -285,7 +285,8 @@ func (params ConsensusParams) ValidateBasic() error {
 	}
 
 	// If we are running in production, we only allow BLS keys
-	if flag.Lookup("test.v") == nil {
+	// TODO Clean up
+	if true { // flag.Lookup("test.v") == nil {
 		if !(len(params.Validator.PubKeyTypes) == 1 && params.Validator.PubKeyTypes[0] == ABCIPubKeyTypeBls12381) {
 			return errors.New("only BLS key type is allowed")
 		}
@@ -444,7 +445,7 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 	}
 	if params2.Feature != nil {
 		if params2.Feature.VoteExtensionsEnableHeight != nil {
-			res.Feature.VoteExtensionsEnableHeight = 0 //params2.Feature.GetVoteExtensionsEnableHeight().Value
+			res.Feature.VoteExtensionsEnableHeight = 0 // disable vote extensions in Berachain
 		}
 
 		if params2.Feature.PbtsEnableHeight != nil {

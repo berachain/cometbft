@@ -307,6 +307,7 @@ func TestReactorReceivePanicsIfInitPeerHasntBeenCalledYet(t *testing.T) {
 // TestSwitchToConsensusVoteExtensions tests that the SwitchToConsensus correctly
 // checks for vote extension data when required.
 func TestSwitchToConsensusVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name                  string
 		storedHeight          int64
@@ -360,7 +361,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 
 			cs.state.LastBlockHeight = testCase.storedHeight
 			cs.state.LastValidators = cs.state.Validators.Copy()
-			//cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
+			cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
 
 			propBlock, err := cs.createProposalBlock(ctx)
 			require.NoError(t, err)

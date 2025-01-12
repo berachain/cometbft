@@ -2139,6 +2139,7 @@ func TestProcessProposalAccept(t *testing.T) {
 // TestExtendVoteCalledWhenEnabled tests that the vote extension methods are called at the
 // correct point in the consensus algorithm when vote extensions are enabled.
 func TestExtendVoteCalledWhenEnabled(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name    string
 		enabled bool
@@ -2239,6 +2240,7 @@ func TestExtendVoteCalledWhenEnabled(t *testing.T) {
 // TestVerifyVoteExtensionNotCalledOnAbsentPrecommit tests that the VerifyVoteExtension
 // method is not called for a validator's vote that is never delivered.
 func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	m := abcimocks.NewApplication(t)
 	m.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.PrepareProposalResponse{}, nil)
 	m.On("ProcessProposal", mock.Anything, mock.Anything).Return(&abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_ACCEPT}, nil)
@@ -2252,7 +2254,7 @@ func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
 	m.On("Commit", mock.Anything, mock.Anything).Return(&abci.CommitResponse{}, nil).Maybe()
 	cs1, vss := randStateWithApp(4, m)
 	height, round, chainID := cs1.Height, cs1.Round, cs1.state.ChainID
-	//cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = cs1.Height
+	cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = cs1.Height
 
 	proposalCh := subscribe(cs1.eventBus, types.EventQueryCompleteProposal)
 	newRoundCh := subscribe(cs1.eventBus, types.EventQueryNewRound)
@@ -2311,6 +2313,7 @@ func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
 // is the proposer again and ensures that the mock application receives the set of
 // vote extensions from the previous consensus instance.
 func TestPrepareProposalReceivesVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	// create a list of vote extensions, one for each validator.
 	voteExtensions := [][]byte{
 		[]byte("extension 0"),
@@ -2555,7 +2558,7 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 			m.On("Commit", mock.Anything, mock.Anything).Return(&abci.CommitResponse{}, nil).Maybe()
 			cs1, vss := randStateWithAppWithHeight(numValidators, m, testCase.enableHeight)
 			height, round, chainID := cs1.Height, cs1.Round, cs1.state.ChainID
-			//cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.enableHeight
+			cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = 0 // disable vote extensions in Berachain
 
 			timeoutCh := subscribe(cs1.eventBus, types.EventQueryTimeoutPropose)
 			proposalCh := subscribe(cs1.eventBus, types.EventQueryCompleteProposal)

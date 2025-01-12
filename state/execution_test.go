@@ -1011,6 +1011,7 @@ func TestPrepareProposalErrorOnPrepareProposalError(t *testing.T) {
 // call correctly panics when the vote extension data is missing from the extended commit
 // data that the method receives.
 func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name string
 
@@ -1063,7 +1064,7 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 			stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 				DiscardABCIResponses: false,
 			})
-			//	state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
+			state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
 			mp := &mpmocks.Mempool{}
 			mp.On("Lock").Return()
 			mp.On("Unlock").Return()
