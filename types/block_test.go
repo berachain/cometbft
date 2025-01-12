@@ -793,7 +793,7 @@ func TestBlockProtoBuf(t *testing.T) {
 			require.EqualValues(t, tc.b1.Header, block.Header, tc.msg)
 			require.EqualValues(t, tc.b1.Data, block.Data, tc.msg)
 			require.EqualValues(t, tc.b1.Evidence.Evidence, block.Evidence.Evidence, tc.msg)
-			require.Equal(t, *tc.b1.LastCommit, *block.LastCommit, tc.msg)
+			require.Equal(t, tc.b1.LastCommit.ToProto(), block.LastCommit.ToProto(), tc.msg)
 		} else {
 			require.Error(t, err, tc.msg)
 		}
