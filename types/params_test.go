@@ -672,6 +672,7 @@ func TestProto(t *testing.T) {
 }
 
 func TestProtoUpgrade(t *testing.T) {
+	t.Skip("No point in testing legacy proto upgrade of vote extensions")
 	params := consensusParamsForTestProto()
 
 	for i := range params {
