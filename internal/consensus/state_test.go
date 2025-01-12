@@ -72,6 +72,35 @@ x * TestHalt1 - if we see +2/3 precommits after timing out into new round, we sh
 // ----------------------------------------------------------------------------------------------------
 // ProposeSuite
 
+func TestStateJSONMarshalling(t *testing.T) {
+	cs1, _ := randState(4)
+	val1, _ := types.RandValidator(true, 100)
+	val2, _ := types.RandValidator(true, 200)
+	cs1.LastCommit = types.NewVoteSet(
+		cs1.state.ChainID, 10, 3, types.PrecommitType,
+		types.NewValidatorSet([]*types.Validator{val1, val2}),
+	)
+
+	stateB, err := cs1.GetRoundStateJSON()
+	t.Log(string(stateB))
+	require.NoError(t, err)
+
+	cs1.LastCommit = &types.Commit{
+		Height:  5,
+		Round:   6,
+		BlockID: types.BlockID{Hash: []byte("blockhash"), PartSetHeader: types.PartSetHeader{Total: 1, Hash: []byte("partshash")}},
+		Signatures: []types.CommitSig{{
+			BlockIDFlag:      types.BlockIDFlagCommit,
+			ValidatorAddress: []byte("valaddr"),
+			Signature:        []byte("signature"),
+		}},
+	}
+
+	stateC, err := cs1.GetRoundStateJSON()
+	t.Log(string(stateC))
+	require.NoError(t, err)
+}
+
 func TestStateProposerSelection0(t *testing.T) {
 	cs1, vss := randState(4)
 	height, round, chainID := cs1.Height, cs1.Round, cs1.state.ChainID

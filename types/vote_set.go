@@ -18,6 +18,10 @@ const (
 	MaxVotesCount = 10000
 )
 
+func init() {
+	cmtjson.RegisterType(&VoteSet{}, "cometbft/VoteSet")
+}
+
 // UNSTABLE
 // XXX: duplicate of p2p.ID to avoid dependence between packages.
 // Perhaps we can have a minimal types package containing this (and other things?)

@@ -17,6 +17,7 @@ import (
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/internal/bits"
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
+	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
 	"github.com/cometbft/cometbft/version"
@@ -38,6 +39,10 @@ const (
 	// Data.Txs field:                      1 byte.
 	MaxOverheadForBlock int64 = 11
 )
+
+func init() {
+	cmtjson.RegisterType(&Commit{}, "cometbft/Commit")
+}
 
 // Block defines the atomic unit of a CometBFT blockchain.
 type Block struct {
