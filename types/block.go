@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	cmtjson "github.com/cometbft/cometbft/libs/json"
-	"github.com/cosmos/gogoproto/proto"
-	gogotypes "github.com/cosmos/gogoproto/types"
 	"strings"
 	"time"
+
+	"github.com/cosmos/gogoproto/proto"
+	gogotypes "github.com/cosmos/gogoproto/types"
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
@@ -1054,23 +1054,6 @@ func (commit *Commit) WrappedExtendedCommit() *ExtendedCommit {
 	}
 }
 
-func (commit *Commit) MarshalJSON() ([]byte, error) {
-	commit.mtx.Lock()
-	defer commit.mtx.Unlock()
-	return cmtjson.Marshal(CommitJSON{
-		commit.Height,
-		commit.Round,
-		commit.BlockID,
-	})
-
-}
-
-type CommitJSON struct {
-	Height  int64   `json:"commit_height"`
-	Round   int32   `json:"commit_round"`
-	BlockID BlockID `json:"block_id"`
-}
-
 // StringIndented returns a string representation of the commit.
 func (commit *Commit) StringIndented(indent string) string {
 	if commit == nil {
@@ -1230,21 +1213,6 @@ func (ec *ExtendedCommit) EnsureExtensions(extEnabled bool) error {
 		}
 	}
 	return nil
-}
-
-func (ec *ExtendedCommit) MarshalJSON() ([]byte, error) {
-	return cmtjson.Marshal(ExtCommitJSON{
-		ec.Height,
-		ec.Round,
-		ec.BlockID,
-	})
-
-}
-
-type ExtCommitJSON struct {
-	Height  int64   `json:"ext_commit_height"`
-	Round   int32   `json:"ext_commit_round"`
-	BlockID BlockID `json:"ext_block_id"`
 }
 
 // ToCommit converts an ExtendedCommit to a Commit by removing all vote
