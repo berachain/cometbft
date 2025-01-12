@@ -163,7 +163,8 @@ func signVoteWith(vs *validatorStub, voteType types.SignedMsgType, chainID strin
 	return v
 }
 
-func signVote(vs *validatorStub, voteType types.SignedMsgType, chainID string, blockID types.BlockID, extEnabled bool) *types.Vote {
+func signVote(vs *validatorStub, voteType types.SignedMsgType, chainID string, blockID types.BlockID, _ bool) *types.Vote {
+	extEnabled := false // disable vote extensions in Berachain
 	return signVoteWith(vs, voteType, chainID, blockID, extEnabled)
 }
 
@@ -294,10 +295,9 @@ func signAddVotes(
 	voteType types.SignedMsgType,
 	chainID string,
 	blockID types.BlockID,
-	_ bool,
+	extEnabled bool,
 	vss ...*validatorStub,
 ) {
-	extEnabled := false // disable vote extensions in Berachain
 	votes := signVotes(voteType, chainID, blockID, extEnabled, vss...)
 	addVotes(to, votes...)
 }

@@ -2490,6 +2490,7 @@ func TestFinalizeBlockCalled(t *testing.T) {
 // enforces that vote extensions be present in consensus for heights greater than
 // or equal to the configured value.
 func TestVoteExtensionEnableHeight(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name                  string
 		enableHeight          int64
