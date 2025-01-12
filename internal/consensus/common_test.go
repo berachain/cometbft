@@ -333,7 +333,6 @@ func validateLastPrecommit(t *testing.T, cs *State, privVal *validatorStub, bloc
 	address := pv.Address()
 	var vote *types.Vote
 	if vs, ok := votes.(*types.VoteSet); ok {
-
 		if vote = vs.GetByAddress(address); vote == nil {
 			panic("Failed to find precommit from validator")
 		}

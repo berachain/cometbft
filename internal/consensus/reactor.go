@@ -694,7 +694,6 @@ OUTER_LOOP:
 		} else {
 			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs); c != nil {
 				if commit, ok := (c).(*types.Commit); ok {
-
 					if ps.sendCommit(commit) {
 						continue OUTER_LOOP
 					}
