@@ -2603,6 +2603,10 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 		return added, err
 	}
 
+	if cs.Votes.GetCommit(commit.Round) != nil {
+		cs.Logger.Error("Received commit, but we already have one", "height", commit.Height, "peer_ID", peerID)
+		return added, err
+	}
 	if !commit.HasAggregatedSignature() {
 		// Only accept aggregated commits
 		cs.Logger.Error("Received non aggregated commit", "commit", commit.Height, "peer_ID", peerID, "commit", commit)
