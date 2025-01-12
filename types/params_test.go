@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	valEd25519             = []string{ABCIPubKeyTypeEd25519}
 	valbls12381            = []string{ABCIPubKeyTypeBls12381}
 	valSecp256k1           = []string{ABCIPubKeyTypeSecp256k1}
 	valEd25519AndSecp256k1 = []string{ABCIPubKeyTypeEd25519, ABCIPubKeyTypeSecp256k1}

@@ -935,7 +935,7 @@ func (commit *Commit) BitArray() *bits.BitArray {
 // GetByIndex returns the vote corresponding to a given validator index.
 // Panics if `index >= extCommit.Size()`.
 // Implements VoteSetReader.
-func (commit *Commit) GetByIndex(valIdx int32) (*Vote, error) {
+func (commit *Commit) GetByIndex(_ int32) (*Vote, error) {
 	return nil, fmt.Errorf("cannot get vote by index from Commit %v", commit.StringIndented("  "))
 }
 

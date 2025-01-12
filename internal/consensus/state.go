@@ -1340,7 +1340,7 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 	case !ok:
 		lastCommitAsCommit, ok := cs.LastCommit.(*types.Commit)
 		if !ok {
-			return nil, fmt.Errorf("last commit is neither a VoteSet nor a Commit")
+			return nil, errors.New("last commit is neither a VoteSet nor a Commit")
 		}
 		// XXX This will need to be extended to support vote extensions.
 		lastExtCommit = lastCommitAsCommit.WrappedExtendedCommit()
@@ -2581,9 +2581,9 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 		"cs_round", cs.Round,
 	)
 
-	if commit.Height < cs.Height {
-		// cs.metrics.MarkLateCommit() TODO Implement
-	}
+	// if commit.Height < cs.Height {
+	// 	cs.metrics.MarkLateCommit() TODO Implement
+	// }
 
 	// Height mismatch is ignored.
 	// Not necessarily a bad peer, but not favorable behavior.

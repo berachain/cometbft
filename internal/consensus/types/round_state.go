@@ -187,7 +187,7 @@ func (rs *RoundState) String() string {
 
 // StringIndented returns a string.
 func (rs *RoundState) StringIndented(indent string) string {
-	lcStr := ""
+	var lcStr string
 	switch lc := rs.LastCommit.(type) {
 	case *types.VoteSet:
 		lcStr = lc.StringShort()

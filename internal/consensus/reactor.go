@@ -692,7 +692,7 @@ OUTER_LOOP:
 				"vote", vote,
 			)
 		} else {
-			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs, rng); c != nil {
+			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs); c != nil {
 				if commit, ok := (c).(*types.Commit); ok {
 
 					if ps.sendCommit(commit) {
@@ -904,12 +904,11 @@ func pickPartForCatchup(
 	return part
 }
 
-func getEntireCommitToSend(logger log.Logger,
+func getEntireCommitToSend(_ log.Logger,
 	conS *State,
 	rs *cstypes.RoundState,
-	ps *PeerState,
+	_ *PeerState,
 	prs *cstypes.PeerRoundState,
-	rng *rand.Rand,
 ) types.VoteSetReader {
 	// Catchup logic
 	// If peer is lagging by more than 1, send Commit.
@@ -939,7 +938,6 @@ func getEntireCommitToSend(logger log.Logger,
 
 func pickVoteToSend(
 	logger log.Logger,
-	conS *State,
 	rs *cstypes.RoundState,
 	ps *PeerState,
 	prs *cstypes.PeerRoundState,
