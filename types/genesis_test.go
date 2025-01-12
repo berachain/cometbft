@@ -64,7 +64,7 @@ func TestBasicGenesisDoc(t *testing.T) {
 			"chain_id": "test-chain-QDKdJr",
 			"initial_height": "1000",
 			"validators": [{
-				"pub_key":{"type":"tendermint/PubKeyEd25519","value":"AT/+aaL1eB0477Mud9JMm8Sh8BIvOYlPGC9KkIUmFaE="},
+				"pub_key":{"type":"cometbft/PubKeyBls12_381","value":"EuBk64ldkhYdGk9LchiULh0A/GocQ+BGsY3K4Ln2MSr3RqAv1Zwbv1cIkTzUrnI8Fndu8dH1LBUulEDP2kVNPC9NmUiXrrP+i0MYdD9kLaee9xm/3SqGv0MBuH60WuYg"},
 				"power":"10",
 				"name":""
 			}],
@@ -72,7 +72,7 @@ func TestBasicGenesisDoc(t *testing.T) {
 			"app_state":{"account_owner": "Bob"},
 			"consensus_params": {
 				"synchrony":  {"precision": "1", "message_delay": "10"},
-				"validator": {"pub_key_types":["ed25519"]},
+				"validator": {"pub_key_types":["bls12_381"]},
 				"block": {"max_bytes": "100"},
 				"evidence": {"max_age_num_blocks": "100", "max_age_duration": "10"},
 				"feature": {"vote_extension_enable_height": "0", "pbts_enable_height": "0"}
