@@ -507,6 +507,7 @@ func TestConsensusParamsUpdate_AppVersion(t *testing.T) {
 }
 
 func TestConsensusParamsUpdate_EnableHeight(t *testing.T) {
+	t.Skip("VE and PBTS have to always be enabled")
 	const nilTest = -10000000
 	testCases := []struct {
 		name        string
