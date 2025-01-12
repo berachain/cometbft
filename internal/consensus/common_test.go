@@ -295,9 +295,10 @@ func signAddVotes(
 	voteType types.SignedMsgType,
 	chainID string,
 	blockID types.BlockID,
-	extEnabled bool,
+	_ bool,
 	vss ...*validatorStub,
 ) {
+	extEnabled := false // disable vote extensions in Bearchain
 	votes := signVotes(voteType, chainID, blockID, extEnabled, vss...)
 	addVotes(to, votes...)
 }
