@@ -3,7 +3,7 @@ package types
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+
 	"math"
 	"os"
 	"reflect"
