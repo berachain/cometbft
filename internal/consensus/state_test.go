@@ -2431,7 +2431,7 @@ func TestFinalizeBlockCalled(t *testing.T) {
 			m.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.PrepareProposalResponse{}, nil)
 			// We only expect VerifyVoteExtension to be called on non-nil precommits.
 			// https://github.com/tendermint/tendermint/issues/8487
-			if !testCase.voteNil {
+			if false { // vote extensions disabled in Berachain
 				m.On("ExtendVote", mock.Anything, mock.Anything).Return(&abci.ExtendVoteResponse{}, nil)
 				m.On("VerifyVoteExtension", mock.Anything, mock.Anything).Return(&abci.VerifyVoteExtensionResponse{
 					Status: abci.VERIFY_VOTE_EXTENSION_STATUS_ACCEPT,
