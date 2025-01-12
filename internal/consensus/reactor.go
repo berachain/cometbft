@@ -702,7 +702,7 @@ OUTER_LOOP:
 						"height", prs.Height,
 						"commit", commit)
 				} else {
-					logger.Error("Commit should have been returned, instead unknown type %T.", c)
+					logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
 				}
 			}
 		}
