@@ -3,7 +3,6 @@ package types
 import (
 	"crypto/rand"
 	"encoding/hex"
-
 	"math"
 	"os"
 	"reflect"

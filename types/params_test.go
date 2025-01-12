@@ -48,7 +48,6 @@ func TestConsensusParamsValidation(t *testing.T) {
 			valid: true,
 		},
 		{
-
 			name: "minimal setup, pbts disabled",
 			params: makeParams(makeParamsArgs{
 				blockBytes:  1,
