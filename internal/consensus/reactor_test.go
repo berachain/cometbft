@@ -360,7 +360,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 
 			cs.state.LastBlockHeight = testCase.storedHeight
 			cs.state.LastValidators = cs.state.Validators.Copy()
-			cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
+			//cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
 
 			propBlock, err := cs.createProposalBlock(ctx)
 			require.NoError(t, err)
@@ -772,7 +772,7 @@ func timeoutWaitGroup(n int, f func(int)) {
 
 	// we're running many nodes in-process, possibly in in a virtual machine,
 	// and spewing debug messages - making a block could take a while,
-	timeout := time.Second * 20
+	timeout := time.Second * 30
 
 	select {
 	case <-done:

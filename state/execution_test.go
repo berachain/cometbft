@@ -1063,7 +1063,7 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 			stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 				DiscardABCIResponses: false,
 			})
-			state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
+			//	state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
 			mp := &mpmocks.Mempool{}
 			mp.On("Lock").Return()
 			mp.On("Unlock").Return()

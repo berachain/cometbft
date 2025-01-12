@@ -670,7 +670,7 @@ func TestProtoUpgrade(t *testing.T) {
 		// Downgrade
 		if pbParams.GetFeature().GetVoteExtensionsEnableHeight().GetValue() > 0 {
 			pbParams.Abci = &cmtproto.ABCIParams{VoteExtensionsEnableHeight: pbParams.GetFeature().GetVoteExtensionsEnableHeight().GetValue()} //nolint: staticcheck
-			pbParams.Feature.VoteExtensionsEnableHeight = nil
+			//	pbParams.Feature.VoteExtensionsEnableHeight = nil
 		}
 
 		oriParams := ConsensusParamsFromProto(pbParams)

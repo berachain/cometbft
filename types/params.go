@@ -444,7 +444,7 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 	}
 	if params2.Feature != nil {
 		if params2.Feature.VoteExtensionsEnableHeight != nil {
-			res.Feature.VoteExtensionsEnableHeight = params2.Feature.GetVoteExtensionsEnableHeight().Value
+			res.Feature.VoteExtensionsEnableHeight = 0 //params2.Feature.GetVoteExtensionsEnableHeight().Value
 		}
 
 		if params2.Feature.PbtsEnableHeight != nil {

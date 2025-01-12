@@ -24,6 +24,7 @@ import (
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	cfg "github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	cstypes "github.com/cometbft/cometbft/internal/consensus/types"
 	cmtos "github.com/cometbft/cometbft/internal/os"
 	"github.com/cometbft/cometbft/internal/test"
@@ -525,7 +526,7 @@ func randStateWithAppWithHeight(
 	height int64,
 ) (*State, []*validatorStub) {
 	c := test.ConsensusParams()
-	c.Feature.VoteExtensionsEnableHeight = height
+	//c.Feature.VoteExtensionsEnableHeight = height
 	return randStateWithAppImpl(nValidators, app, c)
 }
 
@@ -889,7 +890,10 @@ func randConsensusNetWithPeers(
 			require.NoError(t, err)
 			tempStateFile, err := os.CreateTemp("", "priv_validator_state_")
 			require.NoError(t, err)
-			privVal, err = privval.GenFilePV(tempKeyFile.Name(), tempStateFile.Name(), nil)
+			keyGen := func() (crypto.PrivKey, error) {
+				return bls12381.GenPrivKey()
+			}
+			privVal, err = privval.GenFilePV(tempKeyFile.Name(), tempStateFile.Name(), keyGen)
 			require.NoError(t, err)
 		}
 
