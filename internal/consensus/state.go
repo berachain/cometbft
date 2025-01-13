@@ -2055,7 +2055,8 @@ func (cs *State) recordMetrics(height int64, block *types.Block) {
 					"validator_address", val.Address.String(),
 				}
 				cs.metrics.ValidatorPower.With(label...).Set(float64(val.VotingPower))
-				if commitSig.BlockIDFlag == types.BlockIDFlagCommit {
+
+				if commitSig.BlockIDFlag == types.BlockIDFlagCommit || commitSig.BlockIDFlag == types.BlockIDFlagAggCommit || commitSig.BlockIDFlag == types.BlockIDFlagAggCommitAbsent {
 					cs.metrics.ValidatorLastSignedHeight.With(label...).Set(float64(height))
 				} else {
 					cs.metrics.ValidatorMissedBlocks.With(label...).Add(float64(1))
