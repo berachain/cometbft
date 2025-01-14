@@ -282,6 +282,8 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.ApplyNewValidBlockMessage(msg)
 		case *HasVoteMessage:
 			ps.ApplyHasVoteMessage(msg)
+		case *HasCommitMessage:
+			ps.ApplyHasCommitMessage(msg)
 		case *HasProposalBlockPartMessage:
 			ps.ApplyHasProposalBlockPartMessage(msg)
 		case *VoteSetMaj23Message:
@@ -361,6 +363,8 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 		case *CommitMessage:
+			ps.SetHasCommit(msg.Commit)
+
 			cs := conR.conS
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
@@ -440,8 +444,14 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventVote,
 		func(data cmtevents.EventData) {
-			conR.broadcastHasVoteMessage(data.(*types.Vote))
+			vote := data.(*types.Vote)
+			conR.broadcastHasVoteMessage(vote)
 			conR.updateRoundStateNoCsLock()
+			// If we have an entire commit, broadcast it.
+			rs := conR.conS.getRoundState()
+			if commit := rs.Votes.GetCommit(vote.Round); commit != nil {
+				conR.broadcastHasCommitMessage(commit)
+			}
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (Vote)", "err", err)
 	}
@@ -524,6 +534,20 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 			}
 		}
 	*/
+}
+
+func (conR *Reactor) broadcastHasCommitMessage(commit *types.Commit) {
+	msg := &cmtcons.HasCommit{
+		Height: commit.Height,
+		Round:  commit.Round,
+	}
+
+	go func() {
+		conR.Switch.TryBroadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   msg,
+		})
+	}()
 }
 
 // Broadcasts HasProposalBlockPartMessage to peers that care.
@@ -691,7 +715,7 @@ OUTER_LOOP:
 				"height", prs.Height,
 				"vote", vote,
 			)
-		} else {
+		} else if !ps.HasCommit() {
 			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs); c != nil {
 				if commit, ok := (c).(*types.Commit); ok {
 					if ps.sendCommit(commit) {
@@ -1290,15 +1314,16 @@ func (ps *PeerState) SendProposalSetHasProposal(
 // sendCommit sends the aggregated commit to the peer.
 func (ps *PeerState) sendCommit(commit *types.Commit) bool {
 	ps.logger.Debug("Sending commit message", "ps", ps, "commit", commit)
-	return ps.peer.Send(p2p.Envelope{
+	if ps.peer.Send(p2p.Envelope{
 		ChannelID: VoteChannel,
 		Message: &cmtcons.Commit{
 			Commit: commit.ToProto(),
 		},
-	})
-
-	// XXX Good to have: mark the commit as received in the peer state
-	// ps.SetHasVote(vote) alternative
+	}) {
+		ps.SetHasCommit(commit)
+		return true
+	}
+	return false
 }
 
 // sendVoteSetHasVote sends the vote to the peer.
@@ -1517,6 +1542,36 @@ func (ps *PeerState) SetHasVoteFromPeer(vote *types.Vote, csHeight int64, valSiz
 	ps.setHasVote(vote.Height, vote.Round, vote.Type, vote.ValidatorIndex)
 }
 
+// SetHasVote sets the given vote as known by the peer.
+func (ps *PeerState) SetHasCommit(commit *types.Commit) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	ps.setHasCommit(commit.Height, commit.Round)
+}
+
+// CONTRACT: Caller must hold the mutex.
+func (ps *PeerState) setHasCommit(height int64, round int32) {
+	ps.logger.Debug("setHasCommit",
+		"peerH/R",
+		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
+		"H/R",
+		log.NewLazySprintf("%d/%d", height, round))
+
+	if ps.PRS.Height == height {
+		if ps.PRS.Round == round {
+			ps.PRS.HasCommit = true
+		}
+	}
+}
+
+func (ps *PeerState) HasCommit() bool {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	return ps.PRS.HasCommit
+}
+
 func (ps *PeerState) setHasVote(height int64, round int32, voteType types.SignedMsgType, index int32) {
 	ps.logger.Debug("setHasVote",
 		"peerH/R",
@@ -1632,6 +1687,18 @@ func (ps *PeerState) ApplyHasVoteMessage(msg *HasVoteMessage) {
 	ps.setHasVote(msg.Height, msg.Round, msg.Type, msg.Index)
 }
 
+// ApplyHasCommitMessage updates the peer state for the new commit.
+func (ps *PeerState) ApplyHasCommitMessage(msg *HasCommitMessage) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if ps.PRS.Height != msg.Height {
+		return
+	}
+
+	ps.setHasCommit(msg.Height, msg.Round)
+}
+
 // ApplyHasProposalBlockPartMessage updates the peer state for the new block part.
 func (ps *PeerState) ApplyHasProposalBlockPartMessage(msg *HasProposalBlockPartMessage) {
 	ps.mtx.Lock()
@@ -1702,6 +1769,7 @@ func init() {
 	cmtjson.RegisterType(&VoteMessage{}, "tendermint/Vote")
 	cmtjson.RegisterType(&CommitMessage{}, "tendermint/Commit")
 	cmtjson.RegisterType(&HasVoteMessage{}, "tendermint/HasVote")
+	cmtjson.RegisterType(&HasCommitMessage{}, "tendermint/HasCommit")
 	cmtjson.RegisterType(&HasProposalBlockPartMessage{}, "tendermint/HasProposalBlockPart")
 	cmtjson.RegisterType(&VoteSetMaj23Message{}, "tendermint/VoteSetMaj23")
 	cmtjson.RegisterType(&VoteSetBitsMessage{}, "tendermint/VoteSetBits")
@@ -1958,6 +2026,30 @@ func (m *HasVoteMessage) ValidateBasic() error {
 // String returns a string representation.
 func (m *HasVoteMessage) String() string {
 	return fmt.Sprintf("[HasVote VI:%v V:{%v/%02d/%v}]", m.Index, m.Height, m.Round, m.Type)
+}
+
+// -------------------------------------
+
+// HasCommitMessage is sent to indicate that a commit has been received.
+type HasCommitMessage struct {
+	Height int64
+	Round  int32
+}
+
+// ValidateBasic performs basic validation.
+func (m *HasCommitMessage) ValidateBasic() error {
+	if m.Height < 0 {
+		return cmterrors.ErrNegativeField{Field: "Height"}
+	}
+	if m.Round < 0 {
+		return cmterrors.ErrNegativeField{Field: "Round"}
+	}
+	return nil
+}
+
+// String returns a string representation.
+func (m *HasCommitMessage) String() string {
+	return fmt.Sprintf("[HasCommit V:{%v/%02d}]", m.Height, m.Round)
 }
 
 // -------------------------------------
