@@ -42,7 +42,7 @@ type PeerRoundState struct {
 	// All commit precommits peer has for this height & CatchupCommitRound
 	CatchupCommit *bits.BitArray `json:"catchup_commit"`
 
-	HasCommit bool `json:"has_commit"` // True if peer has a commit for this height.
+	HasCatchupCommit bool `json:"has_catchup_commit"` // True if peer has a catchup commit.
 }
 
 // String returns a string representation of the PeerRoundState.
