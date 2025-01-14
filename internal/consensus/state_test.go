@@ -72,6 +72,35 @@ x * TestHalt1 - if we see +2/3 precommits after timing out into new round, we sh
 // ----------------------------------------------------------------------------------------------------
 // ProposeSuite
 
+func TestStateJSONMarshalling(t *testing.T) {
+	cs1, _ := randState(4)
+	val1, _ := types.RandValidator(true, 100)
+	val2, _ := types.RandValidator(true, 200)
+	cs1.LastCommit = types.NewVoteSet(
+		cs1.state.ChainID, 10, 3, types.PrecommitType,
+		types.NewValidatorSet([]*types.Validator{val1, val2}),
+	)
+
+	stateB, err := cs1.GetRoundStateJSON()
+	t.Log(string(stateB))
+	require.NoError(t, err)
+
+	cs1.LastCommit = &types.Commit{
+		Height:  5,
+		Round:   6,
+		BlockID: types.BlockID{Hash: []byte("blockhash"), PartSetHeader: types.PartSetHeader{Total: 1, Hash: []byte("partshash")}},
+		Signatures: []types.CommitSig{{
+			BlockIDFlag:      types.BlockIDFlagCommit,
+			ValidatorAddress: []byte("valaddr"),
+			Signature:        []byte("signature"),
+		}},
+	}
+
+	stateC, err := cs1.GetRoundStateJSON()
+	t.Log(string(stateC))
+	require.NoError(t, err)
+}
+
 func TestStateProposerSelection0(t *testing.T) {
 	cs1, vss := randState(4)
 	height, round, chainID := cs1.Height, cs1.Round, cs1.state.ChainID
@@ -2110,6 +2139,7 @@ func TestProcessProposalAccept(t *testing.T) {
 // TestExtendVoteCalledWhenEnabled tests that the vote extension methods are called at the
 // correct point in the consensus algorithm when vote extensions are enabled.
 func TestExtendVoteCalledWhenEnabled(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name    string
 		enabled bool
@@ -2210,6 +2240,7 @@ func TestExtendVoteCalledWhenEnabled(t *testing.T) {
 // TestVerifyVoteExtensionNotCalledOnAbsentPrecommit tests that the VerifyVoteExtension
 // method is not called for a validator's vote that is never delivered.
 func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	m := abcimocks.NewApplication(t)
 	m.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.PrepareProposalResponse{}, nil)
 	m.On("ProcessProposal", mock.Anything, mock.Anything).Return(&abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_ACCEPT}, nil)
@@ -2282,6 +2313,7 @@ func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
 // is the proposer again and ensures that the mock application receives the set of
 // vote extensions from the previous consensus instance.
 func TestPrepareProposalReceivesVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	// create a list of vote extensions, one for each validator.
 	voteExtensions := [][]byte{
 		[]byte("extension 0"),
@@ -2399,7 +2431,7 @@ func TestFinalizeBlockCalled(t *testing.T) {
 			m.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.PrepareProposalResponse{}, nil)
 			// We only expect VerifyVoteExtension to be called on non-nil precommits.
 			// https://github.com/tendermint/tendermint/issues/8487
-			if !testCase.voteNil {
+			if false { // vote extensions disabled in Berachain
 				m.On("ExtendVote", mock.Anything, mock.Anything).Return(&abci.ExtendVoteResponse{}, nil)
 				m.On("VerifyVoteExtension", mock.Anything, mock.Anything).Return(&abci.VerifyVoteExtensionResponse{
 					Status: abci.VERIFY_VOTE_EXTENSION_STATUS_ACCEPT,
@@ -2458,6 +2490,7 @@ func TestFinalizeBlockCalled(t *testing.T) {
 // enforces that vote extensions be present in consensus for heights greater than
 // or equal to the configured value.
 func TestVoteExtensionEnableHeight(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name                  string
 		enableHeight          int64
@@ -2526,7 +2559,7 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 			m.On("Commit", mock.Anything, mock.Anything).Return(&abci.CommitResponse{}, nil).Maybe()
 			cs1, vss := randStateWithAppWithHeight(numValidators, m, testCase.enableHeight)
 			height, round, chainID := cs1.Height, cs1.Round, cs1.state.ChainID
-			cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.enableHeight
+			cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = 0 // disable vote extensions in Berachain
 
 			timeoutCh := subscribe(cs1.eventBus, types.EventQueryTimeoutPropose)
 			proposalCh := subscribe(cs1.eventBus, types.EventQueryCompleteProposal)
@@ -2555,7 +2588,7 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 			}
 
 			for _, vs := range vss[1:] {
-				vote, err := vs.signVote(types.PrecommitType, chainID, blockID, ext, testCase.hasExtension, vs.clock.Now())
+				vote, err := vs.signVote(types.PrecommitType, chainID, blockID, ext, testCase.hasExtension)
 				require.NoError(t, err)
 				addVotes(cs1, vote)
 			}
@@ -3249,7 +3282,7 @@ func signAddPrecommitWithExtension(
 	stub *validatorStub,
 ) {
 	t.Helper()
-	v, err := stub.signVote(types.PrecommitType, chainID, blockID, extension, true, stub.clock.Now())
+	v, err := stub.signVote(types.PrecommitType, chainID, blockID, extension, true)
 	require.NoError(t, err, "failed to sign vote")
 	addVotes(cs, v)
 }

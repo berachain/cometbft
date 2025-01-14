@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/types"
 )
 
@@ -48,7 +48,10 @@ func GenesisValidatorSet(nVals int) ([]types.GenesisValidator, map[string]types.
 	privVals := make(map[string]types.PrivValidator, nVals)
 	for i := 0; i < nVals; i++ {
 		secret := []byte(fmt.Sprintf("test%d", i))
-		pk := ed25519.GenPrivKeyFromSecret(secret)
+		pk, err := bls12381.GenPrivKeyFromSecret(secret)
+		if err != nil {
+			return nil, nil
+		}
 		valAddr := pk.PubKey().Address()
 		vals[i] = types.GenesisValidator{
 			Address: valAddr,

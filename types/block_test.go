@@ -15,6 +15,7 @@ import (
 
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/internal/bits"
@@ -34,7 +35,7 @@ func TestBlockAddEvidence(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -55,7 +56,7 @@ func TestBlockValidateBasic(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false)
+	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 	commit := extCommit.ToCommit()
@@ -126,7 +127,7 @@ func TestBlockMakePartSetWithEvidence(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
 
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -146,7 +147,7 @@ func TestBlockHashesTo(t *testing.T) {
 
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false)
+	voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), false)
 	require.NoError(t, err)
 
@@ -227,7 +228,7 @@ func TestNilDataHashDoesntCrash(t *testing.T) {
 func TestCommit(t *testing.T) {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), true)
 	require.NoError(t, err)
 
@@ -241,7 +242,11 @@ func TestCommit(t *testing.T) {
 	require.NotNil(t, extCommit.BitArray())
 	assert.Equal(t, bits.NewBitArray(10).Size(), extCommit.BitArray().Size())
 
-	assert.Equal(t, voteSet.GetByIndex(0), extCommit.GetByIndex(0))
+	vote1, err := voteSet.GetByIndex(0)
+	require.NoError(t, err)
+	vote2, err := extCommit.GetByIndex(0)
+	require.NoError(t, err)
+	assert.Equal(t, vote1, vote2)
 	assert.True(t, extCommit.IsCommit())
 }
 
@@ -432,7 +437,7 @@ func TestMaxHeaderBytes(t *testing.T) {
 func randCommit(now time.Time) *Commit {
 	lastID := makeBlockIDRandom()
 	h := int64(3)
-	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false)
+	voteSet, _, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, false, ed25519.KeyType)
 	extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, now, false)
 	if err != nil {
 		panic(err)
@@ -544,7 +549,6 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 					Round:            1,
 					Type:             PrecommitType,
 					BlockID:          blockID,
-					Timestamp:        cmttime.Now(),
 				}
 				v := vote.ToProto()
 				err = vals[i].SignVote(voteSet.ChainID(), v, true)
@@ -564,7 +568,8 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 			ec := voteSet.MakeExtendedCommit(p)
 
 			for i := int32(0); int(i) < len(vals); i++ {
-				vote1 := voteSet.GetByIndex(i)
+				vote1, err := voteSet.GetByIndex(i)
+				require.NoError(t, err)
 				vote2 := ec.GetExtendedVote(i)
 
 				vote1bz, err := vote1.ToProto().Marshal()
@@ -608,13 +613,14 @@ func TestExtendedCommitToVoteSet(t *testing.T) {
 			lastID := makeBlockIDRandom()
 			h := int64(3)
 
-			voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true)
+			voteSet, valSet, vals := randVoteSet(h-1, 1, PrecommitType, 10, 1, true, ed25519.KeyType)
 			extCommit, err := MakeExtCommit(lastID, h-1, 1, voteSet, vals, cmttime.Now(), true)
 			require.NoError(t, err)
 
 			if !testCase.includeExtension {
 				for i := 0; i < len(vals); i++ {
-					v := voteSet.GetByIndex(int32(i))
+					v, err := voteSet.GetByIndex(int32(i))
+					require.NoError(t, err)
 					v.Extension = nil
 					v.ExtensionSignature = nil
 					extCommit.ExtendedSignatures[i].Extension = nil
@@ -631,8 +637,10 @@ func TestExtendedCommitToVoteSet(t *testing.T) {
 			}
 
 			for i := int32(0); int(i) < len(vals); i++ {
-				vote1 := voteSet.GetByIndex(i)
-				vote2 := voteSet2.GetByIndex(i)
+				vote1, err := voteSet.GetByIndex(i)
+				require.NoError(t, err)
+				vote2, err := voteSet2.GetByIndex(i)
+				require.NoError(t, err)
 				vote3 := extCommit.GetExtendedVote(i)
 
 				vote1bz, err := vote1.ToProto().Marshal()
@@ -668,7 +676,7 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		voteSet, valSet, vals := randVoteSet(height-1, round, PrecommitType, tc.numValidators, 1, false)
+		voteSet, valSet, vals := randVoteSet(height-1, round, PrecommitType, tc.numValidators, 1, false, ed25519.KeyType)
 
 		vi := int32(0)
 		for n := range tc.blockIDs {
@@ -682,7 +690,6 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 					Round:            round,
 					Type:             PrecommitType,
 					BlockID:          tc.blockIDs[n],
-					Timestamp:        cmttime.Now(),
 				}
 
 				added, err := signAddVote(vals[vi], vote, voteSet)
@@ -786,7 +793,7 @@ func TestBlockProtoBuf(t *testing.T) {
 			require.EqualValues(t, tc.b1.Header, block.Header, tc.msg)
 			require.EqualValues(t, tc.b1.Data, block.Data, tc.msg)
 			require.EqualValues(t, tc.b1.Evidence.Evidence, block.Evidence.Evidence, tc.msg)
-			require.EqualValues(t, *tc.b1.LastCommit, *block.LastCommit, tc.msg)
+			require.Equal(t, tc.b1.LastCommit.ToProto(), block.LastCommit.ToProto(), tc.msg)
 		} else {
 			require.Error(t, err, tc.msg)
 		}

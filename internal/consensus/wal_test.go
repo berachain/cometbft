@@ -143,8 +143,8 @@ func TestWALEncoderDecoder(t *testing.T) {
 
 func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 	now := time.Time{}.AddDate(100, 10, 20)
-	v038Data, _ := hex.DecodeString("a570586b000000c50a0b0880e2c3b1a4feffffff0112b50112b2010aa7011aa4010aa1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a404942b2803552651e1c7e7b72557cdade0a4c5a638dcda9822ec402d42c5f75c767f62c0f3fb0d58aef7842a4e18964faaff3d17559989cf1f11dd006e31a9d0f12064e6f626f6479")
-
+	v100Data, err := hex.DecodeString("c6c4eff3000000e50a0b0880e2c3b1a4feffffff0112d50112d2010ac7011ac4010ac1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd12064e6f626f6479")
+	require.NoError(t, err)
 	ss, privVals := makeState(1, "execution_chain")
 	var pVal cmttypes.PrivValidator
 	for mk := range privVals {
@@ -169,7 +169,7 @@ func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 	}
 
 	pp := p.ToProto()
-	err := vs.SignProposal(ss.ChainID, pp)
+	err = vs.SignProposal(ss.ChainID, pp)
 	require.NoError(t, err)
 	p.Signature = pp.Signature
 
@@ -185,20 +185,20 @@ func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 	b := new(bytes.Buffer)
 	b.Reset()
 
-	_, err = b.Write(v038Data)
+	_, err = b.Write(v100Data)
 	require.NoError(t, err)
 
 	dec := NewWALDecoder(b)
-	v038decoded, err := dec.Decode()
+	v100decoded, err := dec.Decode()
 	require.NoError(t, err)
-	twmV038 := v038decoded.Msg
-	msgInfoV038 := twmV038.(msgInfo)
+	twmV100 := v100decoded.Msg
+	msgInfoV100 := twmV100.(msgInfo)
 
 	for _, tc := range cases {
 		if tc.expectFailure {
-			assert.NotEqual(t, tc.twm.Msg, msgInfoV038)
+			assert.NotEqual(t, tc.twm.Msg, msgInfoV100)
 		} else {
-			assert.Equal(t, tc.twm.Msg, msgInfoV038)
+			assert.Equal(t, tc.twm.Msg, msgInfoV100)
 		}
 	}
 }
@@ -246,8 +246,8 @@ func TestWALEncoder(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Printf("%s\n", hex.EncodeToString(b1.Bytes()))
 
-	// Encoded string generated with v0.38 (before PBTS)
-	data, err := hex.DecodeString("a570586b000000c50a0b0880e2c3b1a4feffffff0112b50112b2010aa7011aa4010aa1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a404942b2803552651e1c7e7b72557cdade0a4c5a638dcda9822ec402d42c5f75c767f62c0f3fb0d58aef7842a4e18964faaff3d17559989cf1f11dd006e31a9d0f12064e6f626f6479")
+	// Encoded string generated v1.0.0 Berachain Fork
+	data, err := hex.DecodeString("c6c4eff3000000e50a0b0880e2c3b1a4feffffff0112d50112d2010ac7011ac4010ac1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd12064e6f626f6479")
 	require.NoError(t, err)
 	require.Equal(t, data, b2)
 }

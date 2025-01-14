@@ -154,7 +154,6 @@ func TestSignerProposal(t *testing.T) {
 
 func TestSignerVote(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
-		ts := cmttime.Now()
 		hash := cmtrand.Bytes(tmhash.Size)
 		valAddr := cmtrand.Bytes(crypto.AddressSize)
 		want := &types.Vote{
@@ -162,7 +161,6 @@ func TestSignerVote(t *testing.T) {
 			Height:           1,
 			Round:            2,
 			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
@@ -172,7 +170,6 @@ func TestSignerVote(t *testing.T) {
 			Height:           1,
 			Round:            2,
 			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
@@ -199,7 +196,6 @@ func TestSignerVote(t *testing.T) {
 
 func TestSignerVoteResetDeadline(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
-		ts := cmttime.Now()
 		hash := cmtrand.Bytes(tmhash.Size)
 		valAddr := cmtrand.Bytes(crypto.AddressSize)
 		want := &types.Vote{
@@ -207,17 +203,16 @@ func TestSignerVoteResetDeadline(t *testing.T) {
 			Height:           1,
 			Round:            2,
 			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
 
 		have := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
@@ -256,25 +251,24 @@ func TestSignerVoteResetDeadline(t *testing.T) {
 
 func TestSignerVoteKeepAlive(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
-		ts := cmttime.Now()
 		hash := cmtrand.Bytes(tmhash.Size)
 		valAddr := cmtrand.Bytes(crypto.AddressSize)
 		want := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
 
 		have := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 		}
@@ -350,15 +344,14 @@ func TestSignerSignProposalErrors(t *testing.T) {
 
 func TestSignerSignVoteErrors(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
-		ts := cmttime.Now()
 		hash := cmtrand.Bytes(tmhash.Size)
 		valAddr := cmtrand.Bytes(crypto.AddressSize)
 		vote := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 			Signature:        []byte("signature"),
@@ -429,8 +422,7 @@ func TestSignerUnexpectedResponse(t *testing.T) {
 			}
 		})
 
-		ts := cmttime.Now()
-		want := &types.Vote{Timestamp: ts, Type: types.PrecommitType}
+		want := &types.Vote{Type: types.PrecommitType}
 
 		e := tc.signerClient.SignVote(tc.chainID, want.ToProto(), false)
 		require.ErrorIs(t, e, cmterrors.ErrRequiredField{Field: "response"})
@@ -439,26 +431,25 @@ func TestSignerUnexpectedResponse(t *testing.T) {
 
 func TestSignerVoteExtension(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
-		ts := cmttime.Now()
 		hash := cmtrand.Bytes(tmhash.Size)
 		valAddr := cmtrand.Bytes(crypto.AddressSize)
 		want := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 			Extension:        []byte("hello"),
 		}
 
 		have := &types.Vote{
-			Type:             types.PrecommitType,
-			Height:           1,
-			Round:            2,
-			BlockID:          types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
-			Timestamp:        ts,
+			Type:    types.PrecommitType,
+			Height:  1,
+			Round:   2,
+			BlockID: types.BlockID{Hash: hash, PartSetHeader: types.PartSetHeader{Hash: hash, Total: 2}},
+
 			ValidatorAddress: valAddr,
 			ValidatorIndex:   1,
 			Extension:        []byte("world"),

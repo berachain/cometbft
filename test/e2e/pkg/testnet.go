@@ -673,13 +673,13 @@ func (g *keyGenerator) Generate(keyType string) crypto.PrivKey {
 	switch keyType {
 	case secp256k1.KeyType:
 		return secp256k1.GenPrivKeySecp256k1(seed)
-	case bls12381.KeyType:
-		pk, err := bls12381.GenPrivKey()
+	case "", bls12381.KeyType:
+		pk, err := bls12381.GenPrivKeyFromSecret(seed)
 		if err != nil {
 			panic(fmt.Sprintf("unrecoverable error when generating key; key type %s, err %v", bls12381.KeyType, err))
 		}
 		return pk
-	case "", ed25519.KeyType:
+	case ed25519.KeyType:
 		return ed25519.GenPrivKeyFromSecret(seed)
 	default:
 		panic("KeyType not supported") // should not make it this far

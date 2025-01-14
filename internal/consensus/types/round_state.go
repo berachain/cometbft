@@ -98,7 +98,7 @@ type RoundState struct {
 	ValidBlockParts           *types.PartSet      `json:"valid_block_parts"`
 	Votes                     *HeightVoteSet      `json:"votes"`
 	CommitRound               int32               `json:"commit_round"` //
-	LastCommit                *types.VoteSet      `json:"last_commit"`  // Last precommits at Height-1
+	LastCommit                types.VoteSetReader `json:"last_commit"`  // Last precommits at Height-1
 	LastValidators            *types.ValidatorSet `json:"last_validators"`
 	TriggeredTimeoutPrecommit bool                `json:"triggered_timeout_precommit"`
 }
@@ -187,7 +187,17 @@ func (rs *RoundState) String() string {
 
 // StringIndented returns a string.
 func (rs *RoundState) StringIndented(indent string) string {
-	return fmt.Sprintf(`RoundState{
+	var lcStr string
+	switch lc := rs.LastCommit.(type) {
+	case *types.VoteSet:
+		lcStr = lc.StringShort()
+	case *types.Commit:
+		lcStr = lc.StringIndented("  ")
+	default:
+		lcStr = fmt.Sprintf("<unknown last commit type %T>", lc)
+	}
+
+	s := fmt.Sprintf(`RoundState{
 %s  H:%v R:%v S:%v
 %s  StartTime:     %v
 %s  CommitTime:    %v
@@ -213,9 +223,10 @@ func (rs *RoundState) StringIndented(indent string) string {
 		indent, rs.ValidRound,
 		indent, rs.ValidBlockParts.StringShort(), rs.ValidBlock.StringShort(),
 		indent, rs.Votes.StringIndented(indent+"  "),
-		indent, rs.LastCommit.StringShort(),
+		indent, lcStr,
 		indent, rs.LastValidators.StringIndented(indent+"  "),
 		indent)
+	return s
 }
 
 // StringShort returns a string.

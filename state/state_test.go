@@ -1099,6 +1099,30 @@ func TestStateProto(t *testing.T) {
 		smt, err := sm.FromProto(pbs)
 		if tt.expPass2 {
 			require.NoError(t, err, tt.testName)
+			// We need this because there is a pointer indirection in the keys that prevents us from using
+			// require.Equal on the top structure
+			checkVals := func(a, b *types.ValidatorSet) {
+				require.Equal(t, a.Size(), b.Size())
+				for i := 0; i < a.Size(); i++ {
+					_, valA := a.GetByIndex(int32(i))
+					_, valB := b.GetByIndex(int32(i))
+					require.Equal(t, valA.Bytes(), valB.Bytes())
+				}
+				if a.Proposer == nil {
+					require.Nil(t, b.Proposer, tt.testName)
+				} else {
+					require.Equal(t, a.Proposer.Bytes(), b.Proposer.Bytes(), tt.testName)
+				}
+			}
+			checkVals(tt.state.Validators, smt.Validators)
+			tt.state.Validators = nil
+			smt.Validators = nil
+			checkVals(tt.state.LastValidators, smt.LastValidators)
+			tt.state.LastValidators = nil
+			smt.LastValidators = nil
+			checkVals(tt.state.NextValidators, smt.NextValidators)
+			tt.state.NextValidators = nil
+			smt.NextValidators = nil
 			require.Equal(t, tt.state, smt, tt.testName)
 		} else {
 			require.Error(t, err, tt.testName)

@@ -173,9 +173,15 @@ func DefaultEvidenceParams() EvidenceParams {
 // DefaultValidatorParams returns a default ValidatorParams, which allows
 // only ed25519 pubkeys.
 func DefaultValidatorParams() ValidatorParams {
-	return ValidatorParams{
-		PubKeyTypes: []string{ABCIPubKeyTypeEd25519},
+	params := ValidatorParams{
+		PubKeyTypes: []string{ABCIPubKeyTypeBls12381},
 	}
+	// TODO Clean up
+	// // If we are running tests, enable ed25519.
+	// if flag.Lookup("test.v") != nil {
+	// 	params.PubKeyTypes = append(params.PubKeyTypes, ABCIPubKeyTypeEd25519)
+	// }
+	return params
 }
 
 func DefaultVersionParams() VersionParams {
@@ -188,7 +194,7 @@ func DefaultVersionParams() VersionParams {
 func DefaultFeatureParams() FeatureParams {
 	return FeatureParams{
 		VoteExtensionsEnableHeight: 0,
-		PbtsEnableHeight:           0,
+		PbtsEnableHeight:           1, // PBTS from start
 	}
 }
 
@@ -278,12 +284,20 @@ func (params ConsensusParams) ValidateBasic() error {
 		return errors.New("len(Validator.PubKeyTypes) must be greater than 0")
 	}
 
-	// Check if keyType is a known ABCIPubKeyType
-	for i := 0; i < len(params.Validator.PubKeyTypes); i++ {
-		keyType := params.Validator.PubKeyTypes[i]
-		if _, ok := ABCIPubKeyTypesToNames[keyType]; !ok {
-			return fmt.Errorf("params.Validator.PubKeyTypes[%d], %s, is an unknown pubkey type",
-				i, keyType)
+	// If we are running in production, we only allow BLS keys
+	// TODO Clean up
+	if true { // flag.Lookup("test.v") == nil {
+		if !(len(params.Validator.PubKeyTypes) == 1 && params.Validator.PubKeyTypes[0] == ABCIPubKeyTypeBls12381) {
+			return errors.New("only BLS key type is allowed")
+		}
+	} else { // Otherwise, we allow all key types
+		// Check if keyType is a known ABCIPubKeyType
+		for i := 0; i < len(params.Validator.PubKeyTypes); i++ {
+			keyType := params.Validator.PubKeyTypes[i]
+			if _, ok := ABCIPubKeyTypesToNames[keyType]; !ok {
+				return fmt.Errorf("params.Validator.PubKeyTypes[%d], %s, is an unknown pubkey type",
+					i, keyType)
+			}
 		}
 	}
 
@@ -431,11 +445,14 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 	}
 	if params2.Feature != nil {
 		if params2.Feature.VoteExtensionsEnableHeight != nil {
-			res.Feature.VoteExtensionsEnableHeight = params2.Feature.GetVoteExtensionsEnableHeight().Value
+			res.Feature.VoteExtensionsEnableHeight = 0 // disable vote extensions in Berachain
 		}
 
 		if params2.Feature.PbtsEnableHeight != nil {
-			res.Feature.PbtsEnableHeight = params2.Feature.GetPbtsEnableHeight().Value
+			// Disabled because it should be enabled from the beginning
+			if res.Feature.PbtsEnableHeight != 1 {
+				panic("PBTS has to be enabled")
+			}
 		}
 	}
 	if params2.Synchrony != nil {

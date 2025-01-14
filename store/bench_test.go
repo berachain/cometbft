@@ -7,7 +7,6 @@ import (
 
 	"github.com/cometbft/cometbft/internal/test"
 	"github.com/cometbft/cometbft/types"
-	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 // TestLoadBlockExtendedCommit tests loading the extended commit for a previously
@@ -18,7 +17,7 @@ func BenchmarkRepeatedLoadSeenCommitSameBlock(b *testing.B) {
 	defer cleanup()
 	h := bs.Height() + 1
 	block := state.MakeBlock(h, test.MakeNTxs(h, 10), new(types.Commit), nil, state.Validators.GetProposer().Address)
-	seenCommit := makeTestExtCommitWithNumSigs(block.Header.Height, cmttime.Now(), 100).ToCommit()
+	seenCommit := makeTestExtCommitWithNumSigs(block.Header.Height, 100).ToCommit()
 	ps, err := block.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(b, err)
 	bs.SaveBlock(block, ps, seenCommit)

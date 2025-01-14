@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	valEd25519             = []string{ABCIPubKeyTypeEd25519}
+	valbls12381            = []string{ABCIPubKeyTypeBls12381}
 	valSecp256k1           = []string{ABCIPubKeyTypeSecp256k1}
 	valEd25519AndSecp256k1 = []string{ABCIPubKeyTypeEd25519, ABCIPubKeyTypeSecp256k1}
 )
@@ -24,6 +24,7 @@ func TestConsensusParamsValidation(t *testing.T) {
 		name   string
 		params ConsensusParams
 		valid  bool
+		skip   bool
 	}{
 		// valid params
 		{
@@ -56,6 +57,7 @@ func TestConsensusParamsValidation(t *testing.T) {
 				messageDelay: 0,
 			}),
 			valid: true,
+			skip:  true,
 		},
 		// block params
 		{
@@ -264,6 +266,7 @@ func TestConsensusParamsValidation(t *testing.T) {
 					pbtsHeight:   0,
 				}),
 			valid: true,
+			skip:  true,
 		},
 		{
 			name: "pbts enabled",
@@ -288,9 +291,13 @@ func TestConsensusParamsValidation(t *testing.T) {
 					pbtsHeight:   100,
 				}),
 			valid: true,
+			skip:  true,
 		},
 	}
 	for _, tc := range testCases {
+		if tc.skip {
+			continue
+		}
 		if tc.valid {
 			require.NoErrorf(t, tc.params.ValidateBasic(),
 				"expected no error for valid params, test: '%s'", tc.name)
@@ -315,7 +322,7 @@ type makeParamsArgs struct {
 
 func makeParams(args makeParamsArgs) ConsensusParams {
 	if args.pubkeyTypes == nil {
-		args.pubkeyTypes = valEd25519
+		args.pubkeyTypes = valbls12381
 	}
 
 	return ConsensusParams{
@@ -400,20 +407,20 @@ func TestConsensusParamsUpdate(t *testing.T) {
 					VoteExtensionsEnableHeight: &types.Int64Value{Value: 1},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 1}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0}),
 		},
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 1, pbtsHeight: 4}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					VoteExtensionsEnableHeight: &types.Int64Value{Value: 10},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 10, pbtsHeight: 4}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 		},
 		// update enabled pbts only
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					PbtsEnableHeight: &types.Int64Value{Value: 1},
@@ -422,34 +429,35 @@ func TestConsensusParamsUpdate(t *testing.T) {
 			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1}),
 		},
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 4, pbtsHeight: 1}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
+					// Was 100 but this fork does not support BFT time
 					PbtsEnableHeight: &types.Int64Value{Value: 100},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 100, voteExtensionHeight: 4}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1, voteExtensionHeight: 0}),
 		},
 		// update both pbts and vote extensions enable heights
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					VoteExtensionsEnableHeight: &types.Int64Value{Value: 1},
 					PbtsEnableHeight:           &types.Int64Value{Value: 1},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 1, pbtsHeight: 1}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 		},
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 1, pbtsHeight: 1}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					VoteExtensionsEnableHeight: &types.Int64Value{Value: 10},
 					PbtsEnableHeight:           &types.Int64Value{Value: 100},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 10, pbtsHeight: 100}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
 		},
 
 		// fine updates
@@ -506,6 +514,7 @@ func TestConsensusParamsUpdate_AppVersion(t *testing.T) {
 }
 
 func TestConsensusParamsUpdate_EnableHeight(t *testing.T) {
+	t.Skip("VE and PBTS have to always be enabled")
 	const nilTest = -10000000
 	testCases := []struct {
 		name        string
@@ -661,6 +670,7 @@ func TestProto(t *testing.T) {
 }
 
 func TestProtoUpgrade(t *testing.T) {
+	t.Skip("No point in testing legacy proto upgrade of vote extensions")
 	params := consensusParamsForTestProto()
 
 	for i := range params {

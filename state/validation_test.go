@@ -31,7 +31,7 @@ func TestValidateBlockHeader(t *testing.T) {
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
 	cp := test.ConsensusParams()
-	pbtsEnableHeight := validationTestsStopHeight / 2
+	pbtsEnableHeight := int64(1)
 	cp.Feature.PbtsEnableHeight = pbtsEnableHeight
 
 	state, stateDB, privVals := makeStateWithParams(3, 1, cp, chainID)
@@ -255,7 +255,6 @@ func TestValidateBlockCommit(t *testing.T) {
 			ValidatorIndex:   0,
 			Height:           height,
 			Round:            0,
-			Timestamp:        cmttime.Now(),
 			Type:             types.PrecommitType,
 			BlockID:          blockID,
 		}

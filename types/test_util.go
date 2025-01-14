@@ -12,7 +12,7 @@ import (
 )
 
 func MakeExtCommit(blockID BlockID, height int64, round int32,
-	voteSet *VoteSet, validators []PrivValidator, now time.Time, extEnabled bool,
+	voteSet *VoteSet, validators []PrivValidator, _ time.Time, extEnabled bool,
 ) (*ExtendedCommit, error) {
 	// all sign
 	for i := 0; i < len(validators); i++ {
@@ -27,7 +27,6 @@ func MakeExtCommit(blockID BlockID, height int64, round int32,
 			Round:            round,
 			Type:             PrecommitType,
 			BlockID:          blockID,
-			Timestamp:        now,
 		}
 
 		_, err = signAddVote(validators[i], vote, voteSet)
@@ -62,7 +61,7 @@ func MakeVote(
 	round int32,
 	step SignedMsgType,
 	blockID BlockID,
-	votetime time.Time,
+	_ time.Time,
 ) (*Vote, error) {
 	pubKey, err := val.GetPubKey()
 	if err != nil {
@@ -76,7 +75,6 @@ func MakeVote(
 		Round:            round,
 		Type:             step,
 		BlockID:          blockID,
-		Timestamp:        votetime,
 	}
 
 	extensionsEnabled := step == PrecommitType

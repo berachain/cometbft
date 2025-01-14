@@ -17,6 +17,7 @@ import (
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	cmtversion "github.com/cometbft/cometbft/api/cometbft/version/v1"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/internal/test"
@@ -293,7 +294,6 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 					Signatures: []types.CommitSig{{
 						BlockIDFlag:      types.BlockIDFlagNil,
 						ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
-						Timestamp:        defaultEvidenceTime,
 						Signature:        crypto.CRandBytes(types.MaxSignatureSize),
 					}},
 				},
@@ -620,7 +620,9 @@ func TestFinalizeBlockValidatorUpdates(t *testing.T) {
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	pubkey := ed25519.GenPrivKey().PubKey()
+	privKey, err := bls12381.GenPrivKey()
+	require.NoError(t, err)
+	pubkey := privKey.PubKey()
 	app.ValidatorUpdates = []abci.ValidatorUpdate{
 		abci.NewValidatorUpdate(pubkey, 10),
 	}
@@ -641,7 +643,7 @@ func TestFinalizeBlockValidatorUpdates(t *testing.T) {
 		event, ok := msg.Data().(types.EventDataValidatorSetUpdates)
 		require.True(t, ok, "Expected event of type EventDataValidatorSetUpdates, got %T", msg.Data())
 		if assert.NotEmpty(t, event.ValidatorUpdates) {
-			assert.Equal(t, pubkey, event.ValidatorUpdates[0].PubKey)
+			assert.Equal(t, pubkey.Bytes(), event.ValidatorUpdates[0].PubKey.Bytes())
 			assert.EqualValues(t, 10, event.ValidatorUpdates[0].VotingPower)
 		}
 	case <-updatesSub.Canceled():
@@ -1012,6 +1014,7 @@ func TestPrepareProposalErrorOnPrepareProposalError(t *testing.T) {
 // call correctly panics when the vote extension data is missing from the extended commit
 // data that the method receives.
 func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name string
 

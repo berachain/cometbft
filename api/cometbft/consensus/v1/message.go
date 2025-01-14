@@ -30,6 +30,12 @@ func (m *Vote) Wrap() proto.Message {
 	return cm
 }
 
+func (m *Commit) Wrap() proto.Message {
+	cm := &Message{}
+	cm.Sum = &Message_Commit{Commit: m}
+	return cm
+}
+
 func (m *BlockPart) Wrap() proto.Message {
 	cm := &Message{}
 	cm.Sum = &Message_BlockPart{BlockPart: m}
@@ -87,6 +93,9 @@ func (m *Message) Unwrap() (proto.Message, error) {
 
 	case *Message_Vote:
 		return m.GetVote(), nil
+
+	case *Message_Commit:
+		return m.GetCommit(), nil
 
 	case *Message_HasVote:
 		return m.GetHasVote(), nil

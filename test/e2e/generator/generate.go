@@ -62,12 +62,12 @@ var (
 		"upgrade": 0.3,
 	}
 	voteExtensionsUpdateHeight = uniformChoice{int64(-1), int64(0), int64(1)} // -1: genesis, 0: InitChain, 1: (use offset)
-	voteExtensionEnabled       = weightedChoice{true: 3, false: 1}
+	voteExtensionEnabled       = weightedChoice{false: 1}
 	voteExtensionsHeightOffset = uniformChoice{int64(0), int64(10), int64(100)}
 	voteExtensionSize          = uniformChoice{uint(128), uint(512), uint(2048), uint(8192)} // TODO: define the right values depending on experiment results.
-	pbtsUpdateHeight           = uniformChoice{int64(-1), int64(0), int64(1)}                // -1: genesis, 0: InitChain, 1: (use offset)
-	pbtsEnabled                = weightedChoice{true: 3, false: 1}
-	pbtsHeightOffset           = uniformChoice{int64(0), int64(10), int64(100)}
+	pbtsUpdateHeight           = uniformChoice{int64(-1)}                                    // -1: genesis, 0: InitChain, 1: (use offset)
+	pbtsEnabled                = weightedChoice{true: 1}
+	pbtsHeightOffset           = uniformChoice{int64(0)}
 )
 
 type generateConfig struct {
@@ -172,7 +172,8 @@ func generateTestnet(r *rand.Rand, opt map[string]any, upgradeVersion string, pr
 		manifest.PbtsUpdateHeight = manifest.InitialHeight + pbtsHeightOffset.Choose(r).(int64)
 	}
 	if pbtsEnabled.Choose(r).(bool) {
-		baseHeight := max(manifest.PbtsUpdateHeight+1, manifest.InitialHeight)
+		initialHeight := max(1, manifest.InitialHeight)
+		baseHeight := max(manifest.PbtsUpdateHeight+1, initialHeight)
 		manifest.PbtsEnableHeight = baseHeight + pbtsHeightOffset.Choose(r).(int64)
 	}
 

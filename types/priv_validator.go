@@ -7,7 +7,9 @@ import (
 
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/secp256k1"
 )
 
 // PrivValidator defines the functionality of a local CometBFT validator
@@ -64,7 +66,26 @@ type MockPV struct {
 }
 
 func NewMockPV() MockPV {
-	return MockPV{ed25519.GenPrivKey(), false, false}
+	return NewMockPVWithKeyType(ed25519.KeyType)
+}
+
+func NewMockPVWithKeyType(keyType string) MockPV {
+	var pk crypto.PrivKey
+	switch keyType {
+	case "", ed25519.KeyType:
+		pk = ed25519.GenPrivKey()
+	case secp256k1.KeyType:
+		pk = secp256k1.GenPrivKey()
+	case bls12381.KeyType:
+		var err error
+		pk, err = bls12381.GenPrivKey()
+		if err != nil {
+			panic(err)
+		}
+	default:
+		panic("unexpected key type: " + keyType)
+	}
+	return MockPV{pk, false, false}
 }
 
 // NewMockPVWithParams allows one to create a MockPV instance, but with finer

@@ -307,6 +307,7 @@ func TestReactorReceivePanicsIfInitPeerHasntBeenCalledYet(t *testing.T) {
 // TestSwitchToConsensusVoteExtensions tests that the SwitchToConsensus correctly
 // checks for vote extension data when required.
 func TestSwitchToConsensusVoteExtensions(t *testing.T) {
+	t.Skip("No point in testing vote extensions in Berachain")
 	for _, testCase := range []struct {
 		name                  string
 		storedHeight          int64

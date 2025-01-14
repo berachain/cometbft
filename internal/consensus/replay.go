@@ -78,8 +78,10 @@ func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscr
 			v := msg.Vote
 			cs.Logger.Info("Replay: Vote", "height", v.Height, "round", v.Round, "type", v.Type,
 				"blockID", v.BlockID, "peer", peerID, "extensionLen", len(v.Extension), "extSigLen", len(v.ExtensionSignature))
+		case *CommitMessage:
+			c := msg.Commit
+			cs.Logger.Info("Replay: Commit", c.Height)
 		}
-
 		cs.handleMsg(m)
 	case timeoutInfo:
 		cs.Logger.Info("Replay: Timeout", "height", m.Height, "round", m.Round, "step", m.Step, "dur", m.Duration)

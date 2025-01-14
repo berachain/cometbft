@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/internal/bits"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
@@ -16,6 +17,10 @@ const (
 	// the number of validators.
 	MaxVotesCount = 10000
 )
+
+func init() {
+	cmtjson.RegisterType(&VoteSet{}, "cometbft/VoteSet")
+}
 
 // UNSTABLE
 // XXX: duplicate of p2p.ID to avoid dependence between packages.
@@ -392,13 +397,13 @@ func (voteSet *VoteSet) BitArrayByBlockID(blockID BlockID) *bits.BitArray {
 
 // NOTE: if validator has conflicting votes, returns "canonical" vote
 // Implements VoteSetReader.
-func (voteSet *VoteSet) GetByIndex(valIndex int32) *Vote {
+func (voteSet *VoteSet) GetByIndex(valIndex int32) (*Vote, error) {
 	if voteSet == nil {
-		return nil
+		return nil, nil
 	}
 	voteSet.mtx.Lock()
 	defer voteSet.mtx.Unlock()
-	return voteSet.votes[valIndex]
+	return voteSet.votes[valIndex], nil
 }
 
 // List returns a copy of the list of votes stored by the VoteSet.
@@ -671,6 +676,117 @@ func (voteSet *VoteSet) MakeExtendedCommit(fp FeatureParams) *ExtendedCommit {
 	return ec
 }
 
+// MakeBLSCommit is a variant of MakeExtendedCommit that aggregates BLS signatures.
+//
+// It additionally aggregates the BLS signatures for the block and nil. The
+// resulting commit contains only two aggregated signatures:
+//
+// 1 - aggregated signature for the block (compressed)
+// 2 - aggregated signature for nil (compressed).
+//
+// Note the signatures count is preserved, but only the first signature in the
+// each category (block, nil) is non-empty.
+//
+// NOTE: it doesn't aggregate vote extension signatures since the extensions
+// are all different.
+func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
+	voteSet.mtx.Lock()
+	defer voteSet.mtx.Unlock()
+
+	if voteSet.signedMsgType != PrecommitType {
+		panic("Cannot MakeBLSCommit() unless VoteSet.Type is PrecommitType")
+	}
+
+	// Make sure we have a 2/3 majority
+	if voteSet.maj23 == nil {
+		panic("Cannot MakeBLSCommit() unless a blockhash has +2/3")
+	}
+
+	// 1. Aggregate the signatures for the block.
+	sigsToAgg := make([][]byte, 0, len(voteSet.votes))
+	for _, v := range voteSet.votes {
+		if v != nil && v.BlockID.IsComplete() {
+			// if block ID exists but doesn't match, exclude sig
+			if !v.BlockID.Equals(*voteSet.maj23) {
+				continue
+			}
+			sigsToAgg = append(sigsToAgg, v.Signature)
+		}
+	}
+	agSig1, err := bls12381.AggregateSignatures(sigsToAgg)
+	if err != nil {
+		panic(fmt.Errorf("BLS aggregation error: %w", err))
+	}
+
+	// 2. Aggregate the signatures for nil, if any.
+	sigsToAgg = make([][]byte, 0, len(voteSet.votes))
+	for _, v := range voteSet.votes {
+		if v != nil && v.BlockID.IsNil() {
+			sigsToAgg = append(sigsToAgg, v.Signature)
+		}
+	}
+	var agSig2 []byte
+	if len(sigsToAgg) > 0 {
+		agSig2, err = bls12381.AggregateSignatures(sigsToAgg)
+		if err != nil {
+			panic(fmt.Errorf("BLS aggregation error: %w", err))
+		}
+	}
+
+	// For every validator, get the precommit without extensions
+	sigs := make([]ExtendedCommitSig, len(voteSet.votes))
+	for i, v := range voteSet.votes {
+		sig := v.ExtendedCommitSig()
+		sig.CommitSig.Signature = []byte{} // clear the signature
+
+		// if block ID exists but doesn't match, exclude sig
+		if sig.BlockIDFlag == BlockIDFlagCommit && !v.BlockID.Equals(*voteSet.maj23) {
+			sig = NewExtendedCommitSigAbsent()
+		} else {
+			switch sig.BlockIDFlag {
+			case BlockIDFlagCommit:
+				sig.BlockIDFlag = BlockIDFlagAggCommitAbsent
+			case BlockIDFlagNil:
+				sig.BlockIDFlag = BlockIDFlagAggNilAbsent
+			default:
+			}
+		}
+
+		sigs[i] = sig
+	}
+
+	// Add agSig1 to the first validator who voted for block.
+	for i, v := range voteSet.votes {
+		if v != nil && v.BlockID.IsComplete() {
+			// if block ID exists but doesn't match, exclude sig
+			if !v.BlockID.Equals(*voteSet.maj23) {
+				continue
+			}
+			sigs[i].CommitSig.Signature = agSig1
+			sigs[i].CommitSig.BlockIDFlag = BlockIDFlagAggCommit
+			break
+		}
+	}
+
+	// Add agSig2 to the first validator who voted for nil.
+	if agSig2 != nil {
+		for i, v := range voteSet.votes {
+			if v != nil && v.BlockID.IsNil() {
+				sigs[i].CommitSig.Signature = agSig2
+				sigs[i].CommitSig.BlockIDFlag = BlockIDFlagAggNil
+				break
+			}
+		}
+	}
+
+	return &ExtendedCommit{
+		Height:             voteSet.GetHeight(),
+		Round:              voteSet.GetRound(),
+		BlockID:            *voteSet.maj23,
+		ExtendedSignatures: sigs,
+	}
+}
+
 // --------------------------------------------------------------------------------
 
 /*
@@ -720,6 +836,6 @@ type VoteSetReader interface {
 	Type() byte
 	Size() int
 	BitArray() *bits.BitArray
-	GetByIndex(idx int32) *Vote
+	GetByIndex(idx int32) (*Vote, error)
 	IsCommit() bool
 }

@@ -304,6 +304,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			case types.PrevoteType:
 				ourVotes = votes.Prevotes(msg.Round).BitArrayByBlockID(msg.BlockID)
 			case types.PrecommitType:
+				// No need to check Votes.Commit, we are dealing with VoteSetMaj23Message.
 				ourVotes = votes.Precommits(msg.Round).BitArrayByBlockID(msg.BlockID)
 			default:
 				panic("Bad VoteSetBitsMessage field Type. Forgot to add a check in ValidateBasic?")
@@ -359,6 +360,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasVoteFromPeer(msg.Vote, height, valSize, lastCommitSize)
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
+		case *CommitMessage:
+			cs := conR.conS
+			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
 		default:
 			// don't punish (leave room for soft upgrades)
@@ -382,6 +386,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 				case types.PrevoteType:
 					ourVotes = votes.Prevotes(msg.Round).BitArrayByBlockID(msg.BlockID)
 				case types.PrecommitType:
+					// No need to check Votes.Commit, we are dealing with VoteSetBitsMessage.
 					ourVotes = votes.Precommits(msg.Round).BitArrayByBlockID(msg.BlockID)
 				default:
 					panic("Bad VoteSetBitsMessage field Type. Forgot to add a check in ValidateBasic?")
@@ -678,7 +683,7 @@ OUTER_LOOP:
 		// logger.Debug("gossipVotesRoutine", "rsHeight", rs.Height, "rsRound", rs.Round,
 		// "prsHeight", prs.Height, "prsRound", prs.Round, "prsStep", prs.Step)
 
-		if vote := pickVoteToSend(logger, conR.conS, rs, ps, prs, rng); vote != nil {
+		if vote := pickVoteToSend(logger, rs, ps, prs, rng); vote != nil {
 			if ps.sendVoteSetHasVote(vote) {
 				continue OUTER_LOOP
 			}
@@ -686,6 +691,19 @@ OUTER_LOOP:
 				"height", prs.Height,
 				"vote", vote,
 			)
+		} else {
+			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs); c != nil {
+				if commit, ok := (c).(*types.Commit); ok {
+					if ps.sendCommit(commit) {
+						continue OUTER_LOOP
+					}
+					logger.Error("Failed to send commit to peer",
+						"height", prs.Height,
+						"commit", commit)
+				} else {
+					logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
+				}
+			}
 		}
 
 		if sleeping == 0 {
@@ -738,6 +756,7 @@ OUTER_LOOP:
 			rs := conR.getRoundState()
 			prs := ps.GetRoundState()
 			if rs.Height == prs.Height {
+				// No need to check rs.Votes.Commit, as this is for an ongoing consensus.
 				if maj23, ok := rs.Votes.Precommits(prs.Round).TwoThirdsMajority(); ok {
 					peer.TrySend(p2p.Envelope{
 						ChannelID: StateChannel,
@@ -884,9 +903,40 @@ func pickPartForCatchup(
 	return part
 }
 
+func getEntireCommitToSend(_ log.Logger,
+	conS *State,
+	rs *cstypes.RoundState,
+	_ *PeerState,
+	prs *cstypes.PeerRoundState,
+) types.VoteSetReader {
+	// Catchup logic
+	// If peer is lagging by more than 1, send Commit.
+	blockStoreBase := conS.blockStore.Base()
+	if blockStoreBase > 0 && prs.Height != 0 && rs.Height >= prs.Height+2 && prs.Height >= blockStoreBase {
+		// Load the block's extended commit for prs.Height,
+		// which contains precommit signatures for prs.Height.
+		var commit types.VoteSetReader
+		var veEnabled bool
+		func() {
+			conS.mtx.RLock()
+			defer conS.mtx.RUnlock()
+			veEnabled = conS.state.ConsensusParams.Feature.VoteExtensionsEnabled(prs.Height)
+		}()
+		if veEnabled {
+			commit = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
+		} else {
+			commit = conS.blockStore.LoadBlockCommit(prs.Height)
+		}
+		if commit == nil {
+			return nil
+		}
+		return commit
+	}
+	return nil
+}
+
 func pickVoteToSend(
 	logger log.Logger,
-	conS *State,
 	rs *cstypes.RoundState,
 	ps *PeerState,
 	prs *cstypes.PeerRoundState,
@@ -907,37 +957,6 @@ func pickVoteToSend(
 		}
 	}
 
-	// Catchup logic
-	// If peer is lagging by more than 1, send Commit.
-	blockStoreBase := conS.blockStore.Base()
-	if blockStoreBase > 0 && prs.Height != 0 && rs.Height >= prs.Height+2 && prs.Height >= blockStoreBase {
-		// Load the block's extended commit for prs.Height,
-		// which contains precommit signatures for prs.Height.
-		var ec *types.ExtendedCommit
-		var veEnabled bool
-		func() {
-			conS.mtx.RLock()
-			defer conS.mtx.RUnlock()
-			veEnabled = conS.state.ConsensusParams.Feature.VoteExtensionsEnabled(prs.Height)
-		}()
-		if veEnabled {
-			ec = conS.blockStore.LoadBlockExtendedCommit(prs.Height)
-		} else {
-			c := conS.blockStore.LoadBlockCommit(prs.Height)
-			if c == nil {
-				return nil
-			}
-			ec = c.WrappedExtendedCommit()
-		}
-		if ec == nil {
-			return nil
-		}
-
-		if vote := ps.PickVoteToSend(ec, rng); vote != nil {
-			logger.Debug("Picked Catchup commit to send", "height", prs.Height)
-			return vote
-		}
-	}
 	return nil
 }
 
@@ -974,6 +993,7 @@ func pickVoteCurrentHeight(
 	}
 	// If there are precommits to send...
 	if prs.Step <= cstypes.RoundStepPrecommitWait && prs.Round != -1 && prs.Round <= rs.Round {
+		// No need to check rs.Votes.Commit, as this is dealing with individual votes.
 		if vote := ps.PickVoteToSend(rs.Votes.Precommits(prs.Round), rng); vote != nil {
 			logger.Debug("Picked rs.Precommits(prs.Round) to send", "round", prs.Round)
 			return vote
@@ -1267,6 +1287,20 @@ func (ps *PeerState) SendProposalSetHasProposal(
 	}
 }
 
+// sendCommit sends the aggregated commit to the peer.
+func (ps *PeerState) sendCommit(commit *types.Commit) bool {
+	ps.logger.Debug("Sending commit message", "ps", ps, "commit", commit)
+	return ps.peer.Send(p2p.Envelope{
+		ChannelID: VoteChannel,
+		Message: &cmtcons.Commit{
+			Commit: commit.ToProto(),
+		},
+	})
+
+	// XXX Good to have: mark the commit as received in the peer state
+	// ps.SetHasVote(vote) alternative
+}
+
 // sendVoteSetHasVote sends the vote to the peer.
 // Returns true and marks the peer as having the vote if the vote was sent.
 func (ps *PeerState) sendVoteSetHasVote(vote *types.Vote) bool {
@@ -1307,8 +1341,13 @@ func (ps *PeerState) PickVoteToSend(votes types.VoteSetReader, rng *rand.Rand) *
 		return nil // Not something worth sending
 	}
 	if index, ok := votes.BitArray().Sub(psVotes).PickRandom(rng); ok {
-		vote := votes.GetByIndex(int32(index))
-		if vote == nil {
+		vote, err := votes.GetByIndex(int32(index))
+		if err != nil {
+			// Corner case: last commit is a "reconstructed commit" (so not a VoteSet)
+			// coming from switchToConsensus. In this case, we can't pick a vote.
+			// Simplest solution is to do nothing and let the catchup logic fix it later.
+			ps.logger.Debug("votes.GetByIndex returned error", "votes", votes, "index", index, "err", err)
+		} else if vote == nil {
 			ps.logger.Error("votes.GetByIndex returned nil", "votes", votes, "index", index)
 		}
 		return vote
@@ -1661,6 +1700,7 @@ func init() {
 	cmtjson.RegisterType(&ProposalPOLMessage{}, "tendermint/ProposalPOL")
 	cmtjson.RegisterType(&BlockPartMessage{}, "tendermint/BlockPart")
 	cmtjson.RegisterType(&VoteMessage{}, "tendermint/Vote")
+	cmtjson.RegisterType(&CommitMessage{}, "tendermint/Commit")
 	cmtjson.RegisterType(&HasVoteMessage{}, "tendermint/HasVote")
 	cmtjson.RegisterType(&HasProposalBlockPartMessage{}, "tendermint/HasProposalBlockPart")
 	cmtjson.RegisterType(&VoteSetMaj23Message{}, "tendermint/VoteSetMaj23")
@@ -1856,6 +1896,23 @@ func (m *BlockPartMessage) String() string {
 
 // -------------------------------------
 
+// CommitMessage is sent when voting for a proposal (or lack thereof).
+type CommitMessage struct {
+	Commit *types.Commit
+}
+
+// ValidateBasic checks whether the vote within the message is well-formed.
+func (m *CommitMessage) ValidateBasic() error {
+	return m.Commit.ValidateBasic()
+}
+
+// String returns a string representation.
+func (m *CommitMessage) String() string {
+	return fmt.Sprintf("[Commit with aggregated signatures %v]", m.Commit)
+}
+
+// -------------------------------------
+
 // VoteMessage is sent when voting for a proposal (or lack thereof).
 type VoteMessage struct {
 	Vote *types.Vote
@@ -2007,4 +2064,5 @@ var (
 	_ types.Wrapper = &cmtcons.ProposalPOL{}
 	_ types.Wrapper = &cmtcons.VoteSetBits{}
 	_ types.Wrapper = &cmtcons.VoteSetMaj23{}
+	_ types.Wrapper = &cmtcons.Commit{}
 )

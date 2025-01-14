@@ -32,9 +32,6 @@ func DefaultValidationRequestHandler(
 
 		var pubKey crypto.PubKey
 		pubKey, err = privVal.GetPubKey()
-		if err != nil {
-			return res, err
-		}
 
 		if err != nil {
 			res = mustWrapMsg(&pvproto.PubKeyResponse{

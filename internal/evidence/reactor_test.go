@@ -352,16 +352,10 @@ func (ps peerState) GetHeight() int64 {
 }
 
 func exampleVote(t byte) *types.Vote {
-	stamp, err := time.Parse(types.TimeFormat, "2017-12-25T03:00:01.234Z")
-	if err != nil {
-		panic(err)
-	}
-
 	return &types.Vote{
-		Type:      types.SignedMsgType(t),
-		Height:    3,
-		Round:     2,
-		Timestamp: stamp,
+		Type:   types.SignedMsgType(t),
+		Height: 3,
+		Round:  2,
 		BlockID: types.BlockID{
 			Hash: tmhash.Sum([]byte("blockID_hash")),
 			PartSetHeader: types.PartSetHeader{
@@ -396,7 +390,7 @@ func TestEvidenceVectors(t *testing.T) {
 		evidenceList []types.Evidence
 		expBytes     string
 	}{
-		{"DuplicateVoteEvidence", []types.Evidence{dupl}, "0a85020a82020a79080210031802224a0a208b01023386c371778ecb6368573e539afc3cc860ec3a2f614e54fe5652f4fc80122608c0843d122072db3d959635dff1bb567bedaa70573392c5159666a3f8caf11e413aac52207a2a0b08b1d381d20510809dca6f32146af1f4111082efb388211bc72c55bcd61e9ac3d538d5bb031279080110031802224a0a208b01023386c371778ecb6368573e539afc3cc860ec3a2f614e54fe5652f4fc80122608c0843d122072db3d959635dff1bb567bedaa70573392c5159666a3f8caf11e413aac52207a2a0b08b1d381d20510809dca6f32146af1f4111082efb388211bc72c55bcd61e9ac3d538d5bb03180a200a2a060880dbaae105"},
+		{"DuplicateVoteEvidence", []types.Evidence{dupl}, "0a85020a82020a79080210031802224a0a208b01023386c371778ecb6368573e539afc3cc860ec3a2f614e54fe5652f4fc80122608c0843d122072db3d959635dff1bb567bedaa70573392c5159666a3f8caf11e413aac52207a2a0b088092b8c398feffffff0132146af1f4111082efb388211bc72c55bcd61e9ac3d538d5bb031279080110031802224a0a208b01023386c371778ecb6368573e539afc3cc860ec3a2f614e54fe5652f4fc80122608c0843d122072db3d959635dff1bb567bedaa70573392c5159666a3f8caf11e413aac52207a2a0b088092b8c398feffffff0132146af1f4111082efb388211bc72c55bcd61e9ac3d538d5bb03180a200a2a060880dbaae105"},
 	}
 
 	for _, tc := range testCases {

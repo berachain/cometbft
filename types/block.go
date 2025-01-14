@@ -17,9 +17,9 @@ import (
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	"github.com/cometbft/cometbft/internal/bits"
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
+	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
-	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/cometbft/cometbft/version"
 )
 
@@ -39,6 +39,10 @@ const (
 	// Data.Txs field:                      1 byte.
 	MaxOverheadForBlock int64 = 11
 )
+
+func init() {
+	cmtjson.RegisterType(&Commit{}, "cometbft/Commit")
+}
 
 // Block defines the atomic unit of a CometBFT blockchain.
 type Block struct {
@@ -588,6 +592,14 @@ const (
 	BlockIDFlagCommit
 	// BlockIDFlagNil - voted for nil.
 	BlockIDFlagNil
+	// BlockIDFlagAggCommit - voted for the Commit.BlockID and contains aggregated signature..
+	BlockIDFlagAggCommit
+	// BlockIDFlagAggCommitAbsent - voted for the Commit.BlockID; aggregated signature in another entry.
+	BlockIDFlagAggCommitAbsent
+	// BlockIDFlagAggNil - voted for nil and contains aggregated signature..
+	BlockIDFlagAggNil
+	// BlockIDFlagAggNilAbsent - voted for nil; aggregated signature in another entry.
+	BlockIDFlagAggNilAbsent
 )
 
 const (
@@ -645,12 +657,10 @@ func (cs CommitSig) String() string {
 func (cs CommitSig) BlockID(commitBlockID BlockID) BlockID {
 	var blockID BlockID
 	switch cs.BlockIDFlag {
-	case BlockIDFlagAbsent:
+	case BlockIDFlagAbsent, BlockIDFlagNil, BlockIDFlagAggNil, BlockIDFlagAggNilAbsent:
 		blockID = BlockID{}
-	case BlockIDFlagCommit:
+	case BlockIDFlagCommit, BlockIDFlagAggCommit, BlockIDFlagAggCommitAbsent:
 		blockID = commitBlockID
-	case BlockIDFlagNil:
-		blockID = BlockID{}
 	default:
 		panic(fmt.Sprintf("Unknown BlockIDFlag: %v", cs.BlockIDFlag))
 	}
@@ -663,17 +673,22 @@ func (cs CommitSig) ValidateBasic() error {
 	case BlockIDFlagAbsent:
 	case BlockIDFlagCommit:
 	case BlockIDFlagNil:
+	case BlockIDFlagAggCommit:
+	case BlockIDFlagAggCommitAbsent:
+	case BlockIDFlagAggNil:
+	case BlockIDFlagAggNilAbsent:
 	default:
 		return fmt.Errorf("unknown BlockIDFlag: %v", cs.BlockIDFlag)
+	}
+
+	if !cs.Timestamp.IsZero() {
+		return errors.New("time is present")
 	}
 
 	switch cs.BlockIDFlag {
 	case BlockIDFlagAbsent:
 		if len(cs.ValidatorAddress) != 0 {
 			return errors.New("validator address is present")
-		}
-		if !cs.Timestamp.IsZero() {
-			return errors.New("time is present")
 		}
 		if len(cs.Signature) != 0 {
 			return errors.New("signature is present")
@@ -686,9 +701,7 @@ func (cs CommitSig) ValidateBasic() error {
 			)
 		}
 		// NOTE: Timestamp validation is subtle and handled elsewhere.
-		if len(cs.Signature) == 0 {
-			return errors.New("signature is missing")
-		}
+		// NOTE: Signature can be empty when using BLS aggregation.
 		if len(cs.Signature) > MaxSignatureSize {
 			return fmt.Errorf("signature is too big (max: %d)", MaxSignatureSize)
 		}
@@ -777,19 +790,20 @@ func (ecs ExtendedCommitSig) ValidateBasic() error {
 // this ExtendedCommitSig.
 func (ecs ExtendedCommitSig) EnsureExtension(extEnabled bool) error {
 	if extEnabled {
-		if ecs.BlockIDFlag == BlockIDFlagCommit && len(ecs.ExtensionSignature) == 0 {
+		sigForBlock := ecs.BlockIDFlag == BlockIDFlagCommit || ecs.BlockIDFlag == BlockIDFlagAggCommit || ecs.BlockIDFlag == BlockIDFlagAggCommitAbsent
+		if sigForBlock && len(ecs.ExtensionSignature) == 0 {
 			return fmt.Errorf("vote extension signature is missing; validator addr %s, timestamp %v",
 				ecs.ValidatorAddress.String(),
 				ecs.Timestamp,
 			)
 		}
-		if ecs.BlockIDFlag != BlockIDFlagCommit && len(ecs.Extension) != 0 {
+		if !sigForBlock && len(ecs.Extension) != 0 {
 			return fmt.Errorf("non-commit vote extension present; validator addr %s, timestamp %v",
 				ecs.ValidatorAddress.String(),
 				ecs.Timestamp,
 			)
 		}
-		if ecs.BlockIDFlag != BlockIDFlagCommit && len(ecs.ExtensionSignature) != 0 {
+		if !sigForBlock && len(ecs.ExtensionSignature) != 0 {
 			return fmt.Errorf("non-commit vote extension signature present; validator addr %s, timestamp %v",
 				ecs.ValidatorAddress.String(),
 				ecs.Timestamp,
@@ -859,16 +873,76 @@ type Commit struct {
 	// Memoized in first call to corresponding method.
 	// NOTE: can't memoize in constructor because constructor isn't used for
 	// unmarshaling.
-	hash cmtbytes.HexBytes
+	hash     cmtbytes.HexBytes
+	bitArray *bits.BitArray
+	mtx      cmtsync.Mutex // Protects hash and bitArray.
 }
+
+var _ VoteSetReader = (*Commit)(nil)
 
 // Clone creates a deep copy of this commit.
 func (commit *Commit) Clone() *Commit {
 	sigs := make([]CommitSig, len(commit.Signatures))
 	copy(sigs, commit.Signatures)
-	commCopy := *commit
-	commCopy.Signatures = sigs
+	commCopy := Commit{
+		Height:     commit.Height,
+		Round:      commit.Round,
+		BlockID:    commit.BlockID,
+		Signatures: sigs,
+	}
 	return &commCopy
+}
+
+// Type returns the vote type of the commit, which is always
+// VoteTypePrecommit
+// Implements VoteSetReader.
+func (*Commit) Type() byte { return byte(PrecommitType) }
+
+// GetHeight returns height of the commit.
+// Implements VoteSetReader.
+func (commit *Commit) GetHeight() int64 { return commit.Height }
+
+// GetRound returns height of the commit.
+// Implements VoteSetReader.
+func (commit *Commit) GetRound() int32 { return commit.Round }
+
+// Size returns the number of signatures in the commit.
+// Implements VoteSetReader.
+func (commit *Commit) Size() int {
+	if commit == nil {
+		return 0
+	}
+	return len(commit.Signatures)
+}
+
+// BitArray returns a BitArray of which validators voted for BlockID or nil in
+// this extended commit.
+// Implements VoteSetReader.
+func (commit *Commit) BitArray() *bits.BitArray {
+	commit.mtx.Lock()
+	defer commit.mtx.Unlock()
+	if commit.bitArray == nil {
+		initialBitFn := func(i int) bool {
+			// TODO: need to check the BlockID otherwise we could be counting conflicts,
+			//       not just the one with +2/3 !
+			return commit.Signatures[i].BlockIDFlag != BlockIDFlagAbsent
+		}
+		commit.bitArray = bits.NewBitArrayFromFn(len(commit.Signatures), initialBitFn)
+	}
+	return commit.bitArray
+}
+
+// GetByIndex returns the vote corresponding to a given validator index.
+// Panics if `index >= extCommit.Size()`.
+// Implements VoteSetReader.
+func (commit *Commit) GetByIndex(_ int32) (*Vote, error) {
+	return nil, fmt.Errorf("cannot get vote by index from Commit %v", commit.StringIndented("  "))
+}
+
+// IsCommit returns true if there is at least one signature.
+// Implements VoteSetReader.
+func (commit *Commit) IsCommit() bool {
+	return len(commit.Signatures) != 0
 }
 
 // GetVote converts the CommitSig for the given valIdx to a Vote. Commits do
@@ -883,10 +957,10 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 		Height:           commit.Height,
 		Round:            commit.Round,
 		BlockID:          commitSig.BlockID(commit.BlockID),
-		Timestamp:        commitSig.Timestamp,
 		ValidatorAddress: commitSig.ValidatorAddress,
 		ValidatorIndex:   valIdx,
 		Signature:        commitSig.Signature,
+		Timestamp:        time.Time{},
 	}
 }
 
@@ -902,14 +976,6 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 func (commit *Commit) VoteSignBytes(chainID string, valIdx int32) []byte {
 	v := commit.GetVote(valIdx).ToProto()
 	return VoteSignBytes(chainID, v)
-}
-
-// Size returns the number of signatures in the commit.
-func (commit *Commit) Size() int {
-	if commit == nil {
-		return 0
-	}
-	return len(commit.Signatures)
 }
 
 // ValidateBasic performs basic validation that doesn't involve state data.
@@ -939,30 +1005,15 @@ func (commit *Commit) ValidateBasic() error {
 	return nil
 }
 
-// MedianTime computes the median time for a Commit based on the associated validator set.
-// The median time is the weighted median of the Timestamp fields of the commit votes,
-// with heights defined by the validator's voting powers.
-// The BFT Time algorithm ensures that the computed median time is always picked among
-// the timestamps produced by honest processes, i.e., faulty processes cannot arbitrarily
-// increase or decrease the median time.
-// See: https://github.com/cometbft/cometbft/blob/main/spec/consensus/bft-time.md
-func (commit *Commit) MedianTime(validators *ValidatorSet) time.Time {
-	weightedTimes := make([]*cmttime.WeightedTime, len(commit.Signatures))
-	totalVotingPower := int64(0)
-
-	for i, commitSig := range commit.Signatures {
-		if commitSig.BlockIDFlag == BlockIDFlagAbsent {
-			continue
-		}
-		_, validator := validators.GetByAddressMut(commitSig.ValidatorAddress)
-		// If there's no condition, TestValidateBlockCommit panics; not needed normally.
-		if validator != nil {
-			totalVotingPower += validator.VotingPower
-			weightedTimes[i] = cmttime.NewWeightedTime(commitSig.Timestamp, validator.VotingPower)
+// HasAggregatedSignature returns true if the commit contains an aggregated signature.
+func (commit *Commit) HasAggregatedSignature() bool {
+	for _, sig := range commit.Signatures {
+		if sig.BlockIDFlag == BlockIDFlagAggCommit || sig.BlockIDFlag == BlockIDFlagAggNil ||
+			sig.BlockIDFlag == BlockIDFlagAggCommitAbsent || sig.BlockIDFlag == BlockIDFlagAggNilAbsent {
+			return true
 		}
 	}
-
-	return cmttime.WeightedMedian(weightedTimes, totalVotingPower)
+	return false
 }
 
 // Hash returns the hash of the commit.
@@ -970,6 +1021,8 @@ func (commit *Commit) Hash() cmtbytes.HexBytes {
 	if commit == nil {
 		return nil
 	}
+	commit.mtx.Lock()
+	defer commit.mtx.Unlock()
 	if commit.hash == nil {
 		bs := make([][]byte, len(commit.Signatures))
 		for i, commitSig := range commit.Signatures {
@@ -1015,6 +1068,9 @@ func (commit *Commit) StringIndented(indent string) string {
 	for i, commitSig := range commit.Signatures {
 		commitSigStrings[i] = commitSig.String()
 	}
+	commit.mtx.Lock()
+	hash := commit.hash
+	commit.mtx.Unlock()
 	return fmt.Sprintf(`Commit{
 %s  Height:     %d
 %s  Round:      %d
@@ -1027,7 +1083,7 @@ func (commit *Commit) StringIndented(indent string) string {
 		indent, commit.BlockID,
 		indent,
 		indent, strings.Join(commitSigStrings, "\n"+indent+"    "),
-		indent, commit.hash)
+		indent, hash)
 }
 
 // ToProto converts Commit to protobuf.
@@ -1092,6 +1148,8 @@ type ExtendedCommit struct {
 	bitArray *bits.BitArray
 }
 
+var _ VoteSetReader = (*ExtendedCommit)(nil)
+
 // Clone creates a deep copy of this extended commit.
 func (ec *ExtendedCommit) Clone() *ExtendedCommit {
 	sigs := make([]ExtendedCommitSig, len(ec.ExtendedSignatures))
@@ -1131,7 +1189,8 @@ func (ec *ExtendedCommit) addSigsToVoteSet(voteSet *VoteSet) {
 // ToVoteSet constructs a VoteSet from the Commit and validator set.
 // Panics if signatures from the commit can't be added to the voteset.
 // Inverse of VoteSet.MakeCommit().
-func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) *VoteSet {
+/*
+func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) VoteSetReader {
 	voteSet := NewVoteSet(chainID, commit.Height, commit.Round, PrecommitType, vals)
 	for idx, cs := range commit.Signatures {
 		if cs.BlockIDFlag == BlockIDFlagAbsent {
@@ -1148,6 +1207,7 @@ func (commit *Commit) ToVoteSet(chainID string, vals *ValidatorSet) *VoteSet {
 	}
 	return voteSet
 }
+*/
 
 // EnsureExtensions validates that a vote extensions signature is present for
 // every ExtendedCommitSig in the ExtendedCommit.
@@ -1185,7 +1245,6 @@ func (ec *ExtendedCommit) GetExtendedVote(valIndex int32) *Vote {
 		Height:             ec.Height,
 		Round:              ec.Round,
 		BlockID:            ecs.BlockID(ec.BlockID),
-		Timestamp:          ecs.Timestamp,
 		ValidatorAddress:   ecs.ValidatorAddress,
 		ValidatorIndex:     valIndex,
 		Signature:          ecs.Signature,
@@ -1234,8 +1293,8 @@ func (ec *ExtendedCommit) BitArray() *bits.BitArray {
 // GetByIndex returns the vote corresponding to a given validator index.
 // Panics if `index >= extCommit.Size()`.
 // Implements VoteSetReader.
-func (ec *ExtendedCommit) GetByIndex(valIdx int32) *Vote {
-	return ec.GetExtendedVote(valIdx)
+func (ec *ExtendedCommit) GetByIndex(valIdx int32) (*Vote, error) {
+	return ec.GetExtendedVote(valIdx), nil
 }
 
 // IsCommit returns true if there is at least one signature.

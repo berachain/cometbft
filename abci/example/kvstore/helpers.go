@@ -7,14 +7,18 @@ import (
 	"strings"
 
 	"github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	cmtrand "github.com/cometbft/cometbft/internal/rand"
 )
 
 // RandVal creates one random validator, with a key derived
 // from the input value.
 func RandVal() types.ValidatorUpdate {
-	pubkey := ed25519.GenPrivKey().PubKey()
+	privKey, err := bls12381.GenPrivKey()
+	if err != nil {
+		panic("failed to generate private key")
+	}
+	pubkey := privKey.PubKey()
 	power := cmtrand.Uint16() + 1
 	return types.ValidatorUpdate{Power: int64(power), PubKeyType: pubkey.Type(), PubKeyBytes: pubkey.Bytes()}
 }

@@ -85,7 +85,7 @@ func TestEvidencePoolBasic(t *testing.T) {
 	next := pool.EvidenceFront()
 	assert.Equal(t, ev, next.Value.(types.Evidence))
 
-	const evidenceBytes int64 = 372
+	const evidenceBytes int64 = 382
 	evs, size = pool.PendingEvidence(evidenceBytes)
 	assert.Len(t, evs, 1)
 	assert.Equal(t, evidenceBytes, size) // check that the size of the single evidence in bytes is correct
@@ -315,6 +315,7 @@ func TestRecoverPendingEvidence(t *testing.T) {
 	stateStore := initializeValidatorState(val, height)
 	state, err := stateStore.Load()
 	require.NoError(t, err)
+	state.ConsensusParams.Feature.PbtsEnableHeight = 1
 	blockStore, err := initializeBlockStore(dbm.NewMemDB(), state, valAddress)
 	require.NoError(t, err)
 	// create previous pool and populate it
@@ -452,6 +453,7 @@ func defaultTestPool(t *testing.T, height int64) (*evidence.Pool, types.MockPV) 
 	evidenceDB := dbm.NewMemDB()
 	stateStore := initializeValidatorState(val, height)
 	state, _ := stateStore.Load()
+	state.ConsensusParams.Feature.PbtsEnableHeight = 1
 	blockStore, err := initializeBlockStore(dbm.NewMemDB(), state, valAddress)
 	require.NoError(t, err)
 	pool, err := evidence.NewPool(evidenceDB, stateStore, blockStore)

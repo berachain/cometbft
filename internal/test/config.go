@@ -72,7 +72,7 @@ var testGenesisFmt = `{
 		},
 		"validator": {
 			"pub_key_types": [
-				"ed25519"
+				"bls12_381"
 			]
 		},
 		"abci": {
@@ -87,8 +87,8 @@ var testGenesisFmt = `{
   "validators": [
     {
       "pub_key": {
-        "type": "tendermint/PubKeyEd25519",
-        "value":"AT/+aaL1eB0477Mud9JMm8Sh8BIvOYlPGC9KkIUmFaE="
+        "type": "cometbft/PubKeyBls12_381",
+        "value":"BMlO6J39z8FkTRcu46UB0UukCDxzjMJXcXMP2bZNc+Vi1ZbIAWZ/DOT5j8vCWPSVDgQH4OCeXoy0QyKJynYHDQU4nGXYHAyzdmyd2Wx1kSJDvDOXhtlXgrOQUu20G7rH"
       },
       "power": "10",
       "name": ""
@@ -98,14 +98,14 @@ var testGenesisFmt = `{
 }`
 
 var testPrivValidatorKey = `{
-  "address": "A3258DCBF45DCA0DF052981870F2D1441A36D145",
+  "address": "E779026F0791AA52F83B28805FC110B3C6DB163A",
   "pub_key": {
-    "type": "tendermint/PubKeyEd25519",
-    "value": "AT/+aaL1eB0477Mud9JMm8Sh8BIvOYlPGC9KkIUmFaE="
+    "type": "cometbft/PubKeyBls12_381",
+    "value": "BMlO6J39z8FkTRcu46UB0UukCDxzjMJXcXMP2bZNc+Vi1ZbIAWZ/DOT5j8vCWPSVDgQH4OCeXoy0QyKJynYHDQU4nGXYHAyzdmyd2Wx1kSJDvDOXhtlXgrOQUu20G7rH"
   },
   "priv_key": {
-    "type": "tendermint/PrivKeyEd25519",
-    "value": "EVkqJO/jIXp3rkASXfh9YnyToYXRXhBr6g9cQVxPFnQBP/5povV4HTjvsy530kybxKHwEi85iU8YL0qQhSYVoQ=="
+    "type": "cometbft/PrivKeyBls12_381",
+    "value": "LX8gNvm3UzeLQswGVVadP566n2Ix6ixlt87Dq5XQLWg="
   }
 }`
 
