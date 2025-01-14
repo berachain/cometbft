@@ -361,8 +361,6 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 		case *CommitMessage:
-			ps.SetHasCatchupCommit(msg.Commit)
-
 			cs := conR.conS
 			cs.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
@@ -1535,11 +1533,7 @@ func (ps *PeerState) setHasCatchupCommit(height int64, round int32) {
 		"H/R",
 		log.NewLazySprintf("%d/%d", height, round))
 
-	if ps.PRS.Height == height {
-		if ps.PRS.Round == round {
-			ps.PRS.HasCatchupCommit = true
-		}
-	}
+	ps.PRS.HasCatchupCommit = true
 }
 
 func (ps *PeerState) HasCatchupCommit() bool {
@@ -1615,6 +1609,8 @@ func (ps *PeerState) ApplyNewRoundStepMessage(msg *NewRoundStepMessage) {
 		// We'll update the BitArray capacity later.
 		ps.PRS.CatchupCommitRound = -1
 		ps.PRS.CatchupCommit = nil
+
+		ps.PRS.HasCatchupCommit = false
 	}
 }
 
