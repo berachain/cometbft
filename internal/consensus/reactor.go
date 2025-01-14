@@ -442,8 +442,7 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	if err := conR.conS.evsw.AddListenerForEvent(subscriber, types.EventVote,
 		func(data cmtevents.EventData) {
-			vote := data.(*types.Vote)
-			conR.broadcastHasVoteMessage(vote)
+			conR.broadcastHasVoteMessage(data.(*types.Vote))
 			conR.updateRoundStateNoCsLock()
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (Vote)", "err", err)
