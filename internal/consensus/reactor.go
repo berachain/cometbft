@@ -703,7 +703,7 @@ OUTER_LOOP:
 				logger.Error("Failed to send commit to peer",
 					"height", prs.Height,
 					"commit", commit)
-			} else {
+			} else if c != nil {
 				logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
 			}
 		}
