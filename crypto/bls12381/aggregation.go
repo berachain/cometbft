@@ -41,5 +41,5 @@ func VerifyAggregateSignature(agSigCompressed []byte, pubks []*PubKey, msg []byt
 	for i, pubk := range pubks {
 		blsPubKeys[i] = pubk.pk
 	}
-	return agSig.FastAggregateVerify(true, blsPubKeys, msg, dstMinPk)
+	return agSig.FastAggregateVerify(true, blsPubKeys, msg, dstMinSig)
 }

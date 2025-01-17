@@ -30,7 +30,7 @@ var (
 	// of a more comprehensive subgroup check on the key.
 	ErrInfinitePubKey = errors.New("bls12381: pubkey is infinite")
 
-	dstMinPk = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_")
+	dstMinSig = []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
 )
 
 // For minimal-pubkey-size operations.
@@ -111,7 +111,7 @@ func (PrivKey) Type() string {
 
 // Sign signs the given byte array.
 func (privKey PrivKey) Sign(msg []byte) ([]byte, error) {
-	signature := new(blstSignature).Sign(privKey.sk, msg, dstMinPk)
+	signature := new(blstSignature).Sign(privKey.sk, msg, dstMinSig)
 	return signature.Compress(), nil
 }
 
@@ -215,7 +215,7 @@ func (pubKey PubKey) VerifySignature(msg, sig []byte) bool {
 		return false
 	}
 
-	return signature.Verify(false, pubKey.pk, false, msg, dstMinPk)
+	return signature.Verify(false, pubKey.pk, false, msg, dstMinSig)
 }
 
 // Bytes returns the byte format.
