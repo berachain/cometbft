@@ -526,6 +526,172 @@ func TestPBTSTooFarInTheFutureProposal(t *testing.T) {
 	require.Nil(t, results.height2.prevote.BlockID.Hash)
 }
 
+func TestPBTSTooFarInTheFutureProposalOverflow(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// On purpose use a MessageDelay that has an overflow, i.e. infinite
+	// Emulates the logic for adaptive MessageDelay over rounds.
+	synchronyParams := types.DefaultSynchronyParams().InRound(256)
+	synchronyParams.Precision = 1 * time.Millisecond
+
+	// localtime < proposedBlockTime - Precision
+	cfg := pbtsTestConfiguration{
+		synchronyParams:                   synchronyParams,
+		timeoutPropose:                    50 * time.Millisecond,
+		height2ProposedBlockOffset:        100 * time.Millisecond,
+		height2ProposalTimeDeliveryOffset: 10 * time.Millisecond,
+		height4ProposedBlockOffset:        150 * time.Millisecond,
+	}
+
+	pbtsTest := newPBTSTestHarness(ctx, t, cfg)
+	results := pbtsTest.run(ctx, t)
+
+	// The proposal
+	require.Nil(t, results.height2.prevote.BlockID.Hash)
+}
+
+// TestPBTSEnableHeight tests the transition between BFT Time and PBTS.
+// The test runs multiple heights. BFT Time is used until the configured
+// PbtsEnableHeight. During some of these heights, the timestamp of votes
+// is shifted to the future to increase block timestamps. PBTS is enabled
+// at pbtsSetHeight, via FinalizeBlock. From this point, some nodes select
+// timestamps using PBTS, which is not yet enabled. When PbtsEnableHeight
+// is reached, some nodes propose bad timestamps. At the end, only blocks
+// proposed by the tested node are accepted, as they are not tweaked.
+func TestPBTSEnableHeight(t *testing.T) {
+	numValidators := 4
+	election := func(h int64, r int32) int {
+		return (int(h-1) + int(r)) % numValidators
+	}
+
+	c := test.ConsensusParams()
+	c.Feature.PbtsEnableHeight = 0 // Start with PBTS disabled
+
+	app := abcimocks.NewApplication(t)
+	app.On("ProcessProposal", mock.Anything, mock.Anything).Return(&abci.ProcessProposalResponse{
+		Status: abci.PROCESS_PROPOSAL_STATUS_ACCEPT,
+	}, nil)
+	app.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.PrepareProposalResponse{}, nil)
+	app.On("ExtendVote", mock.Anything, mock.Anything).Return(&abci.ExtendVoteResponse{}, nil)
+	app.On("VerifyVoteExtension", mock.Anything, mock.Anything).Return(&abci.VerifyVoteExtensionResponse{
+		Status: abci.VERIFY_VOTE_EXTENSION_STATUS_ACCEPT,
+	}, nil)
+	app.On("Commit", mock.Anything, mock.Anything).Return(&abci.CommitResponse{}, nil).Maybe()
+
+	cs, vss := randStateWithAppImpl(numValidators, app, c)
+	height, round, chainID := cs.Height, cs.Round, cs.state.ChainID
+
+	proposalCh := subscribe(cs.eventBus, types.EventQueryCompleteProposal)
+	newRoundCh := subscribe(cs.eventBus, types.EventQueryNewRound)
+	voteCh := subscribe(cs.eventBus, types.EventQueryVote)
+
+	lastHeight := height + 4
+	pbtsSetHeight := height + 2
+	pbtsEnableHeight := height + 3
+
+	startTestRound(cs, height, round)
+	for height <= lastHeight {
+		var block *types.Block
+		var blockID types.BlockID
+
+		ensureNewRound(newRoundCh, height, round)
+		proposer := election(height, round)
+		pbtsEnabled := (height >= pbtsEnableHeight)
+		rejectProposal := false
+
+		// Propose step
+		if proposer == 0 {
+			// Wait until we receive our own proposal
+			// This may take longer when switching to PBTS since
+			// BFT Time timestamps are shifted to the future.
+			ensureProposalWithTimeout(proposalCh, height, round, nil, 2*time.Second)
+			rs := cs.GetRoundState()
+			block, _ = rs.ProposalBlock, rs.ProposalBlockParts
+			blockID = rs.Proposal.BlockID
+		} else {
+			var ts time.Time
+			var blockParts *types.PartSet
+
+			if height >= pbtsSetHeight && height < pbtsEnableHeight {
+				// Use PBTS logic while PBTS is not yet activated
+				ts = cmttime.Now()
+				rejectProposal = true
+			} else if height >= pbtsEnableHeight {
+				// Shift timestamp to the future 2*PRECISION => not timely
+				ts = cmttime.Now().Add(2 * c.Synchrony.Precision)
+				rejectProposal = true
+			}
+			block, blockParts, blockID = createProposalBlockWithTime(t, cs, ts)
+			proposal := types.NewProposal(height, round, -1, blockID, block.Header.Time)
+			// BFT Time should not care about Proposal's timestamps
+			if height < pbtsSetHeight {
+				proposal.Timestamp = cmttime.Now()
+			}
+			signProposal(t, proposal, chainID, vss[proposer])
+			err := cs.SetProposalAndBlock(proposal, blockParts, "p")
+			require.NoError(t, err)
+			ensureProposal(proposalCh, height, round, blockID)
+		}
+
+		delta := cmttime.Since(block.Time)
+		t.Log("BLOCK", height, round, "PROPOSER", proposer, "PBTS", pbtsEnabled,
+			"TIMESTAMP", block.Time, delta, "ACCEPTED", !rejectProposal)
+
+		// Accept proposal and decide, or reject proposal and move to next round
+		myVote := blockID.Hash
+		lockedRound := round
+		if rejectProposal {
+			myVote = nil
+			lockedRound = int32(-1)
+		} else { // We are deciding, enable FinalizeBlock mock
+			res := &abci.FinalizeBlockResponse{}
+			// Enable PBTS from pbtsEnableHeight via consensus params
+			if height == pbtsSetHeight {
+				params := types.DefaultConsensusParams()
+				params.Feature.VoteExtensionsEnableHeight = 1
+				params.Feature.PbtsEnableHeight = pbtsEnableHeight
+				paramsProto := params.ToProto()
+				res.ConsensusParamUpdates = &paramsProto
+			}
+			app.On("FinalizeBlock", mock.Anything, mock.Anything).
+				Return(res, nil).Once()
+		}
+
+		// Prevote step
+		ensurePrevote(voteCh, height, round)
+		validatePrevote(t, cs, round, vss[0], myVote)
+		for _, vs := range vss[2:] {
+			signAddVotes(cs, types.PrevoteType, chainID, blockID, false, vs)
+			ensurePrevote(voteCh, height, round)
+		}
+
+		// Precommit step
+		ensurePrecommit(voteCh, height, round)
+		validatePrecommit(t, cs, round, lockedRound, vss[0], myVote, myVote)
+		for _, vs := range vss[2:] {
+			ts := cmttime.Now()
+			// Shift the next block timestamp while running BFT Time
+			if height >= pbtsSetHeight-1 && height < pbtsEnableHeight {
+				ts = ts.Add(time.Second)
+			}
+			vote := signVoteWithTimestamp(vs, types.PrecommitType, chainID, blockID, true, ts)
+			cs.peerMsgQueue <- msgInfo{Msg: &VoteMessage{vote}}
+			ensurePrecommit(voteCh, height, round)
+		}
+
+		if myVote != nil {
+			height, round = height+1, 0
+			incrementHeight(vss[1:]...)
+		} else {
+			round = round + 1
+			incrementRound(vss[1:]...)
+		}
+	}
+	// Last call to FinalizeBlock
+	ensureNewRound(newRoundCh, height, round)
+}
+
 // TestPbtsAdaptiveMessageDelay tests whether proposals with timestamps in the
 // past are eventually accepted by validators. The test runs multiple rounds.
 // Rounds where the tested node is the proposer are skipped. Rounds with other
