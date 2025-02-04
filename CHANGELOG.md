@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## v1.0.1
+
+*February 3, 2025*
+
+This release fixes two security issues (ASA-2025-001, ASA-2025-002). Users are
+encouraged to upgrade as soon as possible.
+
+### BUG FIXES
+
+- `[blocksync]` Ban peer if it reports height lower than what was previously reported
+  ([ASA-2025-001](https://github.com/cometbft/cometbft/security/advisories/GHSA-22qq-3xwm-r5x4))
+- `[consensus]` Fix overflow in synchrony parameters in `linux/amd64` architecture.
+  Cap `SynchronyParams.MessageDelay` to 24hrs.
+  Cap `SynchronyParams.Precision` to 30 sec.
+  ([\#4815](https://github.com/cometbft/cometbft/issues/4815))
+- `[crypto/bls12381]` Fix JSON marshal of private key
+  ([\#4772](https://github.com/cometbft/cometbft/pull/4772))
+- `[crypto/bls12381]` Modify `Sign`, `Verify` to use `dstMinPk`
+  ([\#4783](https://github.com/cometbft/cometbft/issues/4783))
+- `[privval]` Re-enable some sanity checks related to vote extensions
+  when signing a vote
+  ([\#3642](https://github.com/cometbft/cometbft/issues/3642))
+- `[types]` Check that `Part.Index` equals `Part.Proof.Index`
+  ([ASA-2025-001](https://github.com/cometbft/cometbft/security/advisories/GHSA-r3r4-g7hq-pq4f))
+
+### DEPENDENCIES
+
+- `[go/runtime]` Bump minimum Go version to 1.23.5
+  ([\#4888](https://github.com/cometbft/cometbft/pull/4888))
+
 ## v1.0.0
 
 *December 17, 2024*
@@ -173,10 +203,10 @@ method is removed ([\#4040](https://github.com/cometbft/cometbft/pull/4040)).
 - `[node]` Change the signature of `GenesisDocProvider` to
   return the checksum of JSON content alongside the parsed genesis data
   ([\#1287](https://github.com/cometbft/cometbft/issues/1287)).
-- `[node]` Go API breaking change to `DefaultNewNode`. The function passes
+- `[node]` Go API breaking change to `DefaultNewNode`. The function passes 
 `CliParams` to a node now.
   ([\#3595](https://github.com/cometbft/cometbft/pull/3595))
-- `[node]` Go API breaking change to `Provider`. The function takes
+- `[node]` Go API breaking change to `Provider`. The function takes  
 `CliParams` as a parameter now.
   ([\#3595](https://github.com/cometbft/cometbft/pull/3595))
 - `[node]` Go-API breaking: Change the signature of `LoadStateFromDBOrGenesisDocProvider`
@@ -361,6 +391,8 @@ on the `/block_results` RPC endpoint.
 
 ### DEPENDENCIES
 
+- Bump api to v1.0.0 for v1.0.0 Release
+  ([\#4666](https://github.com/cometbft/cometbft/issues/4666))
 - Bump api to v1.0.0-rc.1 for v1.0.0 Release Candidate 1
   ([\#3191](https://github.com/cometbft/cometbft/pull/3191))
 - Bump api to v1.0.0-rc2 for v1.0.0 Release Candidate 2
@@ -380,8 +412,6 @@ on the `/block_results` RPC endpoint.
   ([\#3527](https://github.com/cometbft/cometbft/pull/3527))
 - updated cometbft-db dependency to v0.13.0
   ([\#3596](https://github.com/cometbft/cometbft/pull/3596))
-- Bump api to v1.0.0 for v1.0.0 Release
-  ([\#4666](https://github.com/cometbft/cometbft/issues/4666))
 
 ### DEPRECATIONS
 
@@ -535,7 +565,7 @@ on the `/block_results` RPC endpoint.
 - `[abci]` Increase ABCI socket message size limit to 2GB ([\#1730](https://github.com/cometbft/cometbft/pull/1730): @troykessler)
 - `[blockstore]` Remove a redundant `Header.ValidateBasic` call in `LoadBlockMeta`, 75% reducing this time.
   ([\#2964](https://github.com/cometbft/cometbft/pull/2964))
-- `[blockstore]` Use LRU caches for LoadBlockPart. Make the LoadBlockPart and LoadBlockCommit APIs
+- `[blockstore]` Use LRU caches for LoadBlockPart. Make the LoadBlockPart and LoadBlockCommit APIs 
     return mutative copies, that the caller is expected to not modify. This saves on memory copying.
   ([\#3342](https://github.com/cometbft/cometbft/issues/3342))
 - `[blockstore]` Use LRU caches in blockstore, significiantly improving consensus gossip routine performance
@@ -591,7 +621,7 @@ on the `/block_results` RPC endpoint.
   redundancy, not critical, and may be dropped without risks for the protocol.
   ([\#3151](https://github.com/cometbft/cometbft/issues/3151))
 - `[consensus]` Make the consensus reactor no longer have packets on receive take the consensus lock.
-Consensus will now update the reactor's view after every relevant change through the existing
+Consensus will now update the reactor's view after every relevant change through the existing 
 synchronous event bus subscription.
   ([\#3211](https://github.com/cometbft/cometbft/pull/3211))
 - `[consensus]` New metrics (counters) to track duplicate votes and block parts.
@@ -649,6 +679,8 @@ synchronous event bus subscription.
 - `[flowrate]` Remove expensive time.Now() calls from flowrate calls.
   Changes clock updates to happen in a separate goroutine.
   ([\#3016](https://github.com/cometbft/cometbft/issues/3016))
+- `[grpc]` Set grpc.MaxConcurrentStreams to 100 to limit the maximum number of concurrent streams per connection.
+  ([\#1546](https://github.com/cometbft/cometbft/issues/1546))
 - `[indexer]` Optimized the PSQL indexer
   ([\#2142](https://github.com/cometbft/cometbft/pull/2142)) thanks to external contributor @k0marov !
 - `[internal/bits]` 10x speedup and remove heap overhead of `bitArray.PickRandom` (used extensively in consensus gossip)
@@ -769,8 +801,6 @@ synchronous event bus subscription.
 - `[types]` Significantly speedup types.MakePartSet and types.AddPart, which are used in creating a block proposal
   ([\#3117](https://github.com/cometbft/cometbft/issues/3117))
 - `[types]` Validate `Validator#Address` in `ValidateBasic` ([\#1715](https://github.com/cometbft/cometbft/pull/1715))
-- `[grpc]` Set grpc.MaxConcurrentStreams to 100 to limit the maximum number of concurrent streams per connection.
-  ([\#1546](https://github.com/cometbft/cometbft/issues/1546))
 
 ## v0.38.0
 
@@ -1178,3 +1208,4 @@ Friendly reminder, we have a [bug bounty program](https://hackerone.com/cosmos).
 ## Previous changes
 
 For changes released before the creation of CometBFT, please refer to the Tendermint Core [CHANGELOG.md](https://github.com/tendermint/tendermint/blob/a9feb1c023e172b542c972605311af83b777855b/CHANGELOG.md).
+

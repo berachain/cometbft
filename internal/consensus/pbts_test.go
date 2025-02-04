@@ -526,6 +526,31 @@ func TestPBTSTooFarInTheFutureProposal(t *testing.T) {
 	require.Nil(t, results.height2.prevote.BlockID.Hash)
 }
 
+func TestPBTSTooFarInTheFutureProposalOverflow(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// On purpose use a MessageDelay that has an overflow, i.e. infinite
+	// Emulates the logic for adaptive MessageDelay over rounds.
+	synchronyParams := types.DefaultSynchronyParams().InRound(256)
+	synchronyParams.Precision = 1 * time.Millisecond
+
+	// localtime < proposedBlockTime - Precision
+	cfg := pbtsTestConfiguration{
+		synchronyParams:                   synchronyParams,
+		timeoutPropose:                    50 * time.Millisecond,
+		height2ProposedBlockOffset:        100 * time.Millisecond,
+		height2ProposalTimeDeliveryOffset: 10 * time.Millisecond,
+		height4ProposedBlockOffset:        150 * time.Millisecond,
+	}
+
+	pbtsTest := newPBTSTestHarness(ctx, t, cfg)
+	results := pbtsTest.run(ctx, t)
+
+	// The proposal
+	require.Nil(t, results.height2.prevote.BlockID.Hash)
+}
+
 // TestPbtsAdaptiveMessageDelay tests whether proposals with timestamps in the
 // past are eventually accepted by validators. The test runs multiple rounds.
 // Rounds where the tested node is the proposer are skipped. Rounds with other
