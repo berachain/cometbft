@@ -137,23 +137,29 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	}
 
 	var (
-		txs    = blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
-		commit = lastExtCommit.ToCommit()
-		block  = state.MakeBlock(
+		txs              = blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
+		commit           = lastExtCommit.ToCommit()
+		nextProposerAddr = state.NextValidators.GetProposer().Address
+		block            = state.MakeBlock(
 			height,
 			txs,
 			commit,
 			evidence,
 			proposerAddr,
 		)
-		nextProposerAddr = state.NextValidators.GetProposer().Address
+		localLastCommit = buildExtendedCommitInfoFromStore(
+			lastExtCommit,
+			blockExec.store,
+			state.InitialHeight,
+			state.ConsensusParams.Feature,
+		)
 	)
 	rpp, err := blockExec.proxyApp.PrepareProposal(
 		ctx,
 		&abci.PrepareProposalRequest{
 			MaxTxBytes:         maxDataBytes,
 			Txs:                block.Txs.ToSliceOfBytes(),
-			LocalLastCommit:    buildExtendedCommitInfoFromStore(lastExtCommit, blockExec.store, state.InitialHeight, state.ConsensusParams.Feature),
+			LocalLastCommit:    localLastCommit,
 			Misbehavior:        block.Evidence.Evidence.ToABCI(),
 			Height:             block.Height,
 			Time:               block.Time,
