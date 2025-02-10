@@ -123,7 +123,6 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	}
 
 	var (
-		maxGas           = state.ConsensusParams.Block.MaxGas
 		evidence, evSize = blockExec.evpool.PendingEvidence(
 			state.ConsensusParams.Evidence.MaxBytes,
 		)
@@ -137,26 +136,27 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	}
 
 	var (
+		maxGas           = state.ConsensusParams.Block.MaxGas
 		txs              = blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
 		commit           = lastExtCommit.ToCommit()
 		nextProposerAddr = state.NextValidators.GetProposer().Address
-		block            = state.MakeBlock(
+
+		block = state.MakeBlock(
 			height,
 			txs,
 			commit,
 			evidence,
 			proposerAddr,
 		)
+
 		localLastCommit = buildExtendedCommitInfoFromStore(
 			lastExtCommit,
 			blockExec.store,
 			state.InitialHeight,
 			state.ConsensusParams.Feature,
 		)
-	)
-	rpp, err := blockExec.proxyApp.PrepareProposal(
-		ctx,
-		&abci.PrepareProposalRequest{
+
+		proposalReq = &abci.PrepareProposalRequest{
 			MaxTxBytes:          maxDataBytes,
 			Txs:                 block.Txs.ToSliceOfBytes(),
 			LocalLastCommit:     localLastCommit,
@@ -166,8 +166,9 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 			NextValidatorsHash:  block.NextValidatorsHash,
 			ProposerAddress:     block.ProposerAddress,
 			NextProposerAddress: nextProposerAddr,
-		},
+		}
 	)
+	rpp, err := blockExec.proxyApp.PrepareProposal(ctx, proposalReq)
 	if err != nil {
 		// The App MUST ensure that only valid (and hence 'processable') transactions
 		// enter the mempool. Hence, at this point, we can't have any non-processable
