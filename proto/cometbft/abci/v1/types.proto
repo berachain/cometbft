@@ -141,6 +141,7 @@ message PrepareProposalRequest {
   bytes next_validators_hash = 7;
   // address of the public key of the validator proposing the block.
   bytes proposer_address = 8;
+  bytes next_proposer_address = 9;
 }
 
 // ProcessProposalRequest is a request for the ABCI application to process a proposal
