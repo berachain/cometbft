@@ -146,6 +146,7 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 			evidence,
 			proposerAddr,
 		)
+		nextProposerAddr = state.NextValidators.GetProposer().Address
 	)
 	rpp, err := blockExec.proxyApp.PrepareProposal(
 		ctx,
