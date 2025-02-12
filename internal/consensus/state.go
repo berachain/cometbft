@@ -2393,7 +2393,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 
 		// if we can skip timeoutCommit and have all the votes now,
 		skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0 //nolint:staticcheck
-		if skipTimeoutCommit && cs.LastCommit.HasAll() {
+		if skipTimeoutCommit && lastCommitAsVs.HasAll() {
 			// go straight to new round (skip timeout commit)
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
 			cs.enterNewRound(cs.Height, 0)
