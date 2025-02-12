@@ -178,8 +178,11 @@ func (cfg *Config) ValidateBasic() error {
 // CheckDeprecated returns any deprecation warnings. These are printed to the operator on startup.
 func (cfg *Config) CheckDeprecated() []string {
 	var warnings []string
+	if cfg.Consensus.SkipTimeoutCommit {
+		warnings = append(warnings, "[consensus.skip_timeout_commit] is deprecated. Please remove it from the config.")
+	}
 	if cfg.Consensus.TimeoutCommit != 0 {
-		warnings = append(warnings, "[consensus.timeout_commit] is deprecated. Use `next_block_delay` in the ABCI `FinalizeBlockResponse`.")
+		warnings = append(warnings, "[consensus.timeout_commit] is deprecated. Please remove it from the config.")
 	}
 	return warnings
 }
