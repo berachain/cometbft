@@ -696,47 +696,62 @@ func TestFinalizeBlockValidatorUpdatesResultingInEmptySet(t *testing.T) {
 
 func TestEmptyPrepareProposal(t *testing.T) {
 	const height = 2
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app := &abci.BaseApplication{}
-	cc := proxy.NewLocalClientCreator(app)
-	proxyApp := proxy.NewAppConns(cc, proxy.NopMetrics())
+	var (
+		app      = &abci.BaseApplication{}
+		cc       = proxy.NewLocalClientCreator(app)
+		proxyApp = proxy.NewAppConns(cc, proxy.NopMetrics())
+	)
 	err := proxyApp.Start()
 	require.NoError(t, err)
+
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
-	state, stateDB, privVals := makeState(1, height, chainID)
-	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
-		DiscardABCIResponses: false,
-	})
-	mp := &mpmocks.Mempool{}
+	var (
+		state, stateDB, privVals = makeState(1, height, chainID)
+		storeOpts                = sm.StoreOptions{DiscardABCIResponses: false}
+		stateStore               = sm.NewStore(stateDB, storeOpts)
+		mp                       = &mpmocks.Mempool{}
+	)
 	mp.On("Lock").Return()
 	mp.On("Unlock").Return()
 	mp.On("PreUpdate").Return()
 	mp.On("FlushAppConn", mock.Anything).Return(nil)
-	mp.On("Update",
+	mp.On(
+		"Update",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(nil)
+		mock.Anything,
+	).Return(nil)
 	mp.On("ReapMaxBytesMaxGas", mock.Anything, mock.Anything).Return(types.Txs{})
 
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
-	blockExec := sm.NewBlockExecutor(
-		stateStore,
-		log.TestingLogger(),
-		proxyApp.Consensus(),
-		mp,
-		sm.EmptyEvidencePool{},
-		blockStore,
+	var (
+		blockStore = store.NewBlockStore(dbm.NewMemDB())
+		blockExec  = sm.NewBlockExecutor(
+			stateStore,
+			log.TestingLogger(),
+			proxyApp.Consensus(),
+			mp,
+			sm.EmptyEvidencePool{},
+			blockStore,
+		)
+		proposerAddr, _ = state.Validators.GetByIndex(0)
 	)
-	pa, _ := state.Validators.GetByIndex(0)
-	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
+	commit, err := makeValidCommit(
+		height,
+		types.BlockID{},
+		state.Validators,
+		privVals,
+	)
 	require.NoError(t, err)
-	_, err = blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+
+	_, err = blockExec.CreateProposalBlock(ctx, height, state, commit, proposerAddr)
 	require.NoError(t, err)
 }
 
