@@ -114,39 +114,61 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	lastExtCommit *types.ExtendedCommit,
 	proposerAddr []byte,
 ) (*types.Block, error) {
-	maxBytes := state.ConsensusParams.Block.MaxBytes
-	emptyMaxBytes := maxBytes == -1
+	var (
+		maxBytes      = state.ConsensusParams.Block.MaxBytes
+		emptyMaxBytes = maxBytes == -1
+	)
 	if emptyMaxBytes {
 		maxBytes = int64(types.MaxBlockSizeBytes)
 	}
 
-	maxGas := state.ConsensusParams.Block.MaxGas
+	var (
+		evidence, evSize = blockExec.evpool.PendingEvidence(
+			state.ConsensusParams.Evidence.MaxBytes,
+		)
 
-	evidence, evSize := blockExec.evpool.PendingEvidence(state.ConsensusParams.Evidence.MaxBytes)
-
-	// Fetch a limited amount of valid txs
-	maxDataBytes := types.MaxDataBytes(maxBytes, evSize, state.Validators.Size())
-	maxReapBytes := maxDataBytes
+		// Fetch a limited amount of valid txs
+		maxDataBytes = types.MaxDataBytes(maxBytes, evSize, state.Validators.Size())
+		maxReapBytes = maxDataBytes
+	)
 	if emptyMaxBytes {
 		maxReapBytes = -1
 	}
 
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
-	commit := lastExtCommit.ToCommit()
-	block := state.MakeBlock(height, txs, commit, evidence, proposerAddr)
-	rpp, err := blockExec.proxyApp.PrepareProposal(
-		ctx,
-		&abci.PrepareProposalRequest{
-			MaxTxBytes:         maxDataBytes,
-			Txs:                block.Txs.ToSliceOfBytes(),
-			LocalLastCommit:    buildExtendedCommitInfoFromStore(lastExtCommit, blockExec.store, state.InitialHeight, state.ConsensusParams.Feature),
-			Misbehavior:        block.Evidence.Evidence.ToABCI(),
-			Height:             block.Height,
-			Time:               block.Time,
-			NextValidatorsHash: block.NextValidatorsHash,
-			ProposerAddress:    block.ProposerAddress,
-		},
+	var (
+		maxGas           = state.ConsensusParams.Block.MaxGas
+		txs              = blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
+		commit           = lastExtCommit.ToCommit()
+		nextProposerAddr = state.NextValidators.GetProposer().Address
+
+		block = state.MakeBlock(
+			height,
+			txs,
+			commit,
+			evidence,
+			proposerAddr,
+		)
+
+		localLastCommit = buildExtendedCommitInfoFromStore(
+			lastExtCommit,
+			blockExec.store,
+			state.InitialHeight,
+			state.ConsensusParams.Feature,
+		)
+
+		proposalReq = &abci.PrepareProposalRequest{
+			MaxTxBytes:          maxDataBytes,
+			Txs:                 block.Txs.ToSliceOfBytes(),
+			LocalLastCommit:     localLastCommit,
+			Misbehavior:         block.Evidence.Evidence.ToABCI(),
+			Height:              block.Height,
+			Time:                block.Time,
+			NextValidatorsHash:  block.NextValidatorsHash,
+			ProposerAddress:     block.ProposerAddress,
+			NextProposerAddress: nextProposerAddr,
+		}
 	)
+	rpp, err := blockExec.proxyApp.PrepareProposal(ctx, proposalReq)
 	if err != nil {
 		// The App MUST ensure that only valid (and hence 'processable') transactions
 		// enter the mempool. Hence, at this point, we can't have any non-processable
