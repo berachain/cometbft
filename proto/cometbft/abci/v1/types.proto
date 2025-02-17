@@ -141,6 +141,8 @@ message PrepareProposalRequest {
   bytes next_validators_hash = 7;
   // address of the public key of the validator proposing the block.
   bytes proposer_address = 8;
+  // address of the public key of the validator that will propose the block at the
+  // next height.
   bytes next_proposer_address = 9;
 }
 
