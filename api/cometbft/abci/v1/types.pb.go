@@ -1144,7 +1144,9 @@ type PrepareProposalRequest struct {
 	Time               time.Time          `protobuf:"bytes,6,opt,name=time,proto3,stdtime" json:"time"`
 	NextValidatorsHash []byte             `protobuf:"bytes,7,opt,name=next_validators_hash,json=nextValidatorsHash,proto3" json:"next_validators_hash,omitempty"`
 	// address of the public key of the validator proposing the block.
-	ProposerAddress     []byte `protobuf:"bytes,8,opt,name=proposer_address,json=proposerAddress,proto3" json:"proposer_address,omitempty"`
+	ProposerAddress []byte `protobuf:"bytes,8,opt,name=proposer_address,json=proposerAddress,proto3" json:"proposer_address,omitempty"`
+	// address of the public key of the validator that will propose the block at the
+	// next height.
 	NextProposerAddress []byte `protobuf:"bytes,9,opt,name=next_proposer_address,json=nextProposerAddress,proto3" json:"next_proposer_address,omitempty"`
 }
 
