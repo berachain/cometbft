@@ -113,58 +113,82 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	state State,
 	lastExtCommit *types.ExtendedCommit,
 	proposerAddr []byte,
-) (*types.Block, error) {
-	maxBytes := state.ConsensusParams.Block.MaxBytes
-	emptyMaxBytes := maxBytes == -1
+) (*types.Block, types.Blob, error) {
+	var (
+		maxBytes      = state.ConsensusParams.Block.MaxBytes
+		emptyMaxBytes = maxBytes == -1
+	)
 	if emptyMaxBytes {
 		maxBytes = int64(types.MaxBlockSizeBytes)
 	}
 
-	maxGas := state.ConsensusParams.Block.MaxGas
-
-	evidence, evSize := blockExec.evpool.PendingEvidence(state.ConsensusParams.Evidence.MaxBytes)
-
-	// Fetch a limited amount of valid txs
-	maxDataBytes := types.MaxDataBytes(maxBytes, evSize, state.Validators.Size())
-	maxReapBytes := maxDataBytes
+	var (
+		evidence, evSize = blockExec.evpool.PendingEvidence(
+			state.ConsensusParams.Evidence.MaxBytes,
+		)
+		// Fetch a limited amount of valid txs
+		maxDataBytes = types.MaxDataBytes(maxBytes, evSize, state.Validators.Size())
+		maxReapBytes = maxDataBytes
+	)
 	if emptyMaxBytes {
 		maxReapBytes = -1
 	}
 
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
-	commit := lastExtCommit.ToCommit()
-	block := state.MakeBlock(height, txs, commit, evidence, proposerAddr)
-	rpp, err := blockExec.proxyApp.PrepareProposal(
-		ctx,
-		&abci.PrepareProposalRequest{
+	var (
+		maxGas = state.ConsensusParams.Block.MaxGas
+		txs    = blockExec.mempool.ReapMaxBytesMaxGas(maxReapBytes, maxGas)
+		commit = lastExtCommit.ToCommit()
+
+		block = state.MakeBlock(
+			height,
+			txs,
+			commit,
+			evidence,
+			proposerAddr,
+		)
+
+		localLastCommit = buildExtendedCommitInfoFromStore(
+			lastExtCommit,
+			blockExec.store,
+			state.InitialHeight,
+			state.ConsensusParams.Feature,
+		)
+
+		proposalReq = &abci.PrepareProposalRequest{
 			MaxTxBytes:         maxDataBytes,
 			Txs:                block.Txs.ToSliceOfBytes(),
-			LocalLastCommit:    buildExtendedCommitInfoFromStore(lastExtCommit, blockExec.store, state.InitialHeight, state.ConsensusParams.Feature),
+			LocalLastCommit:    localLastCommit,
 			Misbehavior:        block.Evidence.Evidence.ToABCI(),
 			Height:             block.Height,
 			Time:               block.Time,
 			NextValidatorsHash: block.NextValidatorsHash,
 			ProposerAddress:    block.ProposerAddress,
-		},
+		}
 	)
+	rpp, err := blockExec.proxyApp.PrepareProposal(ctx, proposalReq)
 	if err != nil {
 		// The App MUST ensure that only valid (and hence 'processable') transactions
 		// enter the mempool. Hence, at this point, we can't have any non-processable
 		// transaction causing an error.
 		//
-		// Also, the App can simply skip any transaction that could cause any kind of trouble.
-		// Either way, we cannot recover in a meaningful way, unless we skip proposing
-		// this block, repair what caused the error and try again. Hence, we return an
-		// error for now (the production code calling this function is expected to panic).
-		return nil, err
+		// Also, the App can simply skip any transaction that could cause any kind
+		// of trouble. Either way, we cannot recover in a meaningful way, unless we
+		// skip /proposing this block, repair what caused the error and try again.
+		// Hence, we return an error for now (the production code calling this
+		// function is expected to panic).
+		return nil, nil, err
 	}
 
 	txl := types.ToTxs(rpp.Txs)
 	if err := txl.Validate(maxDataBytes); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return state.MakeBlock(height, txl, commit, evidence, proposerAddr), nil
+	var (
+		preparedBlock = state.MakeBlock(height, txl, commit, evidence, proposerAddr)
+		blob          = rpp.Blob
+	)
+	return preparedBlock, blob, nil
 }
 
 func (blockExec *BlockExecutor) ProcessProposal(

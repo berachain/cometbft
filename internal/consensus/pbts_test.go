@@ -212,7 +212,7 @@ func (p *pbtsTestHarness) nextHeight(
 
 	ensureNewRound(p.roundCh, p.currentHeight, p.currentRound)
 
-	b, err := p.observedState.createProposalBlock(ctx)
+	b, _, err := p.observedState.createProposalBlock(ctx)
 	require.NoError(t, err)
 	require.Equal(t, b.Height, p.currentHeight)
 	b.Time = proposedTime

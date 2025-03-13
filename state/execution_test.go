@@ -736,7 +736,7 @@ func TestEmptyPrepareProposal(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	_, err = blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	_, _, err = blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.NoError(t, err)
 }
 
@@ -781,7 +781,7 @@ func TestPrepareProposalTxsAllIncluded(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	block, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	block, _, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.NoError(t, err)
 
 	for i, tx := range block.Data.Txs {
@@ -836,7 +836,7 @@ func TestPrepareProposalReorderTxs(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	block, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	block, _, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.NoError(t, err)
 	for i, tx := range block.Data.Txs {
 		require.Equal(t, txs[i], tx)
@@ -892,7 +892,7 @@ func TestPrepareProposalErrorOnTooManyTxs(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	block, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	block, _, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.Nil(t, block)
 	require.ErrorContains(t, err, "transaction data size exceeds maximum")
 
@@ -949,7 +949,7 @@ func TestPrepareProposalCountSerializationOverhead(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	block, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	block, _, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.Nil(t, block)
 	require.ErrorContains(t, err, "transaction data size exceeds maximum")
 
@@ -1003,7 +1003,7 @@ func TestPrepareProposalErrorOnPrepareProposalError(t *testing.T) {
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
 	require.NoError(t, err)
-	block, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
+	block, _, err := blockExec.CreateProposalBlock(ctx, height, state, commit, pa)
 	require.Nil(t, block)
 	require.ErrorContains(t, err, "an injected error")
 
@@ -1103,11 +1103,88 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 					blockExec.CreateProposalBlock(ctx, testCase.height, state, lastCommit, pa) //nolint:errcheck
 				})
 			} else {
-				_, err = blockExec.CreateProposalBlock(ctx, testCase.height, state, lastCommit, pa)
+				_, _, err = blockExec.CreateProposalBlock(ctx, testCase.height, state, lastCommit, pa)
 				require.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestCreateProposalWithBlob(t *testing.T) {
+	const height = 2
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		app          = &abcimocks.Application{}
+		proposalResp = &abci.PrepareProposalResponse{
+			Blob: []byte("blob"),
+		}
+	)
+	app.On("PrepareProposal", mock.Anything, mock.Anything).Return(proposalResp, nil)
+
+	var (
+		cc       = proxy.NewLocalClientCreator(app)
+		proxyApp = proxy.NewAppConns(cc, proxy.NopMetrics())
+	)
+	err := proxyApp.Start()
+	require.NoError(t, err)
+
+	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
+
+	var (
+		state, stateDB, privVals = makeState(10, height, chainID)
+		storeOpts                = sm.StoreOptions{DiscardABCIResponses: false}
+		stateStore               = sm.NewStore(stateDB, storeOpts)
+		mp                       = &mpmocks.Mempool{}
+	)
+	mp.On("Lock").Return()
+	mp.On("Unlock").Return()
+	mp.On("PreUpdate").Return()
+	mp.On("FlushAppConn", mock.Anything).Return(nil)
+	mp.On(
+		"Update",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(nil)
+	mp.On("ReapMaxBytesMaxGas", mock.Anything, mock.Anything).Return(types.Txs{})
+
+	var (
+		blockStore = store.NewBlockStore(dbm.NewMemDB())
+		blockExec  = sm.NewBlockExecutor(
+			stateStore,
+			log.TestingLogger(),
+			proxyApp.Consensus(),
+			mp,
+			sm.EmptyEvidencePool{},
+			blockStore,
+		)
+		proposerAddr, _ = state.Validators.GetByIndex(0)
+	)
+	commit, err := makeValidCommit(
+		height,
+		types.BlockID{},
+		state.Validators,
+		privVals,
+	)
+	require.NoError(t, err)
+
+	_, gotBlob, err := blockExec.CreateProposalBlock(
+		ctx,
+		height,
+		state,
+		commit,
+		proposerAddr,
+	)
+	require.NoError(t, err)
+
+	wantBlob := types.Blob("blob")
+	require.Equal(t, wantBlob, gotBlob)
 }
 
 func stripSignatures(ec *types.ExtendedCommit) {

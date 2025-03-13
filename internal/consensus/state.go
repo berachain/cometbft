@@ -1235,8 +1235,11 @@ func (cs *State) isProposer(address []byte) bool {
 }
 
 func (cs *State) defaultDecideProposal(height int64, round int32) {
-	var block *types.Block
-	var blockParts *types.PartSet
+	var (
+		block      *types.Block
+		blockParts *types.PartSet
+		blob       types.Blob
+	)
 
 	// Decide on block
 	if cs.ValidBlock != nil {
@@ -1245,7 +1248,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 	} else {
 		// Create a new proposal block from state/txs from the mempool.
 		var err error
-		block, err = cs.createProposalBlock(context.TODO())
+		block, blob, err = cs.createProposalBlock(context.TODO())
 		if err != nil {
 			cs.Logger.Error("Unable to create proposal block", "error", err)
 			return
@@ -1267,9 +1270,23 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 	}
 
 	// Make proposal
-	propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockID, block.Header.Time)
-	p := proposal.ToProto()
+
+	var (
+		// TODO: create blob parts, BlobID, send blob parts.
+		_           = blob
+		propBlockID = types.BlockID{
+			Hash:          block.Hash(),
+			PartSetHeader: blockParts.Header(),
+		}
+		proposal = types.NewProposal(
+			height,
+			round,
+			cs.ValidRound,
+			propBlockID,
+			block.Header.Time,
+		)
+		p = proposal.ToProto()
+	)
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {
 		proposal.Signature = p.Signature
 
@@ -1309,13 +1326,17 @@ func (cs *State) isProposalComplete() bool {
 //
 // NOTE: keep it side-effect free for clarity.
 // CONTRACT: cs.privValidator is not nil.
-func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) {
+func (cs *State) createProposalBlock(
+	ctx context.Context,
+) (*types.Block, types.Blob, error) {
 	if cs.privValidator == nil {
-		return nil, ErrNilPrivValidator
+		return nil, nil, ErrNilPrivValidator
 	}
 
-	// TODO(sergio): wouldn't it be easier if CreateProposalBlock accepted cs.LastCommit directly?
+	// TODO(sergio): wouldn't it be easier if CreateProposalBlock accepted
+	// cs.LastCommit directly?
 	var lastExtCommit *types.ExtendedCommit
+
 	lastCommitAsVs, ok := cs.LastCommit.(*types.VoteSet)
 	switch {
 	case cs.Height == cs.state.InitialHeight:
@@ -1325,43 +1346,56 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 
 	case ok && lastCommitAsVs.HasTwoThirdsMajority():
 		// Make the commit from LastCommit.
-		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
-		_, blsKey2 := cs.privValidatorPubKey.(bls12381.PubKey)
-		canBeAggregated := (blsKey || blsKey2) &&
-			cs.state.Validators.AllKeysHaveSameType()
+		var (
+			_, blsKey       = cs.privValidatorPubKey.(*bls12381.PubKey)
+			_, blsKey2      = cs.privValidatorPubKey.(bls12381.PubKey)
+			valKeysSameType = cs.state.Validators.AllKeysHaveSameType()
+			canBeAggregated = (blsKey || blsKey2) && valKeysSameType
+		)
 		if canBeAggregated {
 			if !cs.isPBTSEnabled(cs.Height) {
 				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
 			}
 			lastExtCommit = lastCommitAsVs.MakeBLSCommit()
 		} else {
-			lastExtCommit = lastCommitAsVs.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+			featParams := cs.state.ConsensusParams.Feature
+			lastExtCommit = lastCommitAsVs.MakeExtendedCommit(featParams)
 		}
+
 	case !ok:
 		lastCommitAsCommit, ok := cs.LastCommit.(*types.Commit)
 		if !ok {
-			return nil, errors.New("last commit is neither a VoteSet nor a Commit")
+			err := errors.New("last commit is neither a VoteSet nor a Commit")
+			return nil, nil, err
 		}
 		// XXX This will need to be extended to support vote extensions.
 		lastExtCommit = lastCommitAsCommit.WrappedExtendedCommit()
 
 	default: // This shouldn't happen.
-		return nil, ErrProposalWithoutPreviousCommit
+		return nil, nil, ErrProposalWithoutPreviousCommit
 	}
 
 	if cs.privValidatorPubKey == nil {
 		// If this node is a validator & proposer in the current round, it will
 		// miss the opportunity to create a block.
-		return nil, fmt.Errorf("propose step; empty priv validator public key, error: %w", ErrPubKeyIsNotSet)
+		errStr := "propose step; empty priv validator public key, error: %w"
+		return nil, nil, fmt.Errorf(errStr, ErrPubKeyIsNotSet)
 	}
 
 	proposerAddr := cs.privValidatorPubKey.Address()
 
-	ret, err := cs.blockExec.CreateProposalBlock(ctx, cs.Height, cs.state, lastExtCommit, proposerAddr)
+	block, blob, err := cs.blockExec.CreateProposalBlock(
+		ctx,
+		cs.Height,
+		cs.state,
+		lastExtCommit,
+		proposerAddr,
+	)
 	if err != nil {
 		panic(err)
 	}
-	return ret, nil
+
+	return block, blob, nil
 }
 
 // Enter: isProposalComplete() and Step <= RoundStepPropose.

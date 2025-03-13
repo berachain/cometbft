@@ -370,9 +370,12 @@ enum ApplySnapshotChunkResult {
   APPLY_SNAPSHOT_CHUNK_RESULT_REJECT_SNAPSHOT = 5;
 }
 
-// PrepareProposalResponse contains a list of transactions, which will form a block.
+// PrepareProposalResponse contains a list of transactions which will form a block.
 message PrepareProposalResponse {
   repeated bytes txs = 1;
+  // A blob (see EIP-4844) is a piece of temporary data attached to a blob
+  // transaction. CometBFT will gossip this blob separately from the block.
+  bytes blob = 2;
 }
 
 // ProcessProposalResponse indicates the ABCI application's decision whenever

@@ -235,7 +235,7 @@ func startTestRound(cs *State, height int64, round int32) {
 
 func createProposalBlockWithTime(t *testing.T, cs *State, time time.Time) (*types.Block, *types.PartSet, types.BlockID) {
 	t.Helper()
-	block, err := cs.createProposalBlock(context.Background())
+	block, _, err := cs.createProposalBlock(context.Background())
 	if !time.IsZero() {
 		block.Time = cmttime.Canonical(time)
 	}
