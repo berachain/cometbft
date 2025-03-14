@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -61,6 +62,19 @@ func init() {
 // acts purely as a finalization gadget, so storing blobs in CometBFT's storage
 // layer is unnecessary and undesirable.
 type Blob []byte
+
+// Hash returns the SHA-256 hash of the blob.
+func (b Blob) Hash() []byte {
+	return tmhash.Sum(b)
+}
+
+// String returns a hex-encoded representation of the blob.
+func (b Blob) String() string {
+	if b == nil {
+		return "nil-Blob"
+	}
+	return "Blob#" + hex.EncodeToString(b)
+}
 
 // Block defines the atomic unit of a CometBFT blockchain.
 type Block struct {

@@ -91,16 +91,27 @@ type RoundState struct {
 	//     response to `ProcessProposal`, or "Reject"
 
 	// Last known round with POL for non-nil valid block.
-	ValidRound int32        `json:"valid_round"`
-	ValidBlock *types.Block `json:"valid_block"` // Last known block of POL mentioned above.
-
+	ValidRound int32 `json:"valid_round"`
+	// Last known block of POL mentioned above.
+	ValidBlock *types.Block `json:"valid_block"`
 	// Last known block parts of POL mentioned above.
-	ValidBlockParts           *types.PartSet      `json:"valid_block_parts"`
-	Votes                     *HeightVoteSet      `json:"votes"`
-	CommitRound               int32               `json:"commit_round"` //
-	LastCommit                types.VoteSetReader `json:"last_commit"`  // Last precommits at Height-1
-	LastValidators            *types.ValidatorSet `json:"last_validators"`
-	TriggeredTimeoutPrecommit bool                `json:"triggered_timeout_precommit"`
+	ValidBlockParts *types.PartSet `json:"valid_block_parts"`
+	Votes           *HeightVoteSet `json:"votes"`
+	CommitRound     int32          `json:"commit_round"`
+	// Last precommits at Height-1
+	LastCommit     types.VoteSetReader `json:"last_commit"`
+	LastValidators *types.ValidatorSet `json:"last_validators"`
+
+	TriggeredTimeoutPrecommit bool `json:"triggered_timeout_precommit"`
+
+	ProposalBlob      types.Blob     `json:"proposal_blob"`
+	ProposalBlobParts *types.PartSet `json:"proposal_blob_parts"`
+	LockedBlob        types.Blob     `json:"locked_blob"`
+	LockedBlobParts   *types.PartSet `json:"locked_blob_parts"`
+	// Last known blob of POL mentioned above.
+	ValidBlob types.Blob `json:"valid_blob"`
+	// Last known blob parts of POL mentioned above.
+	ValidBlobParts *types.PartSet `json:"valid_blob_parts"`
 }
 
 // Compressed version of the RoundState for use in RPC.
@@ -112,6 +123,9 @@ type RoundStateSimple struct {
 	ValidBlockHash    bytes.HexBytes      `json:"valid_block_hash"`
 	Votes             json.RawMessage     `json:"height_vote_set"`
 	Proposer          types.ValidatorInfo `json:"proposer"`
+	ProposalBlobHash  bytes.HexBytes      `json:"proposal_blob_hash"`
+	LockedBlobHash    bytes.HexBytes      `json:"locked_blob_hash"`
+	ValidBlobHash     bytes.HexBytes      `json:"valid_blob_hash"`
 }
 
 // Compress the RoundState to RoundStateSimple.
@@ -130,6 +144,9 @@ func (rs *RoundState) RoundStateSimple() RoundStateSimple {
 		ProposalBlockHash: rs.ProposalBlock.Hash(),
 		LockedBlockHash:   rs.LockedBlock.Hash(),
 		ValidBlockHash:    rs.ValidBlock.Hash(),
+		ProposalBlobHash:  rs.ProposalBlob.Hash(),
+		LockedBlobHash:    rs.LockedBlob.Hash(),
+		ValidBlobHash:     rs.ValidBlob.Hash(),
 		Votes:             votesJSON,
 		Proposer: types.ValidatorInfo{
 			Address: addr,
@@ -204,10 +221,13 @@ func (rs *RoundState) StringIndented(indent string) string {
 %s  Validators:    %v
 %s  Proposal:      %v
 %s  ProposalBlock: %v %v
+%s  ProposalBlob:  %v %v
 %s  LockedRound:   %v
 %s  LockedBlock:   %v %v
+%s  LockedBlob:    %v %v
 %s  ValidRound:    %v
 %s  ValidBlock:    %v %v
+%s  ValidBlob:     %v %v
 %s  Votes:         %v
 %s  LastCommit:    %v
 %s  LastValidators:%v
@@ -218,10 +238,13 @@ func (rs *RoundState) StringIndented(indent string) string {
 		indent, rs.Validators.StringIndented(indent+"  "),
 		indent, rs.Proposal,
 		indent, rs.ProposalBlockParts.StringShort(), rs.ProposalBlock.StringShort(),
+		indent, rs.ProposalBlobParts.StringShort(), rs.ProposalBlob.String(),
 		indent, rs.LockedRound,
 		indent, rs.LockedBlockParts.StringShort(), rs.LockedBlock.StringShort(),
+		indent, rs.LockedBlobParts.StringShort(), rs.LockedBlob.String(),
 		indent, rs.ValidRound,
 		indent, rs.ValidBlockParts.StringShort(), rs.ValidBlock.StringShort(),
+		indent, rs.ValidBlobParts.StringShort(), rs.ValidBlob.String(),
 		indent, rs.Votes.StringIndented(indent+"  "),
 		indent, lcStr,
 		indent, rs.LastValidators.StringIndented(indent+"  "),
