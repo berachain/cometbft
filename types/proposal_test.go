@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	testProposal *Proposal
-	testBlockID  BlockID
-	pbp          *cmtproto.Proposal
+	testProposal      *Proposal
+	testBlockID       BlockID
+	testBlobID        BlobID
+	testProtoProposal *cmtproto.Proposal
 )
 
 func init() {
@@ -30,9 +31,22 @@ func init() {
 	}
 
 	testBlockID = BlockID{
-		Hash:          []byte("--June_15_2020_amino_was_removed"),
-		PartSetHeader: PartSetHeader{Total: 111, Hash: []byte("--June_15_2020_amino_was_removed")},
+		Hash: []byte("--June_15_2020_amino_was_removed"),
+		PartSetHeader: PartSetHeader{
+			Total: 111,
+			Hash:  []byte("--June_15_2020_amino_was_removed"),
+		},
 	}
+
+	testBlobID = BlobID{
+		Hash: []byte("-this_blob_id_hash_is_32_bytes--"),
+		PartSetHeader: PartSetHeader{
+			Total: 42,
+			Hash: []byte(
+				"--this_header_hash_is_32_bytes--"),
+		},
+	}
+
 	testProposal = &Proposal{
 		Type:      ProposalType,
 		Height:    12345,
@@ -40,14 +54,16 @@ func init() {
 		BlockID:   testBlockID,
 		POLRound:  -1,
 		Timestamp: stamp,
+		BlobID:    testBlobID,
 	}
-	pbp = testProposal.ToProto()
+
+	testProtoProposal = testProposal.ToProto()
 }
 
 func TestProposalSignable(t *testing.T) {
 	chainID := "test_chain_id"
-	signBytes := ProposalSignBytes(chainID, pbp)
-	pb := CanonicalizeProposal(chainID, pbp)
+	signBytes := ProposalSignBytes(chainID, testProtoProposal)
+	pb := CanonicalizeProposal(chainID, testProtoProposal)
 
 	expected, err := protoio.MarshalDelimited(&pb)
 	require.NoError(t, err)
@@ -56,7 +72,7 @@ func TestProposalSignable(t *testing.T) {
 
 func TestProposalString(t *testing.T) {
 	str := testProposal.String()
-	expected := `Proposal{12345/23456 (2D2D4A756E655F31355F323032305F616D696E6F5F7761735F72656D6F766564:111:2D2D4A756E65, -1) 000000000000 @ 2018-02-11T07:09:22.765Z}` //nolint:lll // ignore line length for tests
+	expected := `Proposal{12345/23456 (2D2D4A756E655F31355F323032305F616D696E6F5F7761735F72656D6F766564:111:2D2D4A756E65, -1) (2D746869735F626C6F625F69645F686173685F69735F33325F62797465732D2D:42:2D2D74686973) 000000000000 @ 2018-02-11T07:09:22.765Z}` //nolint:lll // ignore line length for tests
 	if str != expected {
 		t.Errorf("got unexpected string for Proposal. Expected:\n%v\nGot:\n%v", expected, str)
 	}
@@ -67,24 +83,40 @@ func TestProposalVerifySignature(t *testing.T) {
 	pubKey, err := privVal.GetPubKey()
 	require.NoError(t, err)
 
-	prop := NewProposal(
-		4, 2, 1,
-		BlockID{cmtrand.Bytes(tmhash.Size), PartSetHeader{777, cmtrand.Bytes(tmhash.Size)}}, cmttime.Now())
-	p := prop.ToProto()
-	signBytes := ProposalSignBytes("test_chain_id", p)
+	var (
+		blockID = BlockID{
+			Hash:          cmtrand.Bytes(tmhash.Size),
+			PartSetHeader: PartSetHeader{777, cmtrand.Bytes(tmhash.Size)},
+		}
+		blobID = BlobID{
+			Hash:          cmtrand.Bytes(tmhash.Size),
+			PartSetHeader: PartSetHeader{42, cmtrand.Bytes(tmhash.Size)},
+		}
+		proposal = NewProposal(
+			4, /* height */
+			2, /* round */
+			1, /* polRound */
+			blockID,
+			cmttime.Now(),
+			blobID,
+		)
+		protoProposal = proposal.ToProto()
+		signBytes     = ProposalSignBytes("test_chain_id", protoProposal)
+	)
 
 	// sign it
-	err = privVal.SignProposal("test_chain_id", p)
+	err = privVal.SignProposal("test_chain_id", protoProposal)
 	require.NoError(t, err)
-	prop.Signature = p.Signature
+
+	proposal.Signature = protoProposal.Signature
 
 	// verify the same proposal
-	valid := pubKey.VerifySignature(signBytes, prop.Signature)
+	valid := pubKey.VerifySignature(signBytes, proposal.Signature)
 	require.True(t, valid)
 
 	// serialize, deserialize and verify again....
 	newProp := new(cmtproto.Proposal)
-	pb := prop.ToProto()
+	pb := proposal.ToProto()
 
 	bs, err := proto.Marshal(pb)
 	require.NoError(t, err)
@@ -104,14 +136,14 @@ func TestProposalVerifySignature(t *testing.T) {
 
 func BenchmarkProposalWriteSignBytes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		ProposalSignBytes("test_chain_id", pbp)
+		ProposalSignBytes("test_chain_id", testProtoProposal)
 	}
 }
 
 func BenchmarkProposalSign(b *testing.B) {
 	privVal := NewMockPV()
 	for i := 0; i < b.N; i++ {
-		err := privVal.SignProposal("test_chain_id", pbp)
+		err := privVal.SignProposal("test_chain_id", testProtoProposal)
 		if err != nil {
 			b.Error(err)
 		}
@@ -120,101 +152,171 @@ func BenchmarkProposalSign(b *testing.B) {
 
 func BenchmarkProposalVerifySignature(b *testing.B) {
 	privVal := NewMockPV()
-	err := privVal.SignProposal("test_chain_id", pbp)
+	err := privVal.SignProposal("test_chain_id", testProtoProposal)
 	require.NoError(b, err)
 	pubKey, err := privVal.GetPubKey()
 	require.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
-		pubKey.VerifySignature(ProposalSignBytes("test_chain_id", pbp), testProposal.Signature)
+		pubKey.VerifySignature(ProposalSignBytes("test_chain_id", testProtoProposal), testProposal.Signature)
 	}
 }
 
 func TestProposalValidateBasic(t *testing.T) {
-	privVal := NewMockPV()
-	blockID := makeBlockID(tmhash.Sum([]byte("blockhash")), math.MaxInt32, tmhash.Sum([]byte("partshash")))
 	location, err := time.LoadLocation("CET")
 	require.NoError(t, err)
 
-	testCases := []struct {
-		testName         string
-		malleateProposal func(*Proposal)
-		expectErr        bool
-	}{
-		{"Good Proposal", func(*Proposal) {}, false},
-		{"Test Proposal", func(p *Proposal) {
-			p.Type = testProposal.Type
-			p.Height = testProposal.Height
-			p.Round = testProposal.Round
-			p.BlockID = testProposal.BlockID
-			p.POLRound = testProposal.POLRound
-			p.Timestamp = testProposal.Timestamp
-		}, false},
-		{"Invalid Type", func(p *Proposal) { p.Type = PrecommitType }, true},
-		{"Invalid Height", func(p *Proposal) { p.Height = -1 }, true},
-		{"Zero Height", func(p *Proposal) { p.Height = 0 }, true},
-		{"Invalid Round", func(p *Proposal) { p.Round = -1 }, true},
-		{"Invalid POLRound", func(p *Proposal) { p.POLRound = -2 }, true},
-		{"POLRound == Round", func(p *Proposal) { p.POLRound = p.Round }, true},
-		{"Invalid BlockId", func(p *Proposal) {
-			p.BlockID = BlockID{[]byte{1, 2, 3}, PartSetHeader{111, []byte("blockparts")}}
-		}, true},
-		{"Invalid Signature", func(p *Proposal) {
-			p.Signature = make([]byte, 0)
-		}, true},
-		{"Small Signature", func(p *Proposal) {
-			p.Signature = make([]byte, MaxSignatureSize-1)
-		}, false},
-		{"Too big Signature", func(p *Proposal) {
-			p.Signature = make([]byte, MaxSignatureSize+1)
-		}, true},
-		{"Non canonical time", func(p *Proposal) {
-			p.Timestamp = time.Now().In(location)
-		}, true},
-		{"Not rounded time", func(p *Proposal) {
-			p.Timestamp = time.Now()
-		}, true},
-	}
+	var (
+		testCases = []struct {
+			name         string
+			malleateFunc func(*Proposal)
+			expectErr    bool
+		}{
+			{"GoodProposal", func(*Proposal) {}, false},
+			{
+				name: "TestProposal",
+				malleateFunc: func(p *Proposal) {
+					p.Type = testProposal.Type
+					p.Height = testProposal.Height
+					p.Round = testProposal.Round
+					p.BlockID = testProposal.BlockID
+					p.POLRound = testProposal.POLRound
+					p.Timestamp = testProposal.Timestamp
+					p.BlobID = testProposal.BlobID
+				},
+				expectErr: false,
+			},
+			{"InvalidType", func(p *Proposal) { p.Type = PrecommitType }, true},
+			{"InvalidHeight", func(p *Proposal) { p.Height = -1 }, true},
+			{"ZeroHeight", func(p *Proposal) { p.Height = 0 }, true},
+			{"InvalidRound", func(p *Proposal) { p.Round = -1 }, true},
+			{"InvalidPOLRound", func(p *Proposal) { p.POLRound = -2 }, true},
+			{"POLRound==Round", func(p *Proposal) { p.POLRound = p.Round }, true},
+			{
+				name: "InvalidBlockID",
+				malleateFunc: func(p *Proposal) {
+					p.BlockID = BlockID{
+						Hash: []byte{1, 2, 3},
+						PartSetHeader: PartSetHeader{
+							Total: 111,
+							Hash:  []byte("blockparts"),
+						},
+					}
+				},
+				expectErr: true,
+			},
+			{
+				name:         "InvalidSignature",
+				malleateFunc: func(p *Proposal) { p.Signature = make([]byte, 0) },
+				expectErr:    true,
+			},
+			{
+				name: "SmallSignature",
+				malleateFunc: func(p *Proposal) {
+					p.Signature = make([]byte, MaxSignatureSize-1)
+				},
+				expectErr: false,
+			},
+			{
+				name: "TooBigSignature",
+				malleateFunc: func(p *Proposal) {
+					p.Signature = make([]byte, MaxSignatureSize+1)
+				},
+				expectErr: true,
+			},
+			{
+				name: "NonCanonicalTime",
+				malleateFunc: func(p *Proposal) {
+					p.Timestamp = time.Now().In(location)
+				},
+				expectErr: true,
+			},
+			{
+				name:         "Not rounded time",
+				malleateFunc: func(p *Proposal) { p.Timestamp = time.Now() },
+				expectErr:    true,
+			},
+		}
+		privVal = NewMockPV()
+		blockID = makeBlockID(
+			tmhash.Sum([]byte("blockhash")),
+			math.MaxInt32,
+			tmhash.Sum([]byte("partshash")),
+		)
+		blobID = mockBlobID(
+			tmhash.Sum([]byte("blobhash")),
+			math.MaxInt32,
+			tmhash.Sum([]byte("partshash")),
+		)
+	)
+
 	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			prop := NewProposal(
-				4, 2, 1,
-				blockID, cmttime.Now())
-			p := prop.ToProto()
-			err := privVal.SignProposal("test_chain_id", p)
-			prop.Signature = p.Signature
+				4, /* height */
+				2, /* round */
+				1, /* polRound */
+				blockID,
+				cmttime.Now(),
+				blobID,
+			)
+			protoProposal := prop.ToProto()
+
+			err := privVal.SignProposal("test_chain_id", protoProposal)
+			prop.Signature = protoProposal.Signature
 			require.NoError(t, err)
 
-			tc.malleateProposal(prop)
+			tc.malleateFunc(prop)
+
 			err = prop.ValidateBasic()
-			errMessage := fmt.Sprintf("Validate Basic had an unexpected error: %v", err)
-			assert.Equal(t, tc.expectErr, prop.ValidateBasic() != nil, errMessage)
+			errMsg := fmt.Sprintf("Validate Basic had an unexpected error: %v", err)
+			assert.Equal(t, tc.expectErr, prop.ValidateBasic() != nil, errMsg)
 		})
 	}
 }
 
 func TestProposalProtoBuf(t *testing.T) {
-	proposal := NewProposal(1, 2, 1, makeBlockID([]byte("hash"), 2, []byte("part_set_hash")), cmttime.Now())
+	var (
+		blockID  = makeBlockID([]byte("hash"), 2, []byte("part_set_hash"))
+		blobID   = mockBlobID([]byte("hash"), 4, []byte("part_set_hash"))
+		proposal = NewProposal(
+			1, /* height */
+			2, /* round */
+			1, /* polRound */
+			blockID,
+			cmttime.Now(),
+			blobID,
+		)
+	)
 	proposal.Signature = []byte("sig")
-	proposal2 := NewProposal(1, 2, 1, BlockID{}, cmttime.Now())
 
-	testCases := []struct {
-		msg     string
-		p1      *Proposal
-		expPass bool
-	}{
-		{"success", proposal, true},
-		{"success", proposal2, false}, // blcokID cannot be empty
-		{"empty proposal failure validatebasic", &Proposal{}, false},
-		{"nil proposal", nil, false},
-	}
+	var (
+		proposal2 = NewProposal(
+			1, /* height */
+			2, /* round */
+			1, /* polRound */
+			BlockID{},
+			cmttime.Now(),
+			BlobID{},
+		)
+		testCases = []struct {
+			name     string
+			proposal *Proposal
+			expPass  bool
+		}{
+			{"Success", proposal, true},
+			{"Success", proposal2, false}, // blockID cannot be empty
+			{"EmptyProposalFailureValidateBasic", &Proposal{}, false},
+			{"NilProposal", nil, false},
+		}
+	)
 	for _, tc := range testCases {
-		protoProposal := tc.p1.ToProto()
+		protoProposal := tc.proposal.ToProto()
 
-		p, err := ProposalFromProto(protoProposal)
+		gotProposal, err := ProposalFromProto(protoProposal)
 		if tc.expPass {
 			require.NoError(t, err)
-			require.Equal(t, tc.p1, p, tc.msg)
+			require.Equal(t, tc.proposal, gotProposal, tc.name)
 		} else {
 			require.Error(t, err)
 		}

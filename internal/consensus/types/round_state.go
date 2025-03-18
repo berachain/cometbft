@@ -180,11 +180,17 @@ func (rs *RoundState) CompleteProposalEvent() types.EventDataCompleteProposal {
 		PartSetHeader: rs.ProposalBlockParts.Header(),
 	}
 
+	blobID := types.BlobID{
+		Hash:          rs.ProposalBlob.Hash(),
+		PartSetHeader: rs.ProposalBlobParts.Header(),
+	}
+
 	return types.EventDataCompleteProposal{
 		Height:  rs.Height,
 		Round:   rs.Round,
 		Step:    rs.Step.String(),
 		BlockID: blockID,
+		BlobID:  blobID,
 	}
 }
 

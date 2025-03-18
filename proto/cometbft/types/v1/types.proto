@@ -144,6 +144,12 @@ message ExtendedCommitSig {
   bytes extension_signature = 6;
 }
 
+// BlobID defines the unique ID of a blob as its hash and its PartSetHeader.
+message BlobID {
+  bytes hash = 1;
+  PartSetHeader part_set_header = 2 [(gogoproto.nullable) = false];
+}
+
 // Block proposal.
 message Proposal {
   SignedMsgType             type      = 1;
@@ -154,6 +160,7 @@ message Proposal {
   google.protobuf.Timestamp timestamp = 6
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes signature = 7;
+  BlobID blob_id = 8 [(gogoproto.customname) = "BlobID", (gogoproto.nullable) = false];
 }
 
 // SignedHeader contains a Header(H) and Commit(H+1) with signatures of validators who signed it.

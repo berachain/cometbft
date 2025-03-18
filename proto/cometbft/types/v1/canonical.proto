@@ -38,6 +38,7 @@ message CanonicalProposal {
   CanonicalBlockID          block_id  = 5 [(gogoproto.customname) = "BlockID"];
   google.protobuf.Timestamp timestamp = 6 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   string                    chain_id  = 7 [(gogoproto.customname) = "ChainID"];
+  CanonicalBlobID          blob_id   = 8 [(gogoproto.customname) = "BlobID"];
 }
 
 // CanonicalVote is a canonical representation of a Vote, which gets

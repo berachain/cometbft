@@ -23,18 +23,30 @@ var (
 // a so-called Proof-of-Lock (POL) round, as noted in the POLRound.
 // If POLRound >= 0, then BlockID corresponds to the block that is locked in POLRound.
 type Proposal struct {
-	Type      SignedMsgType
-	Height    int64     `json:"height"`
-	Round     int32     `json:"round"`     // there can not be greater than 2_147_483_647 rounds
+	Type   SignedMsgType
+	Height int64 `json:"height"`
+
+	// there can not be greater than 2_147_483_647 rounds
+	Round     int32     `json:"round"`
 	POLRound  int32     `json:"pol_round"` // -1 if null.
 	BlockID   BlockID   `json:"block_id"`
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
+
+	// Not every proposal includes a blob, so some valid proposals may have an empty
+	// BlobID.
+	BlobID BlobID `json:"blob_id"`
 }
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(height int64, round int32, polRound int32, blockID BlockID, ts time.Time) *Proposal {
+func NewProposal(
+	height int64,
+	round, polRound int32,
+	blockID BlockID,
+	ts time.Time,
+	blobID BlobID,
+) *Proposal {
 	return &Proposal{
 		Type:      ProposalType,
 		Height:    height,
@@ -42,6 +54,7 @@ func NewProposal(height int64, round int32, polRound int32, blockID BlockID, ts 
 		BlockID:   blockID,
 		POLRound:  polRound,
 		Timestamp: cmttime.Canonical(ts),
+		BlobID:    blobID,
 	}
 }
 
@@ -79,6 +92,11 @@ func (p *Proposal) ValidateBasic() error {
 	if len(p.Signature) > MaxSignatureSize {
 		return fmt.Errorf("signature is too big (max: %d)", MaxSignatureSize)
 	}
+
+	if err := p.BlobID.ValidateBasic(); err != nil {
+		return fmt.Errorf("wrong BlobID: %w", err)
+	}
+
 	return nil
 }
 
@@ -114,16 +132,20 @@ func (p *Proposal) IsTimely(recvTime time.Time, sp SynchronyParams) bool {
 // 4. POL round
 // 5. first 6 bytes of signature
 // 6. timestamp
+// 7. blob ID
 //
 // See BlockID#String.
 func (p *Proposal) String() string {
-	return fmt.Sprintf("Proposal{%v/%v (%v, %v) %X @ %s}",
+	return fmt.Sprintf(
+		"Proposal{%v/%v (%v, %v) (%v) %X @ %s}",
 		p.Height,
 		p.Round,
 		p.BlockID,
 		p.POLRound,
+		p.BlobID,
 		cmtbytes.Fingerprint(p.Signature),
-		CanonicalTime(p.Timestamp))
+		CanonicalTime(p.Timestamp),
+	)
 }
 
 // ProposalSignBytes returns the proto-encoding of the canonicalized Proposal,
@@ -149,17 +171,19 @@ func (p *Proposal) ToProto() *cmtproto.Proposal {
 	if p == nil {
 		return &cmtproto.Proposal{}
 	}
-	pb := new(cmtproto.Proposal)
 
-	pb.BlockID = p.BlockID.ToProto()
-	pb.Type = p.Type
-	pb.Height = p.Height
-	pb.Round = p.Round
-	pb.PolRound = p.POLRound // FIXME: names do not match
-	pb.Timestamp = p.Timestamp
-	pb.Signature = p.Signature
+	protoProposal := &cmtproto.Proposal{
+		BlockID:   p.BlockID.ToProto(),
+		Type:      p.Type,
+		Height:    p.Height,
+		Round:     p.Round,
+		PolRound:  p.POLRound, // FIXME: names do not match
+		Timestamp: p.Timestamp,
+		Signature: p.Signature,
+		BlobID:    p.BlobID.ToProto(),
+	}
 
-	return pb
+	return protoProposal
 }
 
 // ProposalFromProto sets a protobuf Proposal to the given pointer.
@@ -169,20 +193,26 @@ func ProposalFromProto(pp *cmtproto.Proposal) (*Proposal, error) {
 		return nil, errors.New("nil proposal")
 	}
 
-	p := new(Proposal)
-
 	blockID, err := BlockIDFromProto(&pp.BlockID)
 	if err != nil {
 		return nil, err
 	}
 
-	p.BlockID = *blockID
-	p.Type = pp.Type
-	p.Height = pp.Height
-	p.Round = pp.Round
-	p.POLRound = pp.PolRound // FIXME: names do not match
-	p.Timestamp = pp.Timestamp
-	p.Signature = pp.Signature
+	blobID, err := BlobIDFromProto(&pp.BlobID)
+	if err != nil {
+		return nil, err
+	}
+
+	p := &Proposal{
+		BlockID:   *blockID,
+		Type:      pp.Type,
+		Height:    pp.Height,
+		Round:     pp.Round,
+		POLRound:  pp.PolRound, // FIXME: names do not match
+		Timestamp: pp.Timestamp,
+		Signature: pp.Signature,
+		BlobID:    blobID,
+	}
 
 	return p, p.ValidateBasic()
 }

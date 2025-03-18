@@ -373,8 +373,16 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	_, err = assertMempool(css[0].txNotifier).CheckTx(newValidatorTx1, "")
 	require.NoError(t, err)
 
-	propBlock, propBlockParts, blockID := createProposalBlock(t, css[0]) // changeProposer(t, cs1, v2)
-	proposal := types.NewProposal(vss[1].Height, round, -1, blockID, propBlock.Header.Time)
+	// changeProposer(t, cs1, v2)
+	propBlock, propBlockParts, blockID := createProposalBlock(t, css[0])
+	proposal := types.NewProposal(
+		vss[1].Height,
+		round,
+		-1, /* POLRound */
+		blockID,
+		propBlock.Header.Time,
+		types.BlobID{},
+	)
 	signProposal(t, proposal, chainID, vss[1])
 
 	// set the proposal block
@@ -395,8 +403,16 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	_, err = assertMempool(css[0].txNotifier).CheckTx(updateValidatorTx1, "")
 	require.NoError(t, err)
 
-	propBlock, propBlockParts, blockID = createProposalBlock(t, css[0]) // changeProposer(t, cs1, v2)
-	proposal = types.NewProposal(vss[2].Height, round, -1, blockID, propBlock.Header.Time)
+	// changeProposer(t, cs1, v2)
+	propBlock, propBlockParts, blockID = createProposalBlock(t, css[0])
+	proposal = types.NewProposal(
+		vss[2].Height,
+		round,
+		-1, /* polRound */
+		blockID,
+		propBlock.Header.Time,
+		types.BlobID{},
+	)
 	signProposal(t, proposal, chainID, vss[2])
 
 	// set the proposal block
@@ -445,7 +461,14 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 
 	selfIndex := valIndexFn(0)
 
-	proposal = types.NewProposal(vss[3].Height, round, -1, blockID, propBlock.Header.Time)
+	proposal = types.NewProposal(
+		vss[3].Height,
+		round,
+		-1, /* polRound */
+		blockID,
+		propBlock.Header.Time,
+		types.BlobID{},
+	)
 	signProposal(t, proposal, chainID, vss[3])
 
 	// set the proposal block
@@ -501,7 +524,14 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	sort.Sort(ValidatorStubsByPower(newVss))
 
 	selfIndex = valIndexFn(0)
-	proposal = types.NewProposal(vss[1].Height, round, -1, blockID, propBlock.Header.Time)
+	proposal = types.NewProposal(
+		vss[1].Height,
+		round,
+		-1, /* polRound */
+		blockID,
+		propBlock.Header.Time,
+		types.BlobID{},
+	)
 	signProposal(t, proposal, chainID, vss[1])
 
 	// set the proposal block

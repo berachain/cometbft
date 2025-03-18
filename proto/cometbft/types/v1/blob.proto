@@ -3,9 +3,6 @@ package cometbft.types.v1;
 
 option go_package = "github.com/cometbft/cometbft/api/cometbft/types/v1";
 
-import "cometbft/types/v1/types.proto";
-import "gogoproto/gogo.proto";
-
 // Blob defines the structure of a blob in the CometBFT blockchain.
 // Blob represents an Ethereum blob, a binary data structure introduced in
 // EIP-4844 (Proto-Danksharding).
@@ -25,10 +22,4 @@ import "gogoproto/gogo.proto";
 // layer is unnecessary and undesirable.
 message Blob {
   bytes data = 1;
-}
-
-// BlobID defines the unique ID of a blob as its hash and its PartSetHeader.
-message BlobID {
-  bytes hash = 1;
-  PartSetHeader part_set_header = 2 [(gogoproto.nullable) = false];
 }

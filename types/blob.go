@@ -30,7 +30,14 @@ type Blob []byte
 
 // Hash returns the SHA-256 hash of the blob.
 func (b Blob) Hash() []byte {
+	if len(b) == 0 {
+		return nil
+	}
 	return tmhash.Sum(b)
+}
+
+func (b Blob) IsNil() bool {
+	return len(b) == 0
 }
 
 // String returns a hex-encoded representation of the blob.
@@ -83,7 +90,7 @@ func (b BlobID) String() string {
 	return fmt.Sprintf(`%v:%v`, b.Hash, b.PartSetHeader)
 }
 
-// ToProto converts BlobID to protobuf.
+// ToProto serializes BlobID to protobuf.
 func (b BlobID) ToProto() cmtproto.BlobID {
 	if b.IsNil() {
 		return cmtproto.BlobID{}
@@ -95,7 +102,7 @@ func (b BlobID) ToProto() cmtproto.BlobID {
 	}
 }
 
-// BlobIDFromProto sets a protobuf BlobID to the given pointer.
+// BlobIDFromProto deserializes a protobuf BlobID to a BlobID type.
 // It returns an error if the BlobID is invalid.
 func BlobIDFromProto(b *cmtproto.BlobID) (BlobID, error) {
 	if b == nil {

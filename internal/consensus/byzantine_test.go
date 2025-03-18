@@ -226,7 +226,14 @@ func TestByzantinePrevoteEquivocation(t *testing.T) {
 
 		// Make proposal
 		propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-		proposal := types.NewProposal(height, round, lazyProposer.ValidRound, propBlockID, block.Header.Time)
+		proposal := types.NewProposal(
+			height,
+			round,
+			lazyProposer.ValidRound,
+			propBlockID,
+			block.Header.Time,
+			types.BlobID{},
+		)
 		p := proposal.ToProto()
 		if err := lazyProposer.privValidator.SignProposal(lazyProposer.state.ChainID, p); err == nil {
 			proposal.Signature = p.Signature
@@ -465,7 +472,14 @@ func byzantineDecideProposalFunc(_ context.Context, t *testing.T, height int64, 
 	// Create a new proposal block from state/txs from the mempool.
 	block1, blockParts1, propBlockID := createProposalBlock(t, cs)
 	polRound := cs.ValidRound
-	proposal1 := types.NewProposal(height, round, polRound, propBlockID, block1.Time)
+	proposal1 := types.NewProposal(
+		height,
+		round,
+		polRound,
+		propBlockID,
+		block1.Time,
+		types.BlobID{},
+	)
 	p1 := proposal1.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p1); err != nil {
 		t.Error(err)
@@ -479,7 +493,14 @@ func byzantineDecideProposalFunc(_ context.Context, t *testing.T, height int64, 
 	// Create a new proposal block from state/txs from the mempool.
 	block2, blockParts2, propBlockID := createProposalBlock(t, cs)
 	polRound = cs.ValidRound
-	proposal2 := types.NewProposal(height, round, polRound, propBlockID, block2.Time)
+	proposal2 := types.NewProposal(
+		height,
+		round,
+		polRound,
+		propBlockID,
+		block2.Time,
+		types.BlobID{},
+	)
 	p2 := proposal2.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p2); err != nil {
 		t.Error(err)

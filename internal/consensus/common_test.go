@@ -263,18 +263,29 @@ func decideProposal(
 	t.Helper()
 
 	cs1.mtx.Lock()
-	block, _, propBlockID := createProposalBlock(t, cs1)
-
-	validRound := cs1.ValidRound
-	chainID := cs1.state.ChainID
+	var (
+		block, _, propBlockID = createProposalBlock(t, cs1)
+		validRound            = cs1.ValidRound
+		chainID               = cs1.state.ChainID
+	)
 	cs1.mtx.Unlock()
+
 	if block == nil {
 		panic("Failed to createProposalBlock. Did you forget to add commit for previous block?")
 	}
 
-	// Make proposal
-	proposal := types.NewProposal(height, round, validRound, propBlockID, block.Header.Time)
-	p := proposal.ToProto()
+	var (
+		// Make proposal
+		proposal = types.NewProposal(
+			height,
+			round,
+			validRound,
+			propBlockID,
+			block.Header.Time,
+			types.BlobID{},
+		)
+		p = proposal.ToProto()
+	)
 	if err := vs.SignProposal(chainID, p); err != nil {
 		panic(err)
 	}

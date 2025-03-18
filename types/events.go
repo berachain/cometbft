@@ -115,6 +115,7 @@ type EventDataCompleteProposal struct {
 	Step   string `json:"step"`
 
 	BlockID BlockID `json:"block_id"`
+	BlobID  BlobID  `json:"blob_id"`
 }
 
 type EventDataVote struct {

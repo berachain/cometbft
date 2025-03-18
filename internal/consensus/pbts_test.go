@@ -223,7 +223,14 @@ func (p *pbtsTestHarness) nextHeight(
 	ps, err := b.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(t, err)
 	bid := types.BlockID{Hash: b.Hash(), PartSetHeader: ps.Header()}
-	prop := types.NewProposal(p.currentHeight, 0, -1, bid, proposedTime)
+	prop := types.NewProposal(
+		p.currentHeight,
+		0,  /* round */
+		-1, /* polRound */
+		bid,
+		proposedTime,
+		types.BlobID{},
+	)
 	tp := prop.ToProto()
 
 	err = proposer.SignProposal(p.chainID, tp)
@@ -603,7 +610,14 @@ func TestPbtsAdaptiveMessageDelay(t *testing.T) {
 
 			// Create block and proposal with the tweaked timestamp
 			block, blockParts, blockID := createProposalBlockWithTime(t, cs, ts)
-			proposal := types.NewProposal(height, round, -1, blockID, block.Header.Time)
+			proposal := types.NewProposal(
+				height,
+				round,
+				-1, /* polRound */
+				blockID,
+				block.Header.Time,
+				types.BlobID{},
+			)
 			signProposal(t, proposal, chainID, vss[proposer])
 
 			require.NoError(t, cs.SetProposalAndBlock(proposal, blockParts, "p"))

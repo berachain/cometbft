@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -204,52 +203,72 @@ func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 }
 
 func TestWALEncoder(t *testing.T) {
-	now := time.Time{}.AddDate(100, 10, 20)
+	var (
+		now = time.Time{}.AddDate(100, 10, 20)
 
-	ss, privVals := makeState(1, "execution_chain")
-	var pVal cmttypes.PrivValidator
+		ss, privVals = makeState(1, "execution_chain")
+		pVal         cmttypes.PrivValidator
+	)
 	for mk := range privVals {
 		pVal = privVals[mk]
 	}
-	vs := newValidatorStub(pVal, 1)
+
+	valStub := newValidatorStub(pVal, 1)
 
 	cmtrand.Seed(0)
-	randbytes := cmtrand.Bytes(tmhash.Size)
-	block1 := cmttypes.BlockID{
-		Hash:          randbytes,
-		PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randbytes},
-	}
 
-	p := cmttypes.Proposal{
-		Type:      cmttypes.ProposalType,
-		Height:    42,
-		Round:     13,
-		BlockID:   block1,
-		POLRound:  12,
-		Timestamp: cmttime.Canonical(now),
-	}
+	var (
+		randbytes = cmtrand.Bytes(tmhash.Size)
+		block1    = cmttypes.BlockID{
+			Hash:          randbytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randbytes},
+		}
+		proposal = cmttypes.Proposal{
+			Type:      cmttypes.ProposalType,
+			Height:    42,
+			Round:     13,
+			BlockID:   block1,
+			POLRound:  12,
+			Timestamp: cmttime.Canonical(now),
+			BlobID:    cmttypes.BlobID{},
+		}
+		proposalProto = proposal.ToProto()
+	)
 
-	pp := p.ToProto()
-	err := vs.SignProposal(ss.ChainID, pp)
+	err := valStub.SignProposal(ss.ChainID, proposalProto)
 	require.NoError(t, err)
-	p.Signature = pp.Signature
 
-	b := new(bytes.Buffer)
-	enc := NewWALEncoder(b)
-	twm := TimedWALMessage{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody"}}
+	proposal.Signature = proposalProto.Signature
+
+	var (
+		walWriteBuf = new(bytes.Buffer)
+		enc         = NewWALEncoder(walWriteBuf)
+		twm         = TimedWALMessage{
+			Time: now,
+			Msg: msgInfo{
+				Msg:    &ProposalMessage{Proposal: &proposal},
+				PeerID: "Nobody",
+			},
+		}
+	)
 	err = enc.Encode(&twm)
 	require.NoError(t, err)
 
-	var b1 bytes.Buffer
-	tee := io.TeeReader(b, &b1)
-	b2, err := io.ReadAll(tee)
+	var (
+		buf bytes.Buffer
+		tee = io.TeeReader(walWriteBuf, &buf)
+	)
+	walData, err := io.ReadAll(tee)
 	require.NoError(t, err)
-	fmt.Printf("%s\n", hex.EncodeToString(b1.Bytes()))
+
+	// fmt.Printf("%s\n", hex.EncodeToString(buf.Bytes()))
 
 	// Encoded string generated v1.0.0 Berachain Fork
-	data, err := hex.DecodeString("c6c4eff3000000e50a0b0880e2c3b1a4feffffff0112d50112d2010ac7011ac4010ac1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd12064e6f626f6479")
+	// The hex string below is what the WAL has written to walWriteBuf.
+	// You can check it by uncommenting the Printf line above.
+	data, err := hex.DecodeString("5f19fc24000000e90a0b0880e2c3b1a4feffffff0112d90112d6010acb011ac8010ac5010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd4202120012064e6f626f6479")
 	require.NoError(t, err)
-	require.Equal(t, data, b2)
+	require.Equal(t, data, walData)
 }
 
 func TestWALWrite(t *testing.T) {

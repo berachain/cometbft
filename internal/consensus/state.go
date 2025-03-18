@@ -1255,6 +1255,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		} else if block == nil {
 			panic("Method createProposalBlock should not provide a nil block without errors")
 		}
+
 		cs.metrics.ProposalCreateCount.Add(1)
 		blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)
 		if err != nil {
@@ -1284,23 +1285,47 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 			cs.ValidRound,
 			propBlockID,
 			block.Header.Time,
+			types.BlobID{}, // TODO: add part set
 		)
-		p = proposal.ToProto()
+		protoProposal = proposal.ToProto()
 	)
-	if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {
-		proposal.Signature = p.Signature
+	err := cs.privValidator.SignProposal(cs.state.ChainID, protoProposal)
+	if err == nil {
+		proposal.Signature = protoProposal.Signature
 
-		// send proposal and block parts on internal msg queue
-		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, "", cmttime.Now()})
+		// send proposal and block parts on internal proposalMsg queue
+		proposalMsg := msgInfo{
+			Msg:         &ProposalMessage{proposal},
+			PeerID:      "",
+			ReceiveTime: cmttime.Now(),
+		}
+		cs.sendInternalMessage(proposalMsg)
 
 		for i := 0; i < int(blockParts.Total()); i++ {
-			part := blockParts.GetPart(i)
-			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, "", time.Time{}})
+			var (
+				part       = blockParts.GetPart(i)
+				blkPartMsg = msgInfo{
+					Msg:         &BlockPartMessage{cs.Height, cs.Round, part},
+					PeerID:      "",
+					ReceiveTime: time.Time{},
+				}
+			)
+			cs.sendInternalMessage(blkPartMsg)
 		}
 
-		cs.Logger.Debug("Signed proposal", "height", height, "round", round, "proposal", proposal)
+		cs.Logger.Debug(
+			"Signed proposal",
+			"height", height,
+			"round", round,
+			"proposal", proposal,
+		)
 	} else if !cs.replayMode {
-		cs.Logger.Error("Propose step; failed signing proposal", "height", height, "round", round, "err", err)
+		cs.Logger.Error(
+			"Propose step; failed signing proposal",
+			"height", height,
+			"round", round,
+			"err", err,
+		)
 	}
 }
 
@@ -1310,11 +1335,21 @@ func (cs *State) isProposalComplete() bool {
 	if cs.Proposal == nil || cs.ProposalBlock == nil {
 		return false
 	}
+
 	// we have the proposal. if there's a POLRound,
 	// make sure we have the prevotes from it too
 	if cs.Proposal.POLRound < 0 {
+		// If the block has an associated blob, the proposal is only complete once
+		// the blob has been received. To determine whether we need to wait for a
+		// blob, we check if the proposal includes a BlobID. If it does, we must
+		// wait for the blob before marking the proposal as complete.
+		if !cs.Proposal.BlobID.IsNil() {
+			return !cs.ProposalBlob.IsNil()
+		}
+
 		return true
 	}
+
 	// if this is false the proposer is lying or we haven't received the POL yet
 	return cs.Votes.Prevotes(cs.Proposal.POLRound).HasTwoThirdsMajority()
 }
