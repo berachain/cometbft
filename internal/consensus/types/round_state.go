@@ -106,12 +106,6 @@ type RoundState struct {
 
 	ProposalBlob      types.Blob     `json:"proposal_blob"`
 	ProposalBlobParts *types.PartSet `json:"proposal_blob_parts"`
-	LockedBlob        types.Blob     `json:"locked_blob"`
-	LockedBlobParts   *types.PartSet `json:"locked_blob_parts"`
-	// Last known blob of POL mentioned above.
-	ValidBlob types.Blob `json:"valid_blob"`
-	// Last known blob parts of POL mentioned above.
-	ValidBlobParts *types.PartSet `json:"valid_blob_parts"`
 }
 
 // Compressed version of the RoundState for use in RPC.
@@ -124,8 +118,6 @@ type RoundStateSimple struct {
 	Votes             json.RawMessage     `json:"height_vote_set"`
 	Proposer          types.ValidatorInfo `json:"proposer"`
 	ProposalBlobHash  bytes.HexBytes      `json:"proposal_blob_hash"`
-	LockedBlobHash    bytes.HexBytes      `json:"locked_blob_hash"`
-	ValidBlobHash     bytes.HexBytes      `json:"valid_blob_hash"`
 }
 
 // Compress the RoundState to RoundStateSimple.
@@ -145,8 +137,6 @@ func (rs *RoundState) RoundStateSimple() RoundStateSimple {
 		LockedBlockHash:   rs.LockedBlock.Hash(),
 		ValidBlockHash:    rs.ValidBlock.Hash(),
 		ProposalBlobHash:  rs.ProposalBlob.Hash(),
-		LockedBlobHash:    rs.LockedBlob.Hash(),
-		ValidBlobHash:     rs.ValidBlob.Hash(),
 		Votes:             votesJSON,
 		Proposer: types.ValidatorInfo{
 			Address: addr,
@@ -230,10 +220,8 @@ func (rs *RoundState) StringIndented(indent string) string {
 %s  ProposalBlob:  %v %v
 %s  LockedRound:   %v
 %s  LockedBlock:   %v %v
-%s  LockedBlob:    %v %v
 %s  ValidRound:    %v
 %s  ValidBlock:    %v %v
-%s  ValidBlob:     %v %v
 %s  Votes:         %v
 %s  LastCommit:    %v
 %s  LastValidators:%v
@@ -247,10 +235,8 @@ func (rs *RoundState) StringIndented(indent string) string {
 		indent, rs.ProposalBlobParts.StringShort(), rs.ProposalBlob.String(),
 		indent, rs.LockedRound,
 		indent, rs.LockedBlockParts.StringShort(), rs.LockedBlock.StringShort(),
-		indent, rs.LockedBlobParts.StringShort(), rs.LockedBlob.String(),
 		indent, rs.ValidRound,
 		indent, rs.ValidBlockParts.StringShort(), rs.ValidBlock.StringShort(),
-		indent, rs.ValidBlobParts.StringShort(), rs.ValidBlob.String(),
 		indent, rs.Votes.StringIndented(indent+"  "),
 		indent, lcStr,
 		indent, rs.LastValidators.StringIndented(indent+"  "),
