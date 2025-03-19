@@ -1259,6 +1259,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		}
 
 		cs.metrics.ProposalCreateCount.Add(1)
+
 		blockParts, err = block.MakePartSet(types.BlockPartSizeBytes)
 		if err != nil {
 			cs.Logger.Error("unable to create proposal block part set", "error", err)
@@ -1272,11 +1273,17 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		cs.Logger.Error("failed flushing WAL to disk")
 	}
 
-	// Make proposal
+	var propBlobID types.BlobID
+	if !blob.IsNil() {
+		blobParts := types.NewPartSetFromData(blob, types.BlobPartSizeBytes)
+		propBlobID = types.BlobID{
+			Hash:          blob.Hash(),
+			PartSetHeader: blobParts.Header(),
+		}
+	}
 
+	// Make proposal
 	var (
-		// TODO: create blob parts, BlobID, send blob parts.
-		_           = blob
 		propBlockID = types.BlockID{
 			Hash:          block.Hash(),
 			PartSetHeader: blockParts.Header(),
@@ -1287,7 +1294,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 			cs.ValidRound,
 			propBlockID,
 			block.Header.Time,
-			types.BlobID{}, // TODO: add part set
+			propBlobID,
 		)
 		protoProposal = proposal.ToProto()
 	)
