@@ -1586,7 +1586,11 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 			// the liveness properties of consensus.
 			// Please see `PrepareProosal`-`ProcessProposal` coherence and determinism properties
 			// in the ABCI++ specification.
-			isAppValid, err := cs.blockExec.ProcessProposal(cs.ProposalBlock, cs.state)
+			isAppValid, err := cs.blockExec.ProcessProposal(
+				cs.ProposalBlock,
+				cs.state,
+				cs.ProposalBlob,
+			)
 			if err != nil {
 				panic(fmt.Sprintf(
 					"state machine returned an error (%v) when calling ProcessProposal", err,

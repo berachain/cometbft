@@ -159,6 +159,10 @@ message ProcessProposalRequest {
   bytes next_validators_hash = 7;
   // address of the public key of the original proposer of the block.
   bytes proposer_address = 8;
+  // A blob (see EIP-4844) is a piece of temporary data attached to a blob
+  // transaction included in a CometBFT block.
+  // CometBFT gossips this blob separately from its corresponding block.
+  bytes blob = 9;
 }
 
 // ExtendVoteRequest extends a precommit vote with application-injected data.
@@ -374,7 +378,8 @@ enum ApplySnapshotChunkResult {
 message PrepareProposalResponse {
   repeated bytes txs = 1;
   // A blob (see EIP-4844) is a piece of temporary data attached to a blob
-  // transaction. CometBFT will gossip this blob separately from the block.
+  // transaction included in a CometBFT block.
+  // CometBFT gossips this blob separately from its corresponding block.
   bytes blob = 2;
 }
 

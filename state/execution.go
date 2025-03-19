@@ -194,17 +194,28 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 func (blockExec *BlockExecutor) ProcessProposal(
 	block *types.Block,
 	state State,
+	blob types.Blob,
 ) (bool, error) {
-	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), &abci.ProcessProposalRequest{
-		Hash:               block.Header.Hash(),
-		Height:             block.Header.Height,
-		Time:               block.Header.Time,
-		Txs:                block.Data.Txs.ToSliceOfBytes(),
-		ProposedLastCommit: buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
-		Misbehavior:        block.Evidence.Evidence.ToABCI(),
-		ProposerAddress:    block.ProposerAddress,
-		NextValidatorsHash: block.NextValidatorsHash,
-	})
+	var (
+		lastCommit = buildLastCommitInfoFromStore(
+			block,
+			blockExec.store,
+			state.InitialHeight,
+		)
+		req = &abci.ProcessProposalRequest{
+			Hash:               block.Header.Hash(),
+			Height:             block.Header.Height,
+			Time:               block.Header.Time,
+			Txs:                block.Data.Txs.ToSliceOfBytes(),
+			ProposedLastCommit: lastCommit,
+			Misbehavior:        block.Evidence.Evidence.ToABCI(),
+			ProposerAddress:    block.ProposerAddress,
+			NextValidatorsHash: block.NextValidatorsHash,
+			Blob:               blob,
+		}
+	)
+
+	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), req)
 	if err != nil {
 		return false, err
 	}

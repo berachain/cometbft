@@ -364,24 +364,34 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 
 func TestProcessProposal(t *testing.T) {
 	const height = 2
-	txs := test.MakeNTxs(height, 10)
+	var (
+		logger      = log.NewNopLogger()
+		app         = &abcimocks.Application{}
+		mockAppResp = &abci.ProcessProposalResponse{
+			Status: abci.PROCESS_PROPOSAL_STATUS_ACCEPT,
+		}
+	)
+	app.
+		On("ProcessProposal", mock.Anything, mock.Anything).
+		Return(mockAppResp, nil)
 
-	logger := log.NewNopLogger()
-	app := &abcimocks.Application{}
-	app.On("ProcessProposal", mock.Anything, mock.Anything).Return(&abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_ACCEPT}, nil)
-
-	cc := proxy.NewLocalClientCreator(app)
-	proxyApp := proxy.NewAppConns(cc, proxy.NopMetrics())
+	var (
+		cc       = proxy.NewLocalClientCreator(app)
+		proxyApp = proxy.NewAppConns(cc, proxy.NopMetrics())
+	)
 	err := proxyApp.Start()
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
-	state, stateDB, privVals := makeState(1, height, chainID)
-	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
-		DiscardABCIResponses: false,
-	})
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
-	eventBus := types.NewEventBus()
+	var (
+		state, stateDB, privVals = makeState(1, height, chainID)
+		storeOpts                = sm.StoreOptions{
+			DiscardABCIResponses: false,
+		}
+		stateStore = sm.NewStore(stateDB, storeOpts)
+		blockStore = store.NewBlockStore(dbm.NewMemDB())
+		eventBus   = types.NewEventBus()
+	)
 	err = eventBus.Start()
 	require.NoError(t, err)
 
@@ -394,34 +404,58 @@ func TestProcessProposal(t *testing.T) {
 		blockStore,
 	)
 
-	block0 := makeBlock(state, height-1, new(types.Commit))
-	lastCommitSig := []types.CommitSig{}
+	var (
+		block0        = makeBlock(state, height-1, new(types.Commit))
+		lastCommitSig = []types.CommitSig{}
+	)
 	partSet, err := block0.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(t, err)
-	blockID := types.BlockID{Hash: block0.Hash(), PartSetHeader: partSet.Header()}
-	voteInfos := []abci.VoteInfo{}
+
+	var (
+		blockID = types.BlockID{
+			Hash:          block0.Hash(),
+			PartSetHeader: partSet.Header(),
+		}
+		voteInfos = []abci.VoteInfo{}
+	)
 	for _, privVal := range privVals {
 		pk, err := privVal.GetPubKey()
 		require.NoError(t, err)
-		idx, _ := state.Validators.GetByAddress(pk.Address())
-		vote := types.MakeVoteNoError(t, privVal, block0.Header.ChainID, idx, height-1, 0, 2, blockID, cmttime.Now())
-		addr := pk.Address()
-		voteInfos = append(voteInfos,
-			abci.VoteInfo{
+
+		var (
+			valIdx, _ = state.Validators.GetByAddress(pk.Address())
+			vote      = types.MakeVoteNoError(
+				t,
+				privVal,
+				block0.Header.ChainID,
+				valIdx,
+				height-1,
+				0, /* round */
+				2, /* step */
+				blockID,
+				cmttime.Now(),
+			)
+			addr     = pk.Address()
+			voteInfo = abci.VoteInfo{
 				BlockIdFlag: cmtproto.BlockIDFlagCommit,
 				Validator: abci.Validator{
 					Address: addr,
 					Power:   1000,
 				},
-			})
+			}
+		)
+		voteInfos = append(voteInfos, voteInfo)
 		lastCommitSig = append(lastCommitSig, vote.CommitSig())
 	}
 
-	block1 := makeBlock(state, height, &types.Commit{
-		Height:     height - 1,
-		Signatures: lastCommitSig,
-	})
-
+	var (
+		txs    = test.MakeNTxs(height, 10)
+		block1 = makeBlock(state, height, &types.Commit{
+			Height:     height - 1,
+			Signatures: lastCommitSig,
+		})
+		blob = []byte("blob")
+	)
 	block1.Txs = txs
 
 	expectedRpp := &abci.ProcessProposalRequest{
@@ -436,11 +470,13 @@ func TestProcessProposal(t *testing.T) {
 		},
 		NextValidatorsHash: block1.NextValidatorsHash,
 		ProposerAddress:    block1.ProposerAddress,
+		Blob:               blob,
 	}
 
-	acceptBlock, err := blockExec.ProcessProposal(block1, state)
+	acceptBlock, err := blockExec.ProcessProposal(block1, state, blob)
 	require.NoError(t, err)
 	require.True(t, acceptBlock)
+
 	app.AssertExpectations(t)
 	app.AssertCalled(t, "ProcessProposal", context.TODO(), expectedRpp)
 }
