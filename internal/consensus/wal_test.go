@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -34,12 +33,10 @@ const (
 func TestWALTruncate(t *testing.T) {
 	const numBlocks = 60
 
-	walDir, err := os.MkdirTemp("", "wal")
-	require.NoError(t, err)
-	defer os.RemoveAll(walDir)
-
-	walFile := filepath.Join(walDir, "wal")
-
+	var (
+		walDir  = t.TempDir()
+		walFile = filepath.Join(walDir, "wal")
+	)
 	// this magic number 4K can truncate the content when RotateFile.
 	// defaultHeadSizeLimit(10M) is hard to simulate.
 	// this magic number 1 * time.Millisecond make RotateFile check frequently.
@@ -49,9 +46,12 @@ func TestWALTruncate(t *testing.T) {
 		autofile.GroupCheckDuration(1*time.Millisecond),
 	)
 	require.NoError(t, err)
+
 	wal.SetLogger(log.TestingLogger())
+
 	err = wal.Start()
 	require.NoError(t, err)
+
 	defer func() {
 		if err := wal.Stop(); err != nil {
 			t.Error(err)
@@ -89,42 +89,105 @@ func TestWALTruncate(t *testing.T) {
 }
 
 func TestWALEncoderDecoder(t *testing.T) {
-	now := cmttime.Now()
+	var (
+		now      = cmttime.Now()
+		cs1, vss = randState(1)
 
-	randbytes := cmtrand.Bytes(tmhash.Size)
-	cs1, vss := randState(1)
+		randBlkBytes = cmtrand.Bytes(tmhash.Size)
+		blkID        = cmttypes.BlockID{
+			Hash:          randBlkBytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randBlkBytes},
+		}
 
-	block1 := cmttypes.BlockID{
-		Hash:          randbytes,
-		PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randbytes},
-	}
+		randBlobBytes = cmtrand.Bytes(tmhash.Size)
+		blobID        = cmttypes.BlobID{
+			Hash:          randBlobBytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randBlobBytes},
+		}
 
-	p := cmttypes.Proposal{
-		Type:      cmttypes.ProposalType,
-		Height:    42,
-		Round:     13,
-		BlockID:   block1,
-		POLRound:  12,
-		Timestamp: cmttime.Canonical(now),
-	}
+		proposal = cmttypes.Proposal{
+			Type:      cmttypes.ProposalType,
+			Height:    42,
+			Round:     13,
+			BlockID:   blkID,
+			POLRound:  12,
+			Timestamp: cmttime.Canonical(now),
+			BlobID:    blobID,
+		}
+		protoProposal = proposal.ToProto()
+	)
 
-	pp := p.ToProto()
-	err := vss[0].SignProposal(cs1.state.ChainID, pp)
+	err := vss[0].SignProposal(cs1.state.ChainID, protoProposal)
 	require.NoError(t, err)
 
-	p.Signature = pp.Signature
+	proposal.Signature = protoProposal.Signature
 
 	msgs := []TimedWALMessage{
 		{Time: now, Msg: EndHeightMessage{0}},
-		{Time: now, Msg: timeoutInfo{Duration: time.Second, Height: 1, Round: 1, Step: types.RoundStepPropose}},
-		{Time: now, Msg: cmttypes.EventDataRoundState{Height: 1, Round: 1, Step: ""}},
-		{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody", ReceiveTime: now}},
-		{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody", ReceiveTime: time.Time{}}},
-		{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody"}},
+		{
+			Time: now,
+			Msg: timeoutInfo{
+				Duration: time.Second,
+				Height:   1,
+				Round:    1,
+				Step:     types.RoundStepPropose,
+			},
+		},
+		{
+			Time: now,
+			Msg: cmttypes.EventDataRoundState{
+				Height: 1,
+				Round:  1,
+				Step:   "",
+			},
+		},
+		{
+			Time: now,
+			Msg: msgInfo{
+				Msg:         &ProposalMessage{Proposal: &proposal},
+				PeerID:      "Nobody",
+				ReceiveTime: now,
+			},
+		},
+		{
+			Time: now,
+			Msg: msgInfo{
+				Msg:         &ProposalMessage{Proposal: &proposal},
+				PeerID:      "Nobody",
+				ReceiveTime: time.Time{},
+			},
+		},
+		{
+			Time: now,
+			Msg: msgInfo{
+				Msg:    &ProposalMessage{Proposal: &proposal},
+				PeerID: "Nobody",
+			},
+		},
+		{
+			Time: now,
+			Msg: msgInfo{
+				Msg: &BlobPartMessage{
+					Height: 1,
+					Round:  1,
+					Part: &cmttypes.Part{
+						Index: 1,
+						Bytes: []byte("blob"),
+						Proof: merkle.Proof{
+							Total:    1,
+							Index:    1,
+							LeafHash: cmtrand.Bytes(tmhash.Size),
+							Aunts:    nil,
+						},
+					},
+				},
+				PeerID:      "Nobody",
+				ReceiveTime: now,
+			},
+		},
 	}
 
 	b := new(bytes.Buffer)
-
 	for _, msg := range msgs {
 		b.Reset()
 
@@ -142,47 +205,85 @@ func TestWALEncoderDecoder(t *testing.T) {
 
 func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 	now := time.Time{}.AddDate(100, 10, 20)
-	v100Data, err := hex.DecodeString("c6c4eff3000000e50a0b0880e2c3b1a4feffffff0112d50112d2010ac7011ac4010ac1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd12064e6f626f6479")
+
+	v100Data, err := hex.DecodeString(
+		"c6c4eff3000000e50a0b0880e2c3b1a4feffffff0112d50112d2010ac7011ac4010ac1010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd12064e6f626f6479",
+	)
 	require.NoError(t, err)
-	ss, privVals := makeState(1, "execution_chain")
-	var pVal cmttypes.PrivValidator
+
+	var (
+		ss, privVals = makeState(1, "execution_chain")
+		pVal         cmttypes.PrivValidator
+	)
 	for mk := range privVals {
 		pVal = privVals[mk]
 	}
 	vs := newValidatorStub(pVal, 1)
 
 	cmtrand.Seed(0)
-	randbytes := cmtrand.Bytes(tmhash.Size)
-	block1 := cmttypes.BlockID{
-		Hash:          randbytes,
-		PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randbytes},
-	}
 
-	p := cmttypes.Proposal{
-		Type:      cmttypes.ProposalType,
-		Height:    42,
-		Round:     13,
-		BlockID:   block1,
-		POLRound:  12,
-		Timestamp: cmttime.Canonical(now),
-	}
+	var (
+		randBlkBytes = cmtrand.Bytes(tmhash.Size)
+		blk          = cmttypes.BlockID{
+			Hash:          randBlkBytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randBlkBytes},
+		}
 
-	pp := p.ToProto()
-	err = vs.SignProposal(ss.ChainID, pp)
+		proposal = cmttypes.Proposal{
+			Type:      cmttypes.ProposalType,
+			Height:    42,
+			Round:     13,
+			BlockID:   blk,
+			POLRound:  12,
+			Timestamp: cmttime.Canonical(now),
+			BlobID:    cmttypes.BlobID{},
+		}
+		protoProposal = proposal.ToProto()
+	)
+	err = vs.SignProposal(ss.ChainID, protoProposal)
 	require.NoError(t, err)
-	p.Signature = pp.Signature
+
+	proposal.Signature = protoProposal.Signature
 
 	cases := []struct {
 		twm           TimedWALMessage
 		expectFailure bool
 	}{
-		{twm: TimedWALMessage{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody", ReceiveTime: now}}, expectFailure: true},
-		{twm: TimedWALMessage{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody", ReceiveTime: time.Time{}}}, expectFailure: false},
-		{twm: TimedWALMessage{Time: now, Msg: msgInfo{Msg: &ProposalMessage{Proposal: &p}, PeerID: "Nobody"}}, expectFailure: false},
+		{
+			twm: TimedWALMessage{
+				Time: now,
+				Msg: msgInfo{
+					Msg:         &ProposalMessage{Proposal: &proposal},
+					PeerID:      "Nobody",
+					ReceiveTime: now,
+				},
+			},
+			expectFailure: true,
+		},
+		{
+			twm: TimedWALMessage{
+				Time: now,
+				Msg: msgInfo{
+					Msg:         &ProposalMessage{Proposal: &proposal},
+					PeerID:      "Nobody",
+					ReceiveTime: time.Time{},
+				},
+			},
+			expectFailure: false,
+		},
+		{
+			twm: TimedWALMessage{
+				Time: now,
+				Msg: msgInfo{
+					Msg:    &ProposalMessage{Proposal: &proposal},
+					PeerID: "Nobody",
+				},
+			},
+			expectFailure: false,
+		},
 	}
 
 	b := new(bytes.Buffer)
-	b.Reset()
 
 	_, err = b.Write(v100Data)
 	require.NoError(t, err)
@@ -190,9 +291,11 @@ func TestWALEncoderDecoderMultiVersion(t *testing.T) {
 	dec := NewWALDecoder(b)
 	v100decoded, err := dec.Decode()
 	require.NoError(t, err)
-	twmV100 := v100decoded.Msg
-	msgInfoV100 := twmV100.(msgInfo)
 
+	var (
+		twmV100     = v100decoded.Msg
+		msgInfoV100 = twmV100.(msgInfo)
+	)
 	for _, tc := range cases {
 		if tc.expectFailure {
 			assert.NotEqual(t, tc.twm.Msg, msgInfoV100)
@@ -218,19 +321,26 @@ func TestWALEncoder(t *testing.T) {
 	cmtrand.Seed(0)
 
 	var (
-		randbytes = cmtrand.Bytes(tmhash.Size)
-		block1    = cmttypes.BlockID{
-			Hash:          randbytes,
-			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randbytes},
+		randBlkBytes = cmtrand.Bytes(tmhash.Size)
+		blk          = cmttypes.BlockID{
+			Hash:          randBlkBytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randBlkBytes},
 		}
+
+		randBlobBytes = cmtrand.Bytes(tmhash.Size)
+		blobID        = cmttypes.BlobID{
+			Hash:          randBlobBytes,
+			PartSetHeader: cmttypes.PartSetHeader{Total: 5, Hash: randBlobBytes},
+		}
+
 		proposal = cmttypes.Proposal{
 			Type:      cmttypes.ProposalType,
 			Height:    42,
 			Round:     13,
-			BlockID:   block1,
+			BlockID:   blk,
 			POLRound:  12,
 			Timestamp: cmttime.Canonical(now),
-			BlobID:    cmttypes.BlobID{},
+			BlobID:    blobID,
 		}
 		proposalProto = proposal.ToProto()
 	)
@@ -266,21 +376,23 @@ func TestWALEncoder(t *testing.T) {
 	// Encoded string generated v1.0.0 Berachain Fork
 	// The hex string below is what the WAL has written to walWriteBuf.
 	// You can check it by uncommenting the Printf line above.
-	data, err := hex.DecodeString("5f19fc24000000e90a0b0880e2c3b1a4feffffff0112d90112d6010acb011ac8010ac5010820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a608a0c44b5f0476fe9ad5a655e446efc715b97e88f45e4ff200e945892c5c036946b63dd3a6199023aebf3ef58a03c979908cd22ca081b786a0f4f38f0508d6febea456ad5078018dc752550dfd5c41f4d1588f27dd96e8846e2fff6d3121d75bd4202120012064e6f626f6479")
+	data, err := hex.DecodeString(
+		"8059ec450000012f0a0b0880e2c3b1a4feffffff01129f02129c020a91021a8e020a8b020820102a180d200c2a480a2001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa6612240805122001c073624aaf3978514ef8443bb2a859c75fc3cc6af26d5aaa20926f046baa66320b0880e2c3b1a4feffffff013a60b27b5c678f768fb0e6656fd151a39187772bbe4bbb684fb728d37689a8da62714bfd0956e7ab6124d7aa548fb73eab840e2830c4ef0bdf9a22669b0a9fdee332fdee6aa0617e6379000e2def2c3ea3f16b23ced8f788d87fea90aa33b1974a1742480a20ec91a5a2794323c2da405afed61ec15cf793ed103a57c02c869af069b7b56837122408051220ec91a5a2794323c2da405afed61ec15cf793ed103a57c02c869af069b7b5683712064e6f626f6479",
+	)
 	require.NoError(t, err)
 	require.Equal(t, data, walData)
 }
 
 func TestWALWrite(t *testing.T) {
-	walDir, err := os.MkdirTemp("", "wal")
-	require.NoError(t, err)
-	defer os.RemoveAll(walDir)
+	walDir := t.TempDir()
 	walFile := filepath.Join(walDir, "wal")
 
 	wal, err := NewWAL(walFile)
 	require.NoError(t, err)
+
 	err = wal.Start()
 	require.NoError(t, err)
+
 	defer func() {
 		if err := wal.Stop(); err != nil {
 			t.Error(err)
@@ -305,10 +417,10 @@ func TestWALWrite(t *testing.T) {
 		},
 	}
 
-	err = wal.Write(msgInfo{
-		Msg: msg,
-	})
-	if assert.Error(t, err) { //nolint:testifylint // require.Error doesn't work with the conditional here
+	err = wal.Write(msgInfo{Msg: msg})
+
+	// require.Error doesn't work with the conditional here
+	if assert.Error(t, err) { //nolint:testifylint
 		assert.Contains(t, err.Error(), "msg is too big")
 	}
 }
@@ -340,10 +452,7 @@ func TestWALSearchForEndHeight(t *testing.T) {
 }
 
 func TestWALPeriodicSync(t *testing.T) {
-	walDir, err := os.MkdirTemp("", "wal")
-	require.NoError(t, err)
-	defer os.RemoveAll(walDir)
-
+	walDir := t.TempDir()
 	walFile := filepath.Join(walDir, "wal")
 	wal, err := NewWAL(walFile, autofile.GroupCheckDuration(1*time.Millisecond))
 	require.NoError(t, err)

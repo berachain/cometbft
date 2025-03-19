@@ -37,6 +37,7 @@ const (
 	EventValidBlock        = "ValidBlock"
 	EventVote              = "Vote"
 	EventProposalBlockPart = "ProposalBlockPart"
+	EventProposalBlobPart  = "ProposalBlobPart"
 )
 
 // ENCODING / DECODING

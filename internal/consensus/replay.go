@@ -37,7 +37,10 @@ var crc32c = crc32.MakeTable(crc32.Castagnoli)
 // Unmarshal and apply a single message to the consensus state as if it were
 // received in receiveRoutine.  Lines that start with "#" are ignored.
 // NOTE: receiveRoutine should not be running.
-func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscription) error {
+func (cs *State) readReplayMessage(
+	msg *TimedWALMessage,
+	newStepSub types.Subscription,
+) error {
 	// Skip meta messages which exist for demarcating boundaries.
 	if _, ok := msg.Msg.(EndHeightMessage); ok {
 		return nil
@@ -46,7 +49,13 @@ func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscr
 	// for logging
 	switch m := msg.Msg.(type) {
 	case types.EventDataRoundState:
-		cs.Logger.Info("Replay: New Step", "height", m.Height, "round", m.Round, "step", m.Step)
+		cs.Logger.Info(
+			"Replay: New Step",
+			"height", m.Height,
+			"round", m.Round,
+			"step", m.Step,
+		)
+
 		// these are playback checks
 		ticker := time.After(time.Second * 2)
 		if newStepSub != nil {
@@ -54,7 +63,8 @@ func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscr
 			case stepMsg := <-newStepSub.Out():
 				m2 := stepMsg.Data().(types.EventDataRoundState)
 				if m.Height != m2.Height || m.Round != m2.Round || m.Step != m2.Step {
-					return fmt.Errorf("roundState mismatch. Got %v; Expected %v", m2, m)
+					errMsg := "roundState mismatch. Got %v; Expected %v"
+					return fmt.Errorf(errMsg, m2, m)
 				}
 			case <-newStepSub.Canceled():
 				return errors.New("failed to read off newStepSub.Out(). newStepSub was canceled")
@@ -62,32 +72,72 @@ func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscr
 				return errors.New("failed to read off newStepSub.Out()")
 			}
 		}
+
 	case msgInfo:
 		peerID := m.PeerID
 		if peerID == "" {
 			peerID = "local"
 		}
+
 		switch msg := m.Msg.(type) {
 		case *ProposalMessage:
 			p := msg.Proposal
-			cs.Logger.Info("Replay: Proposal", "height", p.Height, "round", p.Round, "header",
-				p.BlockID.PartSetHeader, "pol", p.POLRound, "peer", peerID, "receive_time", m.ReceiveTime)
+			cs.Logger.Info(
+				"Replay: Proposal",
+				"height", p.Height,
+				"round", p.Round,
+				"header", p.BlockID.PartSetHeader,
+				"pol", p.POLRound,
+				"peer", peerID,
+				"receive_time", m.ReceiveTime,
+			)
 		case *BlockPartMessage:
-			cs.Logger.Info("Replay: BlockPart", "height", msg.Height, "round", msg.Round, "peer", peerID)
+			cs.Logger.Info(
+				"Replay: BlockPart",
+				"height", msg.Height,
+				"round", msg.Round,
+				"peer", peerID,
+			)
 		case *VoteMessage:
 			v := msg.Vote
-			cs.Logger.Info("Replay: Vote", "height", v.Height, "round", v.Round, "type", v.Type,
-				"blockID", v.BlockID, "peer", peerID, "extensionLen", len(v.Extension), "extSigLen", len(v.ExtensionSignature))
+			cs.Logger.Info(
+				"Replay: Vote",
+				"height", v.Height,
+				"round", v.Round,
+				"type", v.Type,
+				"blockID", v.BlockID,
+				"peer", peerID,
+				"extensionLen", len(v.Extension),
+				"extSigLen", len(v.ExtensionSignature),
+			)
 		case *CommitMessage:
 			c := msg.Commit
 			cs.Logger.Info("Replay: Commit", c.Height)
-		}
+
+		case *BlobPartMessage:
+			cs.Logger.Info(
+				"Replay: BlobPart",
+				"height", msg.Height,
+				"round", msg.Round,
+				"peer", peerID,
+			)
+		} // end switch msg := m.Msg.(type)
+
 		cs.handleMsg(m)
+
 	case timeoutInfo:
-		cs.Logger.Info("Replay: Timeout", "height", m.Height, "round", m.Round, "step", m.Step, "dur", m.Duration)
+		cs.Logger.Info(
+			"Replay: Timeout",
+			"height", m.Height,
+			"round", m.Round,
+			"step", m.Step,
+			"dur", m.Duration,
+		)
 		cs.handleTimeout(m, cs.RoundState)
+
 	default:
-		return fmt.Errorf("replay: Unknown TimedWALMessage type: %v", reflect.TypeOf(msg.Msg))
+		errStr := "replay: Unknown TimedWALMessage type: %v"
+		return fmt.Errorf(errStr, reflect.TypeOf(msg.Msg))
 	}
 	return nil
 }

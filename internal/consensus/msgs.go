@@ -123,6 +123,28 @@ func MsgToWrappedProto(msg Message) (cmtcons.Message, error) {
 
 		pb.Sum = &cmtcons.Message_VoteSetBits{VoteSetBits: vsb}
 
+	case *BlobPartMessage:
+		parts, err := msg.Part.ToProto()
+		if err != nil {
+			return pb, cmterrors.ErrMsgToProto{MessageName: "Blob Part", Err: err}
+		}
+		pb.Sum = &cmtcons.Message_BlobPart{
+			BlobPart: &cmtcons.BlobPart{
+				Height: msg.Height,
+				Round:  msg.Round,
+				Part:   *parts,
+			},
+		}
+
+	case *HasProposalBlobPartMessage:
+		pb.Sum = &cmtcons.Message_HasProposalBlobPart{
+			HasProposalBlobPart: &cmtcons.HasProposalBlobPart{
+				Height: msg.Height,
+				Round:  msg.Round,
+				Index:  msg.Index,
+			},
+		}
+
 	default:
 		return pb, ErrConsensusMessageNotRecognized{msg}
 	}
@@ -255,6 +277,25 @@ func MsgFromProto(p proto.Message) (Message, error) {
 			BlockID: *bi,
 			Votes:   bits,
 		}
+
+	case *cmtcons.BlobPart:
+		parts, err := types.PartFromProto(&msg.Part)
+		if err != nil {
+			return nil, cmterrors.ErrMsgToProto{MessageName: "Blob Part", Err: err}
+		}
+		pb = &BlobPartMessage{
+			Height: msg.Height,
+			Round:  msg.Round,
+			Part:   parts,
+		}
+
+	case *cmtcons.HasProposalBlobPart:
+		pb = &HasProposalBlobPartMessage{
+			Height: msg.Height,
+			Round:  msg.Round,
+			Index:  msg.Index,
+		}
+
 	default:
 		return nil, ErrConsensusMessageNotRecognized{msg}
 	}

@@ -47,6 +47,14 @@ message BlockPart {
   cometbft.types.v1.Part part   = 3 [(gogoproto.nullable) = false];
 }
 
+// BlobPart is sent when gossipping a piece of the blob associated with the proposed
+// block.
+message BlobPart {
+  int64                  height = 1;
+  int32                  round  = 2;
+  cometbft.types.v1.Part part   = 3 [(gogoproto.nullable) = false];
+}
+
 // Vote is sent when voting for a proposal (or lack thereof).
 message Vote {
   cometbft.types.v1.Vote vote = 1;
@@ -89,6 +97,14 @@ message HasProposalBlockPart {
   int32 index  = 3;
 }
 
+// HasProposalBlobPart is sent to indicate that a particular proposal blob part has
+// been received.
+message HasProposalBlobPart {
+  int64 height = 1;
+  int32 round  = 2;
+  int32 index  = 3;
+}
+
 // Message is an abstract consensus message.
 message Message {
   // Sum of all possible messages.
@@ -104,5 +120,7 @@ message Message {
     VoteSetBits          vote_set_bits           = 9;
     HasProposalBlockPart has_proposal_block_part = 10;
     Commit               commit                  = 11;
+    BlobPart blob_part = 12;
+    HasProposalBlobPart has_proposal_blob_part = 13;
   }
 }

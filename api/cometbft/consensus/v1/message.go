@@ -72,6 +72,18 @@ func (m *HasProposalBlockPart) Wrap() proto.Message {
 	return cm
 }
 
+func (m *BlobPart) Wrap() proto.Message {
+	cm := &Message{}
+	cm.Sum = &Message_BlobPart{BlobPart: m}
+	return cm
+}
+
+func (m *HasProposalBlobPart) Wrap() proto.Message {
+	cm := &Message{}
+	cm.Sum = &Message_HasProposalBlobPart{HasProposalBlobPart: m}
+	return cm
+}
+
 // Unwrap implements the p2p Wrapper interface and unwraps a wrapped consensus
 // proto message.
 func (m *Message) Unwrap() (proto.Message, error) {
@@ -108,6 +120,12 @@ func (m *Message) Unwrap() (proto.Message, error) {
 
 	case *Message_VoteSetBits:
 		return m.GetVoteSetBits(), nil
+
+	case *Message_BlobPart:
+		return m.GetBlobPart(), nil
+
+	case *Message_HasProposalBlobPart:
+		return m.GetHasProposalBlobPart(), nil
 
 	default:
 		return nil, fmt.Errorf("unknown message: %T", msg)

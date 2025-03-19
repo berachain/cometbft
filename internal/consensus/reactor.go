@@ -322,6 +322,9 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 				ChannelID: VoteSetBitsChannel,
 				Message:   eMsg,
 			})
+
+		case *HasProposalBlobPartMessage:
+			// TODO
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 		}
@@ -341,6 +344,8 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.SetHasProposalBlockPart(msg.Height, msg.Round, int(msg.Part.Index))
 			conR.Metrics.BlockParts.With("peer_id", string(e.Src.ID())).Add(1)
 			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
+		case *BlobPartMessage:
+			// TODO
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 		}
@@ -453,6 +458,21 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 		}); err != nil {
 		conR.Logger.Error("Error adding listener for events (ProposalBlockPart)", "err", err)
 	}
+
+	// TODO: add FireEvent call for this message type where appropriate.
+	err := conR.conS.evsw.AddListenerForEvent(
+		subscriber,
+		types.EventProposalBlobPart,
+		func(data cmtevents.EventData) {
+			conR.broadcastHasProposalBlobPartMessage(data.(*BlobPartMessage))
+			conR.updateRoundStateNoCsLock()
+		})
+	if err != nil {
+		conR.Logger.Error(
+			"Error adding listener for events (ProposalBlobPart)",
+			"err", err,
+		)
+	}
 }
 
 func (conR *Reactor) unsubscribeFromBroadcastEvents() {
@@ -529,6 +549,21 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 // Broadcasts HasProposalBlockPartMessage to peers that care.
 func (conR *Reactor) broadcastHasProposalBlockPartMessage(partMsg *BlockPartMessage) {
 	msg := &cmtcons.HasProposalBlockPart{
+		Height: partMsg.Height,
+		Round:  partMsg.Round,
+		Index:  int32(partMsg.Part.Index),
+	}
+	go func() {
+		conR.Switch.TryBroadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   msg,
+		})
+	}()
+}
+
+// Broadcasts HasProposalBlobPartMessage to peers that care.
+func (conR *Reactor) broadcastHasProposalBlobPartMessage(partMsg *BlobPartMessage) {
+	msg := &cmtcons.HasProposalBlobPart{
 		Height: partMsg.Height,
 		Round:  partMsg.Round,
 		Index:  int32(partMsg.Part.Index),
@@ -1052,7 +1087,10 @@ func (conR *Reactor) peerStatsRoutine() {
 				if numParts := ps.RecordBlockPart(); numParts%blocksToContributeToBecomeGoodPeer == 0 {
 					conR.Switch.MarkPeerAsGood(peer)
 				}
+			case *BlobPartMessage:
+				ps.RecordBlobPart()
 			}
+
 		case <-conR.conS.Quit():
 			return
 
@@ -1109,11 +1147,16 @@ type PeerState struct {
 type peerStateStats struct {
 	Votes      int `json:"votes"`
 	BlockParts int `json:"block_parts"`
+	BlobParts  int `json:"blob_parts"`
 }
 
 func (pss peerStateStats) String() string {
-	return fmt.Sprintf("peerStateStats{votes: %d, blockParts: %d}",
-		pss.Votes, pss.BlockParts)
+	return fmt.Sprintf(
+		"peerStateStats{votes: %d, blockParts: %d, blobParts: %d}",
+		pss.Votes,
+		pss.BlockParts,
+		pss.BlobParts,
+	)
 }
 
 // NewPeerState returns a new PeerState for the given Peer.
@@ -1499,6 +1542,24 @@ func (ps *PeerState) BlockPartsSent() int {
 	return ps.Stats.BlockParts
 }
 
+// RecordBlobPart increments internal blob part related statistics for this peer.
+// It returns the total number of added blob parts.
+func (ps *PeerState) RecordBlobPart() int {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	ps.Stats.BlobParts++
+	return ps.Stats.BlobParts
+}
+
+// BlobPartsSent returns the number of useful blob parts the peer has sent us.
+func (ps *PeerState) BlobPartsSent() int {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	return ps.Stats.BlobParts
+}
+
 // SetHasVote sets the given vote as known by the peer.
 func (ps *PeerState) SetHasVote(vote *types.Vote) {
 	ps.mtx.Lock()
@@ -1705,6 +1766,8 @@ func init() {
 	cmtjson.RegisterType(&HasProposalBlockPartMessage{}, "tendermint/HasProposalBlockPart")
 	cmtjson.RegisterType(&VoteSetMaj23Message{}, "tendermint/VoteSetMaj23")
 	cmtjson.RegisterType(&VoteSetBitsMessage{}, "tendermint/VoteSetBits")
+	cmtjson.RegisterType(&BlobPartMessage{}, "tendermint/BlobPart")
+	cmtjson.RegisterType(&HasProposalBlobPartMessage{}, "tendermint/HasProposalBlobPart")
 }
 
 // -------------------------------------
@@ -1896,6 +1959,35 @@ func (m *BlockPartMessage) String() string {
 
 // -------------------------------------
 
+// BlobPartMessage is sent when gossipping a piece of the blob associated with the
+// block being proposed.
+type BlobPartMessage struct {
+	Height int64
+	Round  int32
+	Part   *types.Part
+}
+
+// ValidateBasic performs basic validation.
+func (m *BlobPartMessage) ValidateBasic() error {
+	if m.Height < 0 {
+		return cmterrors.ErrNegativeField{Field: "Height"}
+	}
+	if m.Round < 0 {
+		return cmterrors.ErrNegativeField{Field: "Round"}
+	}
+	if err := m.Part.ValidateBasic(); err != nil {
+		return cmterrors.ErrWrongField{Field: "Part", Err: err}
+	}
+	return nil
+}
+
+// String returns a string representation.
+func (m *BlobPartMessage) String() string {
+	return fmt.Sprintf("[BlobPart H:%v R:%v P:%v]", m.Height, m.Round, m.Part)
+}
+
+// -------------------------------------
+
 // CommitMessage is sent when voting for a proposal (or lack thereof).
 type CommitMessage struct {
 	Commit *types.Commit
@@ -2054,6 +2146,40 @@ func (m *HasProposalBlockPartMessage) String() string {
 	return fmt.Sprintf("[HasProposalBlockPart PI:%v HR:{%v/%02d}]", m.Index, m.Height, m.Round)
 }
 
+// -------------------------------------
+
+// HasProposalBlobPartMessage is sent to indicate that a particular blob part has been received.
+type HasProposalBlobPartMessage struct {
+	Height int64
+	Round  int32
+	Index  int32
+}
+
+// ValidateBasic performs basic validation.
+func (m *HasProposalBlobPartMessage) ValidateBasic() error {
+	if m.Height < 1 {
+		return cmterrors.ErrInvalidField{Field: "Height", Reason: "( < 1 )"}
+	}
+	if m.Round < 0 {
+		return cmterrors.ErrNegativeField{Field: "Round"}
+	}
+	if m.Index < 0 {
+		return cmterrors.ErrNegativeField{Field: "Index"}
+	}
+	return nil
+}
+
+// String returns a string representation.
+func (m *HasProposalBlobPartMessage) String() string {
+	str := fmt.Sprintf(
+		"[HasProposalBlobPart PI:%v HR:{%v/%02d}]",
+		m.Index,
+		m.Height,
+		m.Round,
+	)
+	return str
+}
+
 var (
 	_ types.Wrapper = &cmtcons.BlockPart{}
 	_ types.Wrapper = &cmtcons.HasVote{}
@@ -2065,4 +2191,6 @@ var (
 	_ types.Wrapper = &cmtcons.VoteSetBits{}
 	_ types.Wrapper = &cmtcons.VoteSetMaj23{}
 	_ types.Wrapper = &cmtcons.Commit{}
+	_ types.Wrapper = &cmtcons.BlobPart{}
+	_ types.Wrapper = &cmtcons.HasProposalBlobPart{}
 )

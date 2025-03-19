@@ -967,6 +967,8 @@ func (cs *State) handleMsg(mi msgInfo) {
 		if err != nil {
 			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit, "err", err)
 		}
+	case *BlobPartMessage:
+		// TODO
 
 	default:
 		cs.Logger.Error("Unknown msg type", "type", fmt.Sprintf("%T", msg))

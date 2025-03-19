@@ -21,194 +21,245 @@ import (
 )
 
 func TestMsgToProto(t *testing.T) {
-	psh := types.PartSetHeader{
-		Total: 1,
-		Hash:  cmtrand.Bytes(32),
-	}
-	pbPsh := psh.ToProto()
-	bi := types.BlockID{
-		Hash:          cmtrand.Bytes(32),
-		PartSetHeader: psh,
-	}
-	pbBi := bi.ToProto()
-	bits := bits.NewBitArray(1)
-	pbBits := bits.ToProto()
+	var (
+		blkPartSetHdr = types.PartSetHeader{
+			Total: 1,
+			Hash:  cmtrand.Bytes(32),
+		}
+		protoBlkPartSetHdr = blkPartSetHdr.ToProto()
+		blkPart            = types.Part{
+			Index: 1,
+			Bytes: []byte("test"),
+			Proof: merkle.Proof{
+				Total:    1,
+				Index:    1,
+				LeafHash: cmtrand.Bytes(32),
+				Aunts:    [][]byte{},
+			},
+		}
+		blkID = types.BlockID{
+			Hash:          cmtrand.Bytes(32),
+			PartSetHeader: blkPartSetHdr,
+		}
+		protoBlkID = blkID.ToProto()
 
-	parts := types.Part{
-		Index: 1,
-		Bytes: []byte("test"),
-		Proof: merkle.Proof{
-			Total:    1,
-			Index:    1,
-			LeafHash: cmtrand.Bytes(32),
-			Aunts:    [][]byte{},
-		},
-	}
-	pbParts, err := parts.ToProto()
+		blobPartSetHdr = types.PartSetHeader{
+			Total: 1,
+			Hash:  cmtrand.Bytes(32),
+		}
+		blobPart = types.Part{
+			Index: 1,
+			Bytes: []byte("blob"),
+			Proof: merkle.Proof{
+				Total:    1,
+				Index:    1,
+				LeafHash: cmtrand.Bytes(32),
+				Aunts:    [][]byte{},
+			},
+		}
+		blobID = types.BlobID{
+			Hash:          cmtrand.Bytes(32),
+			PartSetHeader: blobPartSetHdr,
+		}
+
+		proposal = types.Proposal{
+			Type:      types.ProposalType,
+			Height:    1,
+			Round:     2,
+			POLRound:  1,
+			BlockID:   blkID,
+			BlobID:    blobID,
+			Timestamp: cmttime.Now(),
+			Signature: cmtrand.Bytes(20),
+		}
+		protoProposal = proposal.ToProto()
+		vote          = types.MakeVoteNoError(
+			t,
+			types.NewMockPV(),
+			"chainID",
+			0, /* valIndex */
+			1, /* height */
+			0, /* round */
+			types.PrecommitType,
+			blkID,
+			cmttime.Now(),
+		)
+		protoVote = vote.ToProto()
+		bits      = bits.NewBitArray(1)
+		protoBits = bits.ToProto()
+	)
+	protoBlkPart, err := blkPart.ToProto()
 	require.NoError(t, err)
 
-	proposal := types.Proposal{
-		Type:      types.ProposalType,
-		Height:    1,
-		Round:     2,
-		POLRound:  1,
-		BlockID:   bi,
-		Timestamp: cmttime.Now(),
-		Signature: cmtrand.Bytes(20),
-	}
-	pbProposal := proposal.ToProto()
-
-	vote := types.MakeVoteNoError(
-		t,
-		types.NewMockPV(),
-		"chainID",
-		0,
-		1,
-		0,
-		types.PrecommitType,
-		bi,
-		cmttime.Now(),
-	)
-	pbVote := vote.ToProto()
+	protoBlobPart, err := blobPart.ToProto()
+	require.NoError(t, err)
 
 	testsCases := []struct {
-		testName string
-		msg      Message
-		want     proto.Message
-		wantErr  bool
+		name         string
+		msg          Message
+		wantProtoMsg proto.Message
+		wantErr      bool
 	}{
 		{
-			"successful NewRoundStepMessage", &NewRoundStepMessage{
-				Height:                2,
-				Round:                 1,
-				Step:                  1,
-				SecondsSinceStartTime: 1,
-				LastCommitRound:       2,
-			}, &cmtcons.NewRoundStep{
+			name: "successful NewRoundStepMessage",
+			msg: &NewRoundStepMessage{
 				Height:                2,
 				Round:                 1,
 				Step:                  1,
 				SecondsSinceStartTime: 1,
 				LastCommitRound:       2,
 			},
-
-			false,
+			wantProtoMsg: &cmtcons.NewRoundStep{
+				Height:                2,
+				Round:                 1,
+				Step:                  1,
+				SecondsSinceStartTime: 1,
+				LastCommitRound:       2,
+			},
+			wantErr: false,
 		},
-
 		{
-			"successful NewValidBlockMessage", &NewValidBlockMessage{
+			name: "successful NewValidBlockMessage",
+			msg: &NewValidBlockMessage{
 				Height:             1,
 				Round:              1,
-				BlockPartSetHeader: psh,
+				BlockPartSetHeader: blkPartSetHdr,
 				BlockParts:         bits,
 				IsCommit:           false,
-			}, &cmtcons.NewValidBlock{
+			},
+			wantProtoMsg: &cmtcons.NewValidBlock{
 				Height:             1,
 				Round:              1,
-				BlockPartSetHeader: pbPsh,
-				BlockParts:         pbBits,
+				BlockPartSetHeader: protoBlkPartSetHdr,
+				BlockParts:         protoBits,
 				IsCommit:           false,
 			},
-
-			false,
+			wantErr: false,
 		},
 		{
-			"successful BlockPartMessage", &BlockPartMessage{
+			name: "successful BlockPartMessage",
+			msg: &BlockPartMessage{
 				Height: 100,
 				Round:  1,
-				Part:   &parts,
-			}, &cmtcons.BlockPart{
-				Height: 100,
-				Round:  1,
-				Part:   *pbParts,
+				Part:   &blkPart,
 			},
-
-			false,
+			wantProtoMsg: &cmtcons.BlockPart{
+				Height: 100,
+				Round:  1,
+				Part:   *protoBlkPart,
+			},
+			wantErr: false,
 		},
 		{
-			"successful ProposalPOLMessage", &ProposalPOLMessage{
+			name: "successful ProposalPOLMessage",
+			msg: &ProposalPOLMessage{
 				Height:           1,
 				ProposalPOLRound: 1,
 				ProposalPOL:      bits,
-			}, &cmtcons.ProposalPOL{
+			},
+			wantProtoMsg: &cmtcons.ProposalPOL{
 				Height:           1,
 				ProposalPolRound: 1,
-				ProposalPol:      *pbBits,
+				ProposalPol:      *protoBits,
 			},
-			false,
+			wantErr: false,
 		},
 		{
-			"successful ProposalMessage", &ProposalMessage{
+			name: "successful ProposalMessage",
+			msg: &ProposalMessage{
 				Proposal: &proposal,
-			}, &cmtcons.Proposal{
-				Proposal: *pbProposal,
 			},
-
-			false,
+			wantProtoMsg: &cmtcons.Proposal{
+				Proposal: *protoProposal,
+			},
+			wantErr: false,
 		},
 		{
-			"successful VoteMessage", &VoteMessage{
+			name: "successful VoteMessage",
+			msg: &VoteMessage{
 				Vote: vote,
-			}, &cmtcons.Vote{
-				Vote: pbVote,
 			},
-
-			false,
+			wantProtoMsg: &cmtcons.Vote{
+				Vote: protoVote,
+			},
+			wantErr: false,
 		},
 		{
-			"successful VoteSetMaj23", &VoteSetMaj23Message{
+			name: "successful VoteSetMaj23",
+			msg: &VoteSetMaj23Message{
 				Height:  1,
 				Round:   1,
 				Type:    1,
-				BlockID: bi,
-			}, &cmtcons.VoteSetMaj23{
-				Height:  1,
-				Round:   1,
-				Type:    1,
-				BlockID: pbBi,
+				BlockID: blkID,
 			},
-
-			false,
+			wantProtoMsg: &cmtcons.VoteSetMaj23{
+				Height:  1,
+				Round:   1,
+				Type:    1,
+				BlockID: protoBlkID,
+			},
+			wantErr: false,
 		},
 		{
-			"successful VoteSetBits", &VoteSetBitsMessage{
+			name: "successful VoteSetBits",
+			msg: &VoteSetBitsMessage{
 				Height:  1,
 				Round:   1,
 				Type:    1,
-				BlockID: bi,
+				BlockID: blkID,
 				Votes:   bits,
-			}, &cmtcons.VoteSetBits{
+			},
+			wantProtoMsg: &cmtcons.VoteSetBits{
 				Height:  1,
 				Round:   1,
 				Type:    1,
-				BlockID: pbBi,
-				Votes:   *pbBits,
+				BlockID: protoBlkID,
+				Votes:   *protoBits,
 			},
-
-			false,
+			wantErr: false,
 		},
-		{"failure", nil, &cmtcons.Message{}, true},
+		{
+			name: "successful BlobPartMessage",
+			msg: &BlobPartMessage{
+				Height: 42,
+				Round:  1,
+				Part:   &blobPart,
+			},
+			wantProtoMsg: &cmtcons.BlobPart{
+				Height: 42,
+				Round:  1,
+				Part:   *protoBlobPart,
+			},
+			wantErr: false,
+		},
+		{
+			name:         "failure",
+			msg:          nil,
+			wantProtoMsg: &cmtcons.Message{},
+			wantErr:      true,
+		},
 	}
 	for _, tt := range testsCases {
-		t.Run(tt.testName, func(t *testing.T) {
-			wpb, err := MsgToWrappedProto(tt.msg)
+		t.Run(tt.name, func(t *testing.T) {
+			wrappedProto, err := MsgToWrappedProto(tt.msg)
 			if tt.wantErr {
 				assert.Equal(t, tt.wantErr, err != nil)
 				return
 			}
 			require.NoError(t, err)
-			pb, err := wpb.Unwrap()
+
+			gotProtoMsg, err := wrappedProto.Unwrap()
 			require.NoError(t, err)
-			assert.EqualValues(t, tt.want, pb, tt.testName)
 
-			msg, err := MsgFromProto(pb)
+			assert.EqualValues(t, tt.wantProtoMsg, gotProtoMsg, tt.name)
 
+			gotMsg, err := MsgFromProto(gotProtoMsg)
 			if !tt.wantErr {
 				require.NoError(t, err)
-				bcm := assert.Equal(t, tt.msg, msg, tt.testName)
-				assert.True(t, bcm, tt.testName)
+				bcm := assert.Equal(t, tt.msg, gotMsg, tt.name)
+				assert.True(t, bcm, tt.name)
 			} else {
-				require.Error(t, err, tt.testName)
+				require.Error(t, err, tt.name)
 			}
 		})
 	}
