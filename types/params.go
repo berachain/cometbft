@@ -26,7 +26,7 @@ const (
 	MaxBlockPartsCount = (MaxBlockSizeBytes / BlockPartSizeBytes) + 1
 
 	// MaxBlobSyzeBytes is the maximum permitted size of a blob.
-	MaxBlobSizeBytes = 800 * 1024 // 800KB
+	MaxBlobSizeBytes = 800 * 1024 // 800kB
 
 	// BlobPartSizeBytes is the size of one blob part.
 	BlobPartSizeBytes uint32 = 65536 // 64kB
