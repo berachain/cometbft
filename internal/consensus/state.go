@@ -1273,16 +1273,20 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		cs.Logger.Error("failed flushing WAL to disk")
 	}
 
-	var propBlobID types.BlobID
+	var (
+		propBlobID types.BlobID
+		blobParts  *types.PartSet
+	)
+	// Not all blocks have a corresponding blob. If that's the case, we don't create
+	// blob parts and we don't set the blob ID.
 	if !blob.IsNil() {
-		blobParts := types.NewPartSetFromData(blob, types.BlobPartSizeBytes)
+		blobParts = types.NewPartSetFromData(blob, types.BlobPartSizeBytes)
 		propBlobID = types.BlobID{
 			Hash:          blob.Hash(),
 			PartSetHeader: blobParts.Header(),
 		}
 	}
 
-	// Make proposal
 	var (
 		propBlockID = types.BlockID{
 			Hash:          block.Hash(),
@@ -1302,7 +1306,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 	if err == nil {
 		proposal.Signature = protoProposal.Signature
 
-		// send proposal and block parts on internal proposalMsg queue
+		// send proposal, block parts, and blob parts on internal proposalMsg queue
 		proposalMsg := msgInfo{
 			Msg:         &ProposalMessage{proposal},
 			PeerID:      "",
@@ -1310,9 +1314,9 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		}
 		cs.sendInternalMessage(proposalMsg)
 
-		for i := 0; i < int(blockParts.Total()); i++ {
+		for i := range blockParts.Total() {
 			var (
-				part       = blockParts.GetPart(i)
+				part       = blockParts.GetPart(int(i))
 				blkPartMsg = msgInfo{
 					Msg:         &BlockPartMessage{cs.Height, cs.Round, part},
 					PeerID:      "",
@@ -1320,6 +1324,23 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 				}
 			)
 			cs.sendInternalMessage(blkPartMsg)
+		}
+
+		// Recall that not all blocks have a corresponding blob. Therefore, we might
+		// have not initialized the blobParts pointer a few lines above. Obviously,
+		// if blobParts is nil, we have nothing to send.
+		if blobParts != nil {
+			for i := range blobParts.Total() {
+				var (
+					part        = blobParts.GetPart(int(i))
+					blobPartMsg = msgInfo{
+						Msg:         &BlobPartMessage{cs.Height, cs.Round, part},
+						PeerID:      "",
+						ReceiveTime: time.Time{},
+					}
+				)
+				cs.sendInternalMessage(blobPartMsg)
+			}
 		}
 
 		cs.Logger.Debug(
