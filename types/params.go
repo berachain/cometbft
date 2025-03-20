@@ -25,6 +25,15 @@ const (
 	// MaxBlockPartsCount is the maximum number of block parts.
 	MaxBlockPartsCount = (MaxBlockSizeBytes / BlockPartSizeBytes) + 1
 
+	// MaxBlobSyzeBytes is the maximum permitted size of a blob.
+	MaxBlobSizeBytes = 800 * 1024 // 800kB
+
+	// BlobPartSizeBytes is the size of one blob part.
+	BlobPartSizeBytes uint32 = 65536 // 64kB
+
+	// MaxBlobPartsCount defines the maximum number of blob parts.
+	MaxBlobPartsCount = (MaxBlobSizeBytes / BlobPartSizeBytes) + 1
+
 	ABCIPubKeyTypeEd25519   = ed25519.KeyType
 	ABCIPubKeyTypeSecp256k1 = secp256k1.KeyType
 	ABCIPubKeyTypeBls12381  = bls12381.KeyType
