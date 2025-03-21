@@ -24,7 +24,10 @@ type PeerRoundState struct {
 	Proposal                   bool                `json:"proposal"`
 	ProposalBlockPartSetHeader types.PartSetHeader `json:"proposal_block_part_set_header"`
 	// This bit array is length(# of block parts)
-	ProposalBlockParts *bits.BitArray `json:"proposal_block_parts"`
+	ProposalBlockParts        *bits.BitArray      `json:"proposal_block_parts"`
+	ProposalBlobPartSetHeader types.PartSetHeader `json:"proposal_blob_part_set_header"`
+	// This bit array is length(# of blob parts)
+	ProposalBlobParts *bits.BitArray `json:"proposal_blob_parts"`
 	// Proposal's POL round. -1 if none.
 	ProposalPOLRound int32 `json:"proposal_pol_round"`
 
@@ -52,7 +55,8 @@ func (prs PeerRoundState) String() string {
 func (prs PeerRoundState) StringIndented(indent string) string {
 	return fmt.Sprintf(`PeerRoundState{
 %s  %v/%v/%v @%v
-%s  Proposal %v -> %v
+%s  ProposalBlock %v -> %v
+%s  ProposalBlob %v -> %v
 %s  POL      %v (round %v)
 %s  Prevotes   %v
 %s  Precommits %v
@@ -61,6 +65,7 @@ func (prs PeerRoundState) StringIndented(indent string) string {
 %s}`,
 		indent, prs.Height, prs.Round, prs.Step, prs.StartTime,
 		indent, prs.ProposalBlockPartSetHeader, prs.ProposalBlockParts,
+		indent, prs.ProposalBlobPartSetHeader, prs.ProposalBlobParts,
 		indent, prs.ProposalPOL, prs.ProposalPOLRound,
 		indent, prs.Prevotes,
 		indent, prs.Precommits,
