@@ -94,6 +94,12 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "block_interval_seconds",
 			Help:      "Time between this and the last block.",
 		}, labels).With(labelsAndValues...),
+		NextBlockDelay: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "next_block_delay",
+			Help:      "Time to wait before proposing the next block.",
+		}, labels).With(labelsAndValues...),
 		NumTxs: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: MetricsSubsystem,
@@ -224,6 +230,7 @@ func NopMetrics() *Metrics {
 		ByzantineValidators:         discard.NewGauge(),
 		ByzantineValidatorsPower:    discard.NewGauge(),
 		BlockIntervalSeconds:        discard.NewHistogram(),
+		NextBlockDelay:              discard.NewHistogram(),
 		NumTxs:                      discard.NewGauge(),
 		BlockSizeBytes:              discard.NewGauge(),
 		ChainSizeBytes:              discard.NewCounter(),

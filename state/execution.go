@@ -253,6 +253,7 @@ func (blockExec *BlockExecutor) applyBlock(state State, blockID types.BlockID, b
 		"num_val_updates", len(abciResponse.ValidatorUpdates),
 		"block_app_hash", fmt.Sprintf("%X", abciResponse.AppHash),
 		"syncing_to_height", syncingToHeight,
+		"next_block_delay", abciResponse.NextBlockDelay,
 	)
 
 	// Assert that the application correctly returned tx results for each of the transactions provided in the block

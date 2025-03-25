@@ -1993,6 +1993,9 @@ func (cs *State) finalizeCommit(height int64) {
 
 	// must be called before we update state
 	cs.recordMetrics(height, block)
+	cs.metrics.NextBlockDelay.Observe(
+		stateCopy.NextBlockDelay.Seconds(),
+	)
 
 	// NewHeightStep!
 	cs.updateToState(stateCopy)
