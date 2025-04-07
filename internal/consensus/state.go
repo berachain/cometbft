@@ -2495,15 +2495,13 @@ func (cs *State) addProposalBlobPart(msg *BlobPartMessage, peerID p2p.ID) (added
 	// Blobs might be reused, so round mismatch is OK
 	if cs.Height != height {
 		cs.Logger.Debug("Received blob part from wrong height", "height", height, "round", round)
-		// Todo: Implement metrics
-		// cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
+		cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
 		return false, nil
 	}
 
 	// We're not expecting a blob part.
 	if cs.ProposalBlobParts == nil {
-		// Todo: Implement metrics
-		// cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
+		cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
 		// NOTE: this can happen when we've gone to a higher round and
 		// then receive parts from the previous round - not necessarily a bad peer.
 		cs.Logger.Debug(
@@ -2518,24 +2516,19 @@ func (cs *State) addProposalBlobPart(msg *BlobPartMessage, peerID p2p.ID) (added
 
 	added, err = cs.ProposalBlobParts.AddPart(part)
 	if err != nil {
-		// Todo: Implement metrics
-		// if errors.Is(err, types.ErrPartSetInvalidProof) || errors.Is(err, types.ErrPartSetUnexpectedIndex) {
-		//	cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
-		//}
+		if errors.Is(err, types.ErrPartSetInvalidProof) || errors.Is(err, types.ErrPartSetUnexpectedIndex) {
+			cs.metrics.BlobGossipPartsReceived.With("matches_current", "false").Add(1)
+		}
 		return added, err
 	}
 
-	// Todo: implement metrics
-	// cs.metrics.BlobGossipPartsReceived.With("matches_current", "true").Add(1)
-	// if !added {
-	//	// NOTE: we are disregarding possible duplicates above where heights dont match or we're not expecting blob parts yet
-	//	// but between the matches_current = true and false, we have all the info.
-	//	cs.metrics.DuplicateBlobPart.Add(1)
-	// } else {
-	//	cs.evsw.FireEvent(types.EventProposalBlobPart, msg)
-	//}
-	// Todo: remove this condition and enable the above one when metrics are implemented.
-	if added {
+	cs.metrics.BlobGossipPartsReceived.With("matches_current", "true").Add(1)
+
+	if !added {
+		// NOTE: we are disregarding possible duplicates above where heights dont match or we're not expecting blob parts yet
+		// but between the matches_current = true and false, we have all the info.
+		cs.metrics.DuplicateBlobPart.Add(1)
+	} else {
 		cs.evsw.FireEvent(types.EventProposalBlobPart, msg)
 	}
 

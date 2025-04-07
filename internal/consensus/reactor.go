@@ -346,8 +346,7 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 		case *BlobPartMessage:
 			ps.SetHasProposalBlobPart(msg.Height, msg.Round, int(msg.Part.Index))
-			// Todo: Implement metrics
-			// conR.Metrics.BlobParts.With("peer_id", string(e.Src.ID())).Add(1)
+			conR.Metrics.BlobParts.With("peer_id", string(e.Src.ID())).Add(1)
 			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))

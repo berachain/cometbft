@@ -66,8 +66,14 @@ type Metrics struct {
 	// Number of block parts transmitted by each peer.
 	BlockParts metrics.Counter `metrics_labels:"peer_id"`
 
+	// Number of blob parts transmitted by each peer.
+	BlobParts metrics.Counter `metrics_labels:"peer_id"`
+
 	// Number of times we received a duplicate block part
 	DuplicateBlockPart metrics.Counter
+
+	// Number of times we received a duplicate blob part
+	DuplicateBlobPart metrics.Counter
 
 	// Number of times we received a duplicate vote
 	DuplicateVote metrics.Counter
@@ -79,6 +85,10 @@ type Metrics struct {
 	// Number of block parts received by the node, separated by whether the part
 	// was relevant to the block the node is trying to gather or not.
 	BlockGossipPartsReceived metrics.Counter `metrics_labels:"matches_current"`
+
+	// Number of blob parts received by the node, separated by whether the part
+	// was relevant to the blob the node is trying to gather or not.
+	BlobGossipPartsReceived metrics.Counter `metrics_labels:"matches_current"`
 
 	// QuroumPrevoteMessageDelay is the interval in seconds between the proposal
 	// timestamp and the timestamp of the earliest prevote that achieved a quorum
