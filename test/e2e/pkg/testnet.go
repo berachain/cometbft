@@ -338,6 +338,9 @@ func (t Testnet) Validate() error {
 	if t.BlockMaxBytes > types.MaxBlockSizeBytes {
 		return fmt.Errorf("value of BlockMaxBytes cannot be higher than %d", types.MaxBlockSizeBytes)
 	}
+	if t.BlobMaxBytes > types.MaxBlobSizeBytes {
+		return fmt.Errorf("value of BlobMaxBytes cannot be higher than %d", types.MaxBlobSizeBytes)
+	}
 	if t.VoteExtensionsUpdateHeight < -1 {
 		return fmt.Errorf("value of VoteExtensionsUpdateHeight must be positive, 0 (InitChain), "+
 			"or -1 (Genesis); update height %d", t.VoteExtensionsUpdateHeight)

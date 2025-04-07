@@ -21,6 +21,7 @@ var (
 	ErrSignatureFoundInPastBlocks = errors.New("found signature from the same key")
 	ErrPubKeyIsNotSet             = errors.New("pubkey is not set. Look for \"Can't get private validator pubkey\" errors")
 	ErrProposalTooManyParts       = errors.New("proposal block has too many parts")
+	ErrProposalTooManyBlobParts   = errors.New("proposal blob has too many parts")
 )
 
 type ErrInvalidVote struct {

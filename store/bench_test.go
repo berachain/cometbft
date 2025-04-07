@@ -18,7 +18,7 @@ func BenchmarkRepeatedLoadSeenCommitSameBlock(b *testing.B) {
 	h := bs.Height() + 1
 	block := state.MakeBlock(h, test.MakeNTxs(h, 10), new(types.Commit), nil, state.Validators.GetProposer().Address)
 	seenCommit := makeTestExtCommitWithNumSigs(block.Header.Height, 100).ToCommit()
-	ps, err := block.MakePartSet(types.BlockPartSizeBytes)
+	ps, err := block.MakePartSet(types.PartSizeBytes)
 	require.NoError(b, err)
 	bs.SaveBlock(block, ps, seenCommit)
 

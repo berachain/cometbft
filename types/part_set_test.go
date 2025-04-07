@@ -132,16 +132,16 @@ func TestPart_ValidateBasic(t *testing.T) {
 		expectErr    bool
 	}{
 		{"Good Part", func(_ *Part) {}, false},
-		{"Too big part", func(pt *Part) { pt.Bytes = make([]byte, BlockPartSizeBytes+1) }, true},
+		{"Too big part", func(pt *Part) { pt.Bytes = make([]byte, PartSizeBytes+1) }, true},
 		{"Good small last part", func(pt *Part) {
 			pt.Index = 1
-			pt.Bytes = make([]byte, BlockPartSizeBytes-1)
+			pt.Bytes = make([]byte, PartSizeBytes-1)
 			pt.Proof.Total = 2
 			pt.Proof.Index = 1
 		}, false},
 		{"Too small inner part", func(pt *Part) {
 			pt.Index = 0
-			pt.Bytes = make([]byte, BlockPartSizeBytes-1)
+			pt.Bytes = make([]byte, PartSizeBytes-1)
 			pt.Proof.Total = 2
 		}, true},
 		{"Too big proof", func(pt *Part) {

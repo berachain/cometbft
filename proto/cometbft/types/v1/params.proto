@@ -19,6 +19,7 @@ message ConsensusParams {
   ABCIParams      abci      = 5 [deprecated = true]; // Use FeatureParams.vote_extensions_enable_height instead
   SynchronyParams synchrony = 6;
   FeatureParams   feature   = 7;
+  BlobParams      blob      = 8;
 }
 
 // BlockParams define limits on the block size and gas.
@@ -146,4 +147,15 @@ message ABCIParams {
   // vote_extensions_enable_height has been deprecated.
   // Instead, use FeatureParams.vote_extensions_enable_height.
   int64 vote_extensions_enable_height = 1;
+}
+
+// BlobParams define limits on the blob size.
+message BlobParams {
+  // Maximum size of a blob, in bytes.
+  //
+  // Must be greater or equal to -1 and cannot be greater than the hard-coded
+  // maximum blob size, which is 800kB (819200 bytes).
+  //
+  // If set to -1, the limit is the hard-coded maximum blob size.
+  int64 max_bytes = 1;
 }

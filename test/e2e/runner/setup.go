@@ -169,6 +169,9 @@ func MakeGenesis(testnet *e2e.Testnet) (types.GenesisDoc, error) {
 	if testnet.BlockMaxBytes != 0 {
 		genesis.ConsensusParams.Block.MaxBytes = testnet.BlockMaxBytes
 	}
+	if testnet.BlobMaxBytes != 0 {
+		genesis.ConsensusParams.Blob.MaxBytes = testnet.BlobMaxBytes
+	}
 	if testnet.VoteExtensionsUpdateHeight == -1 {
 		genesis.ConsensusParams.Feature.VoteExtensionsEnableHeight = testnet.VoteExtensionsEnableHeight
 	}

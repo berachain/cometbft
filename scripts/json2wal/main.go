@@ -41,7 +41,7 @@ func main() {
 	// the length of wal/MsgInfo in the wal.json may exceed the defaultBufSize(4096) of bufio
 	// because of the byte array in BlockPart
 	// leading to unmarshal error: unexpected end of JSON input
-	br := bufio.NewReaderSize(f, int(2*types.BlockPartSizeBytes))
+	br := bufio.NewReaderSize(f, int(2*types.PartSizeBytes))
 	dec := cs.NewWALEncoder(walFile)
 
 	for {

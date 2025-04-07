@@ -43,11 +43,11 @@ type Part struct {
 
 // ValidateBasic performs basic validation.
 func (part *Part) ValidateBasic() error {
-	if len(part.Bytes) > int(BlockPartSizeBytes) {
+	if len(part.Bytes) > int(PartSizeBytes) {
 		return ErrPartTooBig
 	}
 	// All parts except the last one should have the same constant size.
-	if int64(part.Index) < part.Proof.Total-1 && len(part.Bytes) != int(BlockPartSizeBytes) {
+	if int64(part.Index) < part.Proof.Total-1 && len(part.Bytes) != int(PartSizeBytes) {
 		return ErrPartInvalidSize
 	}
 	if int64(part.Index) != part.Proof.Index {

@@ -419,7 +419,7 @@ func initializeBlockStore(db dbm.DB, state sm.State, valAddr []byte) (*store.Blo
 		block := state.MakeBlock(i, test.MakeNTxs(i, 1), lastCommit.ToCommit(), nil, state.Validators.Proposer.Address)
 		block.Header.Time = defaultEvidenceTime.Add(time.Duration(i) * time.Minute)
 		block.Header.Version = cmtversion.Consensus{Block: version.BlockProtocol, App: 1}
-		partSet, err := block.MakePartSet(types.BlockPartSizeBytes)
+		partSet, err := block.MakePartSet(types.PartSizeBytes)
 		if err != nil {
 			return nil, err
 		}

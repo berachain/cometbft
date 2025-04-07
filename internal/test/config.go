@@ -61,6 +61,9 @@ var testGenesisFmt = `{
 			"max_gas": "-1",
 			"time_iota_ms": "10"
 		},
+		"blob": {
+			"max_bytes": "819200"
+		},
 		"synchrony": {
 			"message_delay": "500000000",
 			"precision": "10000000"

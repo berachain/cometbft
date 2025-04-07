@@ -767,7 +767,7 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 
 func applyBlock(t *testing.T, stateStore sm.Store, mempool mempl.Mempool, evpool sm.EvidencePool, st sm.State, blk *types.Block, proxyApp proxy.AppConns, bs sm.BlockStore) sm.State {
 	t.Helper()
-	testPartSize := types.BlockPartSizeBytes
+	testPartSize := types.PartSizeBytes
 	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool, bs)
 
 	bps, err := blk.MakePartSet(testPartSize)
@@ -1203,7 +1203,7 @@ func (bs *mockBlockStore) LoadBlockByHash([]byte) (*types.Block, *types.BlockMet
 func (*mockBlockStore) LoadBlockMetaByHash([]byte) *types.BlockMeta { return nil }
 func (bs *mockBlockStore) LoadBlockMeta(height int64) *types.BlockMeta {
 	block := bs.chain[height-1]
-	bps, err := block.MakePartSet(types.BlockPartSizeBytes)
+	bps, err := block.MakePartSet(types.PartSizeBytes)
 	require.NoError(bs.t, err)
 	return &types.BlockMeta{
 		BlockID: types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()},

@@ -150,7 +150,7 @@ func (p *pbtsTestHarness) observedValidatorProposerHeight(t *testing.T, previous
 	if timeout < ensureTimeout {
 		timeout = ensureTimeout
 	}
-	ensureProposalWithTimeout(p.ensureProposalCh, p.currentHeight, p.currentRound, nil, timeout)
+	ensureProposalWithTimeout(p.ensureProposalCh, p.currentHeight, p.currentRound, nil, types.BlobID{}, timeout)
 
 	rs := p.observedState.GetRoundState()
 	bid := types.BlockID{Hash: rs.ProposalBlock.Hash(), PartSetHeader: rs.ProposalBlockParts.Header()}
@@ -220,7 +220,7 @@ func (p *pbtsTestHarness) nextHeight(
 	k, err := proposer.GetPubKey()
 	require.NoError(t, err)
 	b.Header.ProposerAddress = k.Address()
-	ps, err := b.MakePartSet(types.BlockPartSizeBytes)
+	ps, err := b.MakePartSet(types.PartSizeBytes)
 	require.NoError(t, err)
 	bid := types.BlockID{Hash: b.Hash(), PartSetHeader: ps.Header()}
 	prop := types.NewProposal(

@@ -55,7 +55,7 @@ func makeAndApplyGoodBlock(state sm.State, height int64, lastCommit *types.Commi
 	blockExec *sm.BlockExecutor, evidence []types.Evidence,
 ) (sm.State, types.BlockID, error) {
 	block := state.MakeBlock(height, test.MakeNTxs(height, 10), lastCommit, evidence, proposerAddr)
-	partSet, err := block.MakePartSet(types.BlockPartSizeBytes)
+	partSet, err := block.MakePartSet(types.PartSizeBytes)
 	if err != nil {
 		return state, types.BlockID{}, err
 	}
