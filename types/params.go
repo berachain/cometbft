@@ -93,6 +93,7 @@ type VersionParams struct {
 type FeatureParams struct {
 	VoteExtensionsEnableHeight int64 `json:"vote_extensions_enable_height"`
 	PbtsEnableHeight           int64 `json:"pbts_enable_height"`
+	SBTEnableHeight            int64 `json:"sbt_enable_height"`
 }
 
 // VoteExtensionsEnabled returns true if vote extensions are enabled at height h
@@ -108,6 +109,13 @@ func (p FeatureParams) PbtsEnabled(h int64) bool {
 	enabledHeight := p.PbtsEnableHeight
 
 	return featureEnabled(enabledHeight, h, "PBTS")
+}
+
+// SBTEnabled returns true if SBT is enabled at height h and false otherwise.
+func (p FeatureParams) SBTEnabled(h int64) bool {
+	enabledHeight := p.SBTEnableHeight
+
+	return featureEnabled(enabledHeight, h, "SBT")
 }
 
 // featureEnabled returns true if `enabledHeight` points to a height that is smaller than `currentHeight“.
@@ -287,6 +295,10 @@ func (params ConsensusParams) ValidateBasic() error {
 		return fmt.Errorf("Feature.VoteExtensionsEnabledHeight cannot be negative. Got: %d", params.Feature.VoteExtensionsEnableHeight)
 	}
 
+	if params.Feature.SBTEnableHeight < 0 {
+		return fmt.Errorf("Feature.SBTEnableHeight cannot be negative. Got: %d", params.Feature.SBTEnableHeight)
+	}
+
 	if params.Feature.PbtsEnableHeight < 0 {
 		return fmt.Errorf("Feature.PbtsEnableHeight cannot be negative. Got: %d", params.Feature.PbtsEnableHeight)
 	}
@@ -370,6 +382,13 @@ func validateUpdateFeatures(params FeatureParams, updated cmtproto.FeatureParams
 
 	if updated.PbtsEnableHeight != nil {
 		err := validateUpdateFeatureEnableHeight(params.PbtsEnableHeight, updated.PbtsEnableHeight.Value, h, "PBTS")
+		if err != nil {
+			return err
+		}
+	}
+
+	if updated.SbtEnableHeight != nil {
+		err := validateUpdateFeatureEnableHeight(params.SBTEnableHeight, updated.SbtEnableHeight.Value, h, "SBT")
 		if err != nil {
 			return err
 		}
@@ -516,6 +535,7 @@ func (params *ConsensusParams) ToProto() cmtproto.ConsensusParams {
 		Feature: &cmtproto.FeatureParams{
 			PbtsEnableHeight:           &gogo.Int64Value{Value: params.Feature.PbtsEnableHeight},
 			VoteExtensionsEnableHeight: &gogo.Int64Value{Value: params.Feature.VoteExtensionsEnableHeight},
+			SbtEnableHeight:            &gogo.Int64Value{Value: params.Feature.SBTEnableHeight},
 		},
 		Synchrony: &cmtproto.SynchronyParams{
 			MessageDelay: &params.Synchrony.MessageDelay,
@@ -544,6 +564,7 @@ func ConsensusParamsFromProto(pbParams cmtproto.ConsensusParams) ConsensusParams
 		Feature: FeatureParams{
 			VoteExtensionsEnableHeight: pbParams.GetFeature().GetVoteExtensionsEnableHeight().GetValue(),
 			PbtsEnableHeight:           pbParams.GetFeature().GetPbtsEnableHeight().GetValue(),
+			SBTEnableHeight:            pbParams.GetFeature().GetSbtEnableHeight().GetValue(), // New field
 		},
 	}
 	if pbParams.GetSynchrony().GetMessageDelay() != nil {
