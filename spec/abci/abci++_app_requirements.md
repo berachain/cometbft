@@ -35,7 +35,9 @@ title: Requirements for the Application
                 - [EvidenceParams.MaxBytes](#evidenceparamsmaxbytes)
                 - [ValidatorParams.PubKeyTypes](#validatorparamspubkeytypes)
                 - [VersionParams.App](#versionparamsapp)
-                - [ABCIParams.VoteExtensionsEnableHeight](#abciparamsvoteextensionsenableheight)
+                - [FeatureParams.VoteExtensionsEnableHeight](#featureparamsvoteextensionsenableheight)
+                - [FeatureParams.PBTSEnableHeight](#featureparamspbtsenableheight)
+                - [FeatureParams.SBTEnableHeight](#featureparamssbtenableheight)
             - [Updating Consensus Parameters](#updating-consensus-parameters)
                 - [`InitChain`](#initchain)
                 - [`FinalizeBlock`, `PrepareProposal`/`ProcessProposal`](#finalizeblock-prepareproposalprocessproposal)
@@ -710,6 +712,27 @@ include the vote extensions from height `H`. For all heights after `H`
   extensions.
 
 Must always be set to a future height, 0, or the same height that was previously set.
+Once the chain's height reaches the value set, it cannot be changed to a different value.
+
+
+##### FeatureParams.SBTEnableHeight
+
+This parameter is either 0 or a positive height after which the application
+will apply the Stable Block Times (SBT) algorithms for computing
+`NextBlockDelay`. If the value is zero (which is the default), SBT is disabled 
+and a default `constBlockDelay` is returned by the application. 
+If the value is greater than zero, at all heights greater than the
+configured height `H` will leverage the SBT algorithm for computing
+the `NextBlockDelay`.
+When the configured height `H` is reached, `FinalizeBlock` will still return
+`constBlockDelay` but will properly set the `InitialHeight` and `InitialTime`
+of the SBT algorithm to the current height and time of the request. 
+Then, when reaching height `H+1`, `NextBlockDelay` is properly computed. 
+
+Note that the following rules apply to this parameter:
+- sbt cannot be disabled once enabled,
+
+The parameter must always be set to a future height, 0, or the same height that was previously set.
 Once the chain's height reaches the value set, it cannot be changed to a different value.
 
 ##### ValidatorParams.PubKeyTypes
