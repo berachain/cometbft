@@ -339,7 +339,7 @@ type makeParamsArgs struct {
 	pubkeyTypes         []string
 	voteExtensionHeight int64
 	pbtsHeight          int64
-	sbt_enable_height   int64
+	sbtEnableHeight     int64
 	precision           time.Duration
 	messageDelay        time.Duration
 }
@@ -369,7 +369,7 @@ func makeParams(args makeParamsArgs) ConsensusParams {
 		Feature: FeatureParams{
 			VoteExtensionsEnableHeight: args.voteExtensionHeight,
 			PbtsEnableHeight:           args.pbtsHeight,
-			SBTEnableHeight:            args.sbt_enable_height,
+			SBTEnableHeight:            args.sbtEnableHeight,
 		},
 	}
 }
@@ -455,23 +455,23 @@ func TestConsensusParamsUpdate(t *testing.T) {
 		},
 		// update enabled sbt height only
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbt_enable_height: 1}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 1}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					SbtEnableHeight: &types.Int64Value{Value: 3},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbt_enable_height: 1}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 1}),
 		},
 		// update enabled sbt height false
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbt_enable_height: 4}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					SbtEnableHeight: &types.Int64Value{Value: 3},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbt_enable_height: 4}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
 		},
 		{
 			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
@@ -722,7 +722,7 @@ func consensusParamsForTestProto() []ConsensusParams {
 		makeParams(makeParamsArgs{pbtsHeight: 100}),
 		makeParams(makeParamsArgs{voteExtensionHeight: 100, pbtsHeight: 42}),
 		makeParams(makeParamsArgs{pbtsHeight: 100}),
-		makeParams(makeParamsArgs{sbt_enable_height: 100}),
+		makeParams(makeParamsArgs{sbtEnableHeight: 100}),
 	}
 }
 
