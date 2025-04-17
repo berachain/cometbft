@@ -718,7 +718,7 @@ Once the chain's height reaches the value set, it cannot be changed to a differe
 ##### FeatureParams.SBTEnableHeight
 
 This parameter is either 0 or a positive height after which the application
-will apply the Stable Block Times (SBT) algorithms for computing
+will apply the Stable Block Times (SBT) algorithm for computing
 `NextBlockDelay`. If the value is zero (which is the default), SBT is disabled 
 and a default `constBlockDelay` is returned by the application. 
 If the value is greater than zero, at all heights greater than the

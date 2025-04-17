@@ -453,22 +453,32 @@ func TestConsensusParamsUpdate(t *testing.T) {
 			},
 			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1}),
 		},
-		// update enabled sbt height only
+		// set SbtEnableHeight (should succeed)
 		{
-			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 1}),
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
 					SbtEnableHeight: &types.Int64Value{Value: 3},
 				},
 			},
-			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 1}),
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 3}),
 		},
-		// update enabled sbt height false
+		// attempt to update SbtEnableHeight (should fail)
 		{
 			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
 			updates: &cmtproto.ConsensusParams{
 				Feature: &cmtproto.FeatureParams{
-					SbtEnableHeight: &types.Int64Value{Value: 3},
+					SbtEnableHeight: &types.Int64Value{Value: 5},
+				},
+			},
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
+		},
+		// attempt to update SbtEnableHeight (#2; should fail)
+		{
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
+			updates: &cmtproto.ConsensusParams{
+				Feature: &cmtproto.FeatureParams{
+					SbtEnableHeight: &types.Int64Value{Value: 1},
 				},
 			},
 			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),

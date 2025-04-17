@@ -564,7 +564,7 @@ func ConsensusParamsFromProto(pbParams cmtproto.ConsensusParams) ConsensusParams
 		Feature: FeatureParams{
 			VoteExtensionsEnableHeight: pbParams.GetFeature().GetVoteExtensionsEnableHeight().GetValue(),
 			PbtsEnableHeight:           pbParams.GetFeature().GetPbtsEnableHeight().GetValue(),
-			SBTEnableHeight:            pbParams.GetFeature().GetSbtEnableHeight().GetValue(), // New field
+			SBTEnableHeight:            pbParams.GetFeature().GetSbtEnableHeight().GetValue(),
 		},
 	}
 	if pbParams.GetSynchrony().GetMessageDelay() != nil {
