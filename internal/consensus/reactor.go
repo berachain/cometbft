@@ -693,15 +693,17 @@ OUTER_LOOP:
 			)
 		} else if !ps.HasCatchupCommit() {
 			c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs)
-			if commit, ok := (c).(*types.Commit); ok {
-				if ps.sendCommit(commit) {
-					continue OUTER_LOOP
+			if c != nil {
+				if commit, ok := (c).(*types.Commit); ok {
+					if ps.sendCommit(commit) {
+						continue OUTER_LOOP
+					}
+					logger.Error("Failed to send commit to peer",
+						"height", prs.Height,
+						"commit", commit)
+				} else {
+					logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
 				}
-				logger.Error("Failed to send commit to peer",
-					"height", prs.Height,
-					"commit", commit)
-			} else if c != nil {
-				logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
 			}
 		}
 
