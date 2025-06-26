@@ -303,16 +303,16 @@ title: Methods
 
 * **Request**:
 
-    | Name                  | Type                                            | Description                                                                                                      | Field Number |
-    | --------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------ |
-    | max_tx_bytes          | int64                                           | Currently configured maximum size in bytes taken by the modified transactions.                                   | 1            |
-    | txs                   | repeated bytes                                  | Preliminary list of transactions that have been picked as part of the block to propose.                          | 2            |
-    | local_last_commit     | [ExtendedCommitInfo](#extendedcommitinfo)       | Info about the last commit, obtained locally from CometBFT's data structures.                                    | 3            |
-    | misbehavior           | repeated [Misbehavior](#misbehavior)            | List of information about validators that misbehaved.                                                            | 4            |
-    | height                | int64                                           | The height of the block that will be proposed.                                                                   | 5            |
-    | time                  | [google.protobuf.Timestamp][protobuf-timestamp] | Timestamp of the block that that will be proposed.                                                               | 6            |
-    | next_validators_hash  | bytes                                           | Merkle root of the next validator set.                                                                           | 7            |
-    | proposer_address      | bytes                                           | [Address](../core/data_structures.md#address) of the validator that is creating the proposal.                    | 8            |
+    | Name                  | Type                                            | Description                                                                                                                                                                                                     | Field Number |
+    | --------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+    | max_tx_bytes          | int64                                           | Currently configured maximum size in bytes taken by the modified transactions.                                                                                                                                  | 1            |
+    | txs                   | repeated bytes                                  | Preliminary list of transactions that have been picked as part of the block to propose.                                                                                                                         | 2            |
+    | local_last_commit     | [ExtendedCommitInfo](#extendedcommitinfo)       | Info about the last commit, obtained locally from CometBFT's data structures.                                                                                                                                   | 3            |
+    | misbehavior           | repeated [Misbehavior](#misbehavior)            | List of information about validators that misbehaved.                                                                                                                                                           | 4            |
+    | height                | int64                                           | The height of the block that will be proposed.                                                                                                                                                                  | 5            |
+    | time                  | [google.protobuf.Timestamp][protobuf-timestamp] | Timestamp of the block that that will be proposed.                                                                                                                                                              | 6            |
+    | next_validators_hash  | bytes                                           | Merkle root of the next validator set.                                                                                                                                                                          | 7            |
+    | proposer_address      | bytes                                           | [Address](../core/data_structures.md#address) of the validator that is creating the proposal.                                                                                                                   | 8            |
     | next_proposer_address | bytes                                           | [Address](../core/data_structures.md#address) of the validator scheduled to create the proposal at the next height (also the proposer at round 1 of the current height if consensus goes into multiple rounds). | 9            |
 
 * **Response**:
@@ -673,11 +673,10 @@ without calling `VerifyVoteExtension` to verify it.
       some more precommits, even though it already has the required 2/3+.
       - Set to 0 if you want a proposer to make progress as soon as it has all
         the precommits and the block is processed by the application.
-      - Previously `timeout_commit` in CometBFT config.
-        **Set to constant 1s to preserve the old (v0.34 - v1.0) behavior**.
+      - Previously `timeout_commit` in CometBFT config. **Set to constant 1s to preserve the old (v0.34 - v1.0) behavior**.
     * `FinalizeBlockResponse.next_block_delay` is a non-deterministic field.
       This means that each node MAY provide a different value, which is
-      supposed to depend on how long processing is taking at the local node. It's
+      supposed to depend on how long things are taking at the local node. It's
       reasonable to use real --wallclock-- time and mandate for the nodes to have
       synchronized clocks (NTP, or other; PBTS also requires this) for the
       variable delay to work properly.
