@@ -1146,7 +1146,7 @@ type PrepareProposalRequest struct {
 	// address of the public key of the validator proposing the block.
 	ProposerAddress []byte `protobuf:"bytes,8,opt,name=proposer_address,json=proposerAddress,proto3" json:"proposer_address,omitempty"`
 	// address of the public key of the validator that will propose the block at the
-	// next height.
+	// next height (also the proposer at round 1 of the current height if consensus goes into multiple rounds).
 	NextProposerAddress []byte `protobuf:"bytes,9,opt,name=next_proposer_address,json=nextProposerAddress,proto3" json:"next_proposer_address,omitempty"`
 }
 
