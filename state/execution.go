@@ -171,16 +171,19 @@ func (blockExec *BlockExecutor) ProcessProposal(
 	block *types.Block,
 	state State,
 ) (bool, error) {
-	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), &abci.ProcessProposalRequest{
-		Hash:               block.Header.Hash(),
-		Height:             block.Header.Height,
-		Time:               block.Header.Time,
-		Txs:                block.Data.Txs.ToSliceOfBytes(),
-		ProposedLastCommit: buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
-		Misbehavior:        block.Evidence.Evidence.ToABCI(),
-		ProposerAddress:    block.ProposerAddress,
-		NextValidatorsHash: block.NextValidatorsHash,
-	})
+	req := &abci.ProcessProposalRequest{
+		Hash:                block.Header.Hash(),
+		Height:              block.Header.Height,
+		Time:                block.Header.Time,
+		Txs:                 block.Data.Txs.ToSliceOfBytes(),
+		ProposedLastCommit:  buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
+		Misbehavior:         block.Evidence.Evidence.ToABCI(),
+		ProposerAddress:     block.ProposerAddress,
+		NextValidatorsHash:  block.NextValidatorsHash,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
+	}
+
+	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), req)
 	if err != nil {
 		return false, err
 	}
