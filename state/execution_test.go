@@ -434,8 +434,9 @@ func TestProcessProposal(t *testing.T) {
 			Round: 0,
 			Votes: voteInfos,
 		},
-		NextValidatorsHash: block1.NextValidatorsHash,
-		ProposerAddress:    block1.ProposerAddress,
+		NextValidatorsHash:  block1.NextValidatorsHash,
+		ProposerAddress:     block1.ProposerAddress,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
 	}
 
 	acceptBlock, err := blockExec.ProcessProposal(block1, state)
