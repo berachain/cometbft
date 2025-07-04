@@ -69,6 +69,11 @@ func TestMain(m *testing.M) {
 			"listen_addresses = '*'",
 		},
 		ExposedPorts: []string{port},
+		PortBindings: map[docker.Port][]docker.PortBinding{
+			"5432/tcp": {
+				{HostIP: "0.0.0.0", HostPort: "5433"},
+			},
+		},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
