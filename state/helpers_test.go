@@ -197,6 +197,8 @@ type testApp struct {
 	LastTime         time.Time
 	ValidatorUpdates []abci.ValidatorUpdate
 	AppHash          []byte
+
+	NextProposerAddress types.Address
 }
 
 var _ abci.Application = (*testApp)(nil)
@@ -247,10 +249,13 @@ func (*testApp) PrepareProposal(
 	return &abci.PrepareProposalResponse{Txs: txs}, nil
 }
 
-func (*testApp) ProcessProposal(
+func (app *testApp) ProcessProposal(
 	_ context.Context,
 	req *abci.ProcessProposalRequest,
 ) (*abci.ProcessProposalResponse, error) {
+	app.NextProposerAddress = make([]byte, len(req.NextProposerAddress))
+	copy(app.NextProposerAddress, req.NextProposerAddress)
+
 	for _, tx := range req.Txs {
 		if len(tx) == 0 {
 			return &abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_REJECT}, nil

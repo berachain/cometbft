@@ -1115,7 +1115,7 @@ func TestProcessProposalNextProposerAddress(t *testing.T) {
 	const height = 2
 
 	var (
-		app      = &mockProposalApp{}
+		app      = &testApp{}
 		cc       = proxy.NewLocalClientCreator(app)
 		proxyApp = proxy.NewAppConns(cc, proxy.NopMetrics())
 	)
