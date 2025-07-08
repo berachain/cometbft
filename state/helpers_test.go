@@ -253,8 +253,10 @@ func (app *testApp) ProcessProposal(
 	_ context.Context,
 	req *abci.ProcessProposalRequest,
 ) (*abci.ProcessProposalResponse, error) {
-	app.NextProposerAddress = make([]byte, len(req.NextProposerAddress))
-	copy(app.NextProposerAddress, req.NextProposerAddress)
+	if len(req.NextProposerAddress) > 0 {
+		app.NextProposerAddress = make([]byte, len(req.NextProposerAddress))
+		copy(app.NextProposerAddress, req.NextProposerAddress)
+	}
 
 	for _, tx := range req.Txs {
 		if len(tx) == 0 {
