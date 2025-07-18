@@ -716,12 +716,7 @@ func (r *Reactor) crawlPeers(addrs []*p2p.NetAddress) {
 
 		err := r.dialPeer(addr)
 		if err != nil {
-			switch err.(type) {
-			case errMaxAttemptsToDial, errTooEarlyToDial, p2p.ErrCurrentlyDialingOrExistingAddress:
-				r.Logger.Debug(err.Error(), "addr", addr)
-			default:
-				r.Logger.Debug(err.Error(), "addr", addr)
-			}
+			r.Logger.Debug(err.Error(), "addr", addr)
 			continue
 		}
 
