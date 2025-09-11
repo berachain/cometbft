@@ -468,9 +468,10 @@ func TestProcessProposal(t *testing.T) {
 			Round: 0,
 			Votes: voteInfos,
 		},
-		NextValidatorsHash: block1.NextValidatorsHash,
-		ProposerAddress:    block1.ProposerAddress,
-		Blob:               blob,
+		NextValidatorsHash:  block1.NextValidatorsHash,
+		ProposerAddress:     block1.ProposerAddress,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
+		Blob:                blob,
 	}
 
 	acceptBlock, err := blockExec.ProcessProposal(block1, state, blob)
@@ -1145,7 +1146,74 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 		})
 	}
 }
+func TestProcessProposalNextProposerAddress(t *testing.T) {
+	const height = 2
 
+	var (
+		app                      = &testApp{}
+		state, stateDB, privVals = makeState(1, height, chainID)
+		storeOpts                = sm.StoreOptions{DiscardABCIResponses: false}
+		stateStore               = sm.NewStore(stateDB, storeOpts)
+		mp                       = &mpmocks.Mempool{}
+		blkStore                 = store.NewBlockStore(dbm.NewMemDB())
+		blkExec                  = sm.NewBlockExecutor(
+			stateStore,
+			log.NewNopLogger(),
+			proxyApp.Consensus(),
+			mp,
+			sm.EmptyEvidencePool{},
+			blkStore,
+		)
+		blk0 = makeBlock(state, height-1, new(types.Commit))
+	)
+	partSet, err := blk0.MakePartSet(types.BlockPartSizeBytes)
+	require.NoError(t, err)
+
+	var (
+		blk0ID = types.BlockID{
+			Hash: blk0.Hash(), PartSetHeader: partSet.Header(),
+		}
+		lastCommitSig = []types.CommitSig{}
+	)
+	for _, privVal := range privVals {
+		valPubKey, err := privVal.GetPubKey()
+		require.NoError(t, err)
+
+		var (
+			valAddr   = valPubKey.Address()
+			valIdx, _ = state.Validators.GetByAddress(valAddr)
+			vote      = types.MakeVoteNoError(
+				t,
+				privVal,
+				blk0.Header.ChainID,
+				valIdx,
+				height-1,
+				0, /* round */
+				2, /* step */
+				blk0ID,
+				cmttime.Now(),
+			)
+		)
+		lastCommitSig = append(lastCommitSig, vote.CommitSig())
+	}
+
+	var (
+		commit = &types.Commit{
+			Height:     height - 1,
+			Signatures: lastCommitSig,
+		}
+		blk1 = makeBlock(state, height, commit)
+	)
+	blk1.Txs = test.MakeNTxs(height, 10)
+
+	statusAccept, err := blkExec.ProcessProposal(blk1, state)
+	require.NoError(t, err)
+	require.True(t, statusAccept)
+
+	nextProposerAddr := state.NextValidators.GetProposer().Address
+	require.Equal(t, nextProposerAddr, app.NextProposerAddress)
+
+}
 func TestCreateProposalWithBlob(t *testing.T) {
 	const height = 2
 

@@ -52,6 +52,9 @@ type Metrics struct {
 	// Time between this and the last block.
 	BlockIntervalSeconds metrics.Histogram
 
+	// Time to wait before proposing the next block.
+	NextBlockDelay metrics.Histogram
+
 	// Number of transactions.
 	NumTxs metrics.Gauge
 	// Size of the block.

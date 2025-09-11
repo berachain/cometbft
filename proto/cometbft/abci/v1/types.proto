@@ -159,10 +159,14 @@ message ProcessProposalRequest {
   bytes next_validators_hash = 7;
   // address of the public key of the original proposer of the block.
   bytes proposer_address = 8;
-  // A blob (see EIP-4844) is a piece of temporary data attached to a blob
+  // address of the public key of the validator that will propose the block at the
+  // next height (also the proposer at round 1 of the current height if consensus
+  // goes into multiple rounds).
+  bytes next_proposer_address = 9;
+   // A blob (see EIP-4844) is a piece of temporary data attached to a blob
   // transaction included in a CometBFT block.
   // CometBFT gossips this blob separately from its corresponding block.
-  bytes blob = 9;
+  bytes blob = 10;
 }
 
 // ExtendVoteRequest extends a precommit vote with application-injected data.

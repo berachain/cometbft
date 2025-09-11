@@ -200,24 +200,18 @@ func (blockExec *BlockExecutor) ProcessProposal(
 	state State,
 	blob types.Blob,
 ) (bool, error) {
-	var (
-		lastCommit = buildLastCommitInfoFromStore(
-			block,
-			blockExec.store,
-			state.InitialHeight,
-		)
-		req = &abci.ProcessProposalRequest{
-			Hash:               block.Header.Hash(),
-			Height:             block.Header.Height,
-			Time:               block.Header.Time,
-			Txs:                block.Data.Txs.ToSliceOfBytes(),
-			ProposedLastCommit: lastCommit,
-			Misbehavior:        block.Evidence.Evidence.ToABCI(),
-			ProposerAddress:    block.ProposerAddress,
-			NextValidatorsHash: block.NextValidatorsHash,
-			Blob:               blob,
-		}
-	)
+	req := &abci.ProcessProposalRequest{
+		Hash:                block.Header.Hash(),
+		Height:              block.Header.Height,
+		Time:                block.Header.Time,
+		Txs:                 block.Data.Txs.ToSliceOfBytes(),
+		ProposedLastCommit:  buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
+		Misbehavior:         block.Evidence.Evidence.ToABCI(),
+		ProposerAddress:     block.ProposerAddress,
+		NextValidatorsHash:  block.NextValidatorsHash,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
+		Blob:                blob,
+	}
 
 	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), req)
 	if err != nil {
@@ -292,6 +286,7 @@ func (blockExec *BlockExecutor) applyBlock(state State, blockID types.BlockID, b
 		"num_val_updates", len(abciResponse.ValidatorUpdates),
 		"block_app_hash", fmt.Sprintf("%X", abciResponse.AppHash),
 		"syncing_to_height", syncingToHeight,
+		"next_block_delay", abciResponse.NextBlockDelay,
 	)
 
 	// Assert that the application correctly returned tx results for each of the transactions provided in the block

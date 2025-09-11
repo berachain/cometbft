@@ -1193,7 +1193,8 @@ func TestMarshalJSONPeerState(t *testing.T) {
 			"last_commit_round": -1,
 			"last_commit": null,
 			"catchup_commit_round": -1,
-			"catchup_commit": null
+			"catchup_commit": null,
+			"has_catchup_commit": false
 		},
 		"stats":{
 			"votes":"0",

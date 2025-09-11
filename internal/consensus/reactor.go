@@ -744,18 +744,17 @@ OUTER_LOOP:
 				"height", prs.Height,
 				"vote", vote,
 			)
-		} else {
-			if c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs); c != nil {
-				if commit, ok := (c).(*types.Commit); ok {
-					if ps.sendCommit(commit) {
-						continue OUTER_LOOP
-					}
-					logger.Error("Failed to send commit to peer",
-						"height", prs.Height,
-						"commit", commit)
-				} else {
-					logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
+		} else if !ps.HasCatchupCommit() {
+			c := getEntireCommitToSend(logger, conR.conS, rs, ps, prs)
+			if commit, ok := (c).(*types.Commit); ok {
+				if ps.sendCommit(commit) {
+					continue OUTER_LOOP
 				}
+				logger.Error("Failed to send commit to peer",
+					"height", prs.Height,
+					"commit", commit)
+			} else if c != nil {
+				logger.Error("Commit should have been returned, instead unknown type.", "type", fmt.Sprintf("%T", c))
 			}
 		}
 
@@ -1424,15 +1423,16 @@ func (ps *PeerState) SendProposalSetHasProposal(
 // sendCommit sends the aggregated commit to the peer.
 func (ps *PeerState) sendCommit(commit *types.Commit) bool {
 	ps.logger.Debug("Sending commit message", "ps", ps, "commit", commit)
-	return ps.peer.Send(p2p.Envelope{
+	if ps.peer.Send(p2p.Envelope{
 		ChannelID: VoteChannel,
 		Message: &cmtcons.Commit{
 			Commit: commit.ToProto(),
 		},
-	})
-
-	// XXX Good to have: mark the commit as received in the peer state
-	// ps.SetHasVote(vote) alternative
+	}) {
+		ps.SetHasCatchupCommit(commit)
+		return true
+	}
+	return false
 }
 
 // sendVoteSetHasVote sends the vote to the peer.
@@ -1669,6 +1669,32 @@ func (ps *PeerState) SetHasVoteFromPeer(vote *types.Vote, csHeight int64, valSiz
 	ps.setHasVote(vote.Height, vote.Round, vote.Type, vote.ValidatorIndex)
 }
 
+// SetHasCatchupCommit sets the given commit as known by the peer.
+func (ps *PeerState) SetHasCatchupCommit(commit *types.Commit) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	ps.setHasCatchupCommit(commit.Height, commit.Round)
+}
+
+// CONTRACT: Caller must hold the mutex.
+func (ps *PeerState) setHasCatchupCommit(height int64, round int32) {
+	ps.logger.Debug("setHasCatchupCommit",
+		"peerH/R",
+		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
+		"H/R",
+		log.NewLazySprintf("%d/%d", height, round))
+
+	ps.PRS.HasCatchupCommit = true
+}
+
+func (ps *PeerState) HasCatchupCommit() bool {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	return ps.PRS.HasCatchupCommit
+}
+
 func (ps *PeerState) setHasVote(height int64, round int32, voteType types.SignedMsgType, index int32) {
 	ps.logger.Debug("setHasVote",
 		"peerH/R",
@@ -1737,6 +1763,8 @@ func (ps *PeerState) ApplyNewRoundStepMessage(msg *NewRoundStepMessage) {
 		// We'll update the BitArray capacity later.
 		ps.PRS.CatchupCommitRound = -1
 		ps.PRS.CatchupCommit = nil
+
+		ps.PRS.HasCatchupCommit = false
 	}
 }
 

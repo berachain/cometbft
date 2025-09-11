@@ -139,6 +139,8 @@ message FeatureParams {
   //
   // Cannot be set to heights lower or equal to the current blockchain height.
   google.protobuf.Int64Value pbts_enable_height = 2 [(gogoproto.nullable) = true];
+
+  google.protobuf.Int64Value sbt_enable_height = 3 [(gogoproto.nullable) = true];
 }
 
 // ABCIParams is deprecated and its contents moved to FeatureParams

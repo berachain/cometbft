@@ -774,7 +774,7 @@ func (cs *State) updateToState(state sm.State) {
 	timeoutCommit := state.NextBlockDelay
 	// If the ABCI app didn't set a delay, use the deprecated config value.
 	if timeoutCommit == 0 {
-		timeoutCommit = cs.config.TimeoutCommit
+		timeoutCommit = cs.config.TimeoutCommit //nolint:staticcheck
 	}
 	if cs.CommitTime.IsZero() {
 		// "Now" makes it easier to sync up dev nodes.
@@ -2179,6 +2179,9 @@ func (cs *State) finalizeCommit(height int64) {
 
 	// must be called before we update state
 	cs.recordMetrics(height, block)
+	cs.metrics.NextBlockDelay.Observe(
+		stateCopy.NextBlockDelay.Seconds(),
+	)
 
 	// NewHeightStep!
 	cs.updateToState(stateCopy)
@@ -2695,7 +2698,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 		cs.evsw.FireEvent(types.EventVote, vote)
 
 		// if we can skip timeoutCommit and have all the votes now,
-		skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
+		skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0 //nolint:staticcheck
 		if skipTimeoutCommit && lastCommitAsVs.HasAll() {
 			// go straight to new round (skip timeout commit)
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
@@ -2860,7 +2863,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 
 			if !blockID.IsNil() {
 				cs.enterCommit(height, vote.Round)
-				skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
+				skipTimeoutCommit := cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0 //nolint:staticcheck
 				if skipTimeoutCommit && precommits.HasAll() {
 					cs.enterNewRound(cs.Height, 0)
 				}

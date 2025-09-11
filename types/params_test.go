@@ -451,6 +451,7 @@ type makeParamsArgs struct {
 	pubkeyTypes         []string
 	voteExtensionHeight int64
 	pbtsHeight          int64
+	sbtEnableHeight     int64
 	precision           time.Duration
 	messageDelay        time.Duration
 }
@@ -483,6 +484,7 @@ func makeParams(args makeParamsArgs) ConsensusParams {
 		Feature: FeatureParams{
 			VoteExtensionsEnableHeight: args.voteExtensionHeight,
 			PbtsEnableHeight:           args.pbtsHeight,
+			SBTEnableHeight:            args.sbtEnableHeight,
 		},
 	}
 }
@@ -565,6 +567,26 @@ func TestConsensusParamsUpdate(t *testing.T) {
 				},
 			},
 			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, pbtsHeight: 1}),
+		},
+		// set SbtEnableHeight
+		{
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3}),
+			updates: &cmtproto.ConsensusParams{
+				Feature: &cmtproto.FeatureParams{
+					SbtEnableHeight: &types.Int64Value{Value: 3},
+				},
+			},
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 3}),
+		},
+		// update SbtEnableHeight
+		{
+			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 4}),
+			updates: &cmtproto.ConsensusParams{
+				Feature: &cmtproto.FeatureParams{
+					SbtEnableHeight: &types.Int64Value{Value: 5},
+				},
+			},
+			updatedParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, sbtEnableHeight: 5}),
 		},
 		{
 			intialParams: makeParams(makeParamsArgs{blockBytes: 1, blockGas: 2, evidenceAge: 3, voteExtensionHeight: 0, pbtsHeight: 1}),
@@ -744,9 +766,31 @@ func TestConsensusParamsUpdate_EnableHeight(t *testing.T) {
 		})
 	}
 
+	// Test stable block times
+	for _, tc := range testCases {
+		t.Run(tc.name+" SBT", func(*testing.T) {
+			initialParams := makeParams(makeParamsArgs{
+				pbtsHeight: tc.from,
+			})
+			update := &cmtproto.ConsensusParams{Feature: &cmtproto.FeatureParams{}}
+			if tc.to == nilTest {
+				update.Feature.SbtEnableHeight = nil
+			} else {
+				update.Feature = &cmtproto.FeatureParams{
+					SbtEnableHeight: &types.Int64Value{Value: tc.to},
+				}
+			}
+			if tc.expectedErr {
+				require.Error(t, initialParams.ValidateUpdate(update, tc.current))
+			} else {
+				require.NoError(t, initialParams.ValidateUpdate(update, tc.current))
+			}
+		})
+	}
+
 	// Test PBTS and VE enabling
 	for _, tc := range testCases {
-		t.Run(tc.name+"VE PBTS", func(*testing.T) {
+		t.Run(tc.name+"VE PBTS SBT", func(*testing.T) {
 			initialParams := makeParams(makeParamsArgs{
 				voteExtensionHeight: tc.from,
 				pbtsHeight:          tc.from,
@@ -759,6 +803,7 @@ func TestConsensusParamsUpdate_EnableHeight(t *testing.T) {
 				update.Feature = &cmtproto.FeatureParams{
 					VoteExtensionsEnableHeight: &types.Int64Value{Value: tc.to},
 					PbtsEnableHeight:           &types.Int64Value{Value: tc.to},
+					SbtEnableHeight:            &types.Int64Value{Value: tc.to},
 				}
 			}
 			if tc.expectedErr {
@@ -792,6 +837,7 @@ func consensusParamsForTestProto() []ConsensusParams {
 		makeParams(makeParamsArgs{pbtsHeight: 100}),
 		makeParams(makeParamsArgs{voteExtensionHeight: 100, pbtsHeight: 42}),
 		makeParams(makeParamsArgs{pbtsHeight: 100}),
+		makeParams(makeParamsArgs{sbtEnableHeight: 100}),
 	}
 }
 
