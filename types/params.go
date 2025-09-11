@@ -20,7 +20,7 @@ const (
 	MaxBlockSizeBytes = 100 * 1024 * 1024
 
 	// MaxBlobSizeBytes is the maximum permitted size of the blob.
-	MaxBlobSizeBytes = 800 * 1024
+	MaxBlobSizeBytes = 800 * 1024 // 800kB
 
 	// PartSizeBytes defines the size (in bytes) of each part when splitting
 	// a large object for transmission over the wire.
@@ -108,6 +108,7 @@ type FeatureParams struct {
 	VoteExtensionsEnableHeight int64 `json:"vote_extensions_enable_height"`
 	PbtsEnableHeight           int64 `json:"pbts_enable_height"`
 	SBTEnableHeight            int64 `json:"sbt_enable_height"`
+	BlobEnableHeight           int64 `json:"blob_enable_height"` // unused
 }
 
 // VoteExtensionsEnabled returns true if vote extensions are enabled at height h
@@ -130,6 +131,13 @@ func (p FeatureParams) SBTEnabled(h int64) bool {
 	enabledHeight := p.SBTEnableHeight
 
 	return featureEnabled(enabledHeight, h, "SBT")
+}
+
+// BlobEnabled returns true if Blob is enabled at height h and false otherwise.
+func (p FeatureParams) BlobEnabled(h int64) bool {
+	enabledHeight := p.BlobEnableHeight
+
+	return featureEnabled(enabledHeight, h, "Blob")
 }
 
 // featureEnabled returns true if `enabledHeight` points to a height that is smaller than `currentHeight“.
@@ -210,7 +218,7 @@ func DefaultBlockParams() BlockParams {
 // DefaultBlobParams returns a default BlobParams.
 func DefaultBlobParams() BlobParams {
 	return BlobParams{
-		MaxBytes: 819200, // 800kB
+		MaxBytes: 0, // blobs disabled by default
 	}
 }
 
@@ -249,6 +257,7 @@ func DefaultFeatureParams() FeatureParams {
 		VoteExtensionsEnableHeight: 0,
 		PbtsEnableHeight:           1, // PBTS from start
 		SBTEnableHeight:            0, // SBT disabled by default
+		BlobEnableHeight:           0, // unused
 	}
 }
 
@@ -291,13 +300,13 @@ func (params ConsensusParams) ValidateBasic() error {
 			params.Block.MaxGas)
 	}
 
-	if params.Blob.MaxBytes == 0 {
-		return errors.New("blob.MaxBytes cannot be 0")
-	}
-	if params.Blob.MaxBytes < -1 {
-		return fmt.Errorf("blob.MaxBytes must be -1 or greater than 0. Got %d",
-			params.Blob.MaxBytes)
-	}
+	// if params.Blob.MaxBytes == 0 {
+	// 	return errors.New("blob.MaxBytes cannot be 0")
+	// }
+	// if params.Blob.MaxBytes < -1 {
+	// 	return fmt.Errorf("blob.MaxBytes must be -1 or greater than 0. Got %d",
+	// 		params.Blob.MaxBytes)
+	// }
 	if params.Blob.MaxBytes > MaxBlobSizeBytes {
 		return fmt.Errorf("blob.MaxBytes is too big. %d > %d",
 			params.Blob.MaxBytes, MaxBlobSizeBytes)
@@ -428,6 +437,13 @@ func validateUpdateFeatures(params FeatureParams, updated cmtproto.FeatureParams
 			return err
 		}
 	}
+
+	if updated.BlobEnableHeight != nil {
+		err := validateUpdateFeatureEnableHeight(params.BlobEnableHeight, updated.BlobEnableHeight.Value, h, "Blob")
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -513,9 +529,7 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 		res.Block.MaxBytes = params2.Block.MaxBytes
 		res.Block.MaxGas = params2.Block.MaxGas
 	}
-	if params2.Blob != nil {
-		res.Blob.MaxBytes = params2.Blob.MaxBytes
-	}
+
 	if params2.Evidence != nil {
 		res.Evidence.MaxAgeNumBlocks = params2.Evidence.MaxAgeNumBlocks
 		res.Evidence.MaxAgeDuration = params2.Evidence.MaxAgeDuration
@@ -544,7 +558,17 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 		if params2.Feature.SbtEnableHeight != nil {
 			res.Feature.SBTEnableHeight = params2.Feature.GetSbtEnableHeight().GetValue()
 		}
+
+		if params2.Feature.BlobEnableHeight != nil {
+			res.Feature.BlobEnableHeight = params2.Feature.GetBlobEnableHeight().GetValue()
+		}
 	}
+
+	// We can set the Blob.MaxBytes to something other than 0 only once we enable blobs
+	if params2.Blob != nil && params.Feature.BlobEnableHeight > 0 {
+		res.Blob.MaxBytes = params2.Blob.MaxBytes
+	}
+
 	if params2.Synchrony != nil {
 		if params2.Synchrony.MessageDelay != nil {
 			res.Synchrony.MessageDelay = *params2.Synchrony.GetMessageDelay()
