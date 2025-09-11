@@ -1150,7 +1150,16 @@ func TestProcessProposalNextProposerAddress(t *testing.T) {
 	const height = 2
 
 	var (
-		app                      = &testApp{}
+		app      = &testApp{}
+		cc       = proxy.NewLocalClientCreator(app)
+		proxyApp = proxy.NewAppConns(cc, proxy.NopMetrics())
+	)
+	err := proxyApp.Start()
+	require.NoError(t, err)
+
+	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
+
+	var (
 		state, stateDB, privVals = makeState(1, height, chainID)
 		storeOpts                = sm.StoreOptions{DiscardABCIResponses: false}
 		stateStore               = sm.NewStore(stateDB, storeOpts)
@@ -1166,7 +1175,7 @@ func TestProcessProposalNextProposerAddress(t *testing.T) {
 		)
 		blk0 = makeBlock(state, height-1, new(types.Commit))
 	)
-	partSet, err := blk0.MakePartSet(types.BlockPartSizeBytes)
+	partSet, err := blk0.MakePartSet(types.PartSizeBytes)
 	require.NoError(t, err)
 
 	var (
@@ -1206,13 +1215,12 @@ func TestProcessProposalNextProposerAddress(t *testing.T) {
 	)
 	blk1.Txs = test.MakeNTxs(height, 10)
 
-	statusAccept, err := blkExec.ProcessProposal(blk1, state)
+	statusAccept, err := blkExec.ProcessProposal(blk1, state, nil)
 	require.NoError(t, err)
 	require.True(t, statusAccept)
 
 	nextProposerAddr := state.NextValidators.GetProposer().Address
 	require.Equal(t, nextProposerAddr, app.NextProposerAddress)
-
 }
 func TestCreateProposalWithBlob(t *testing.T) {
 	const height = 2
