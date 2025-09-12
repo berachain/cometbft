@@ -657,6 +657,7 @@ func (app *Application) PrepareProposal(
 		// Coherence: No need to call parseTx, as the check is stateless and has been performed by CheckTx
 		txs = append(txs, tx)
 	}
+
 	// Generate blob for the current height.
 	blob, exists := CreateBlob(req.Height)
 

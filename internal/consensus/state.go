@@ -1690,7 +1690,6 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 				cs.signAddVote(types.PrevoteType, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header(), nil)
 				return
 			}
-
 			// We request the Application, via a `ProcessProposal` ABCI call, to
 			// confirm that the block is valid. If the application does not
 			// accept the block, consensus prevotes nil.
