@@ -1246,7 +1246,7 @@ func TestCreateProposalWithBlob(t *testing.T) {
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
 	var (
-		state, stateDB, privVals = makeState(10, height, chainID)
+		state, stateDB, privVals = makeStateWithBlob(10, height, chainID)
 		storeOpts                = sm.StoreOptions{DiscardABCIResponses: false}
 		stateStore               = sm.NewStore(stateDB, storeOpts)
 		mp                       = &mpmocks.Mempool{}

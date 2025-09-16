@@ -430,8 +430,14 @@ func TestReactorRecordsVotesAndBlockPartsAndBlobParts(t *testing.T) {
 			newMockTickerFunc(true),
 			newPersistentKVStoreWithPathAndBlob,
 		)
-		reactors, blocksSubs, eventBuses = startConsensusNet(t, css, n)
 	)
+
+	for _, cs := range css {
+		cs.state.ConsensusParams.Feature.BlobEnableHeight = 1
+		cs.state.ConsensusParams.Blob.MaxBytes = 819200
+	}
+
+	reactors, blocksSubs, eventBuses := startConsensusNet(t, css, n)
 	defer cleanup()
 	defer stopConsensusNet(log.TestingLogger(), reactors, eventBuses)
 

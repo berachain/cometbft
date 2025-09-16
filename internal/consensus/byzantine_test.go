@@ -323,6 +323,10 @@ func TestByzantineConflictingProposalsWithPartition(t *testing.T) {
 	)
 	defer cleanup()
 
+	for _, cs := range css {
+		cs.state.ConsensusParams.Feature.BlobEnableHeight = 1
+		cs.state.ConsensusParams.Blob.MaxBytes = 819200
+	}
 	// give the byzantine validator a normal ticker
 	ticker := NewTimeoutTicker()
 	ticker.SetLogger(css[0].Logger)

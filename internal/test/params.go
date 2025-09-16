@@ -14,3 +14,10 @@ func ConsensusParams() *types.ConsensusParams {
 	c.Feature.PbtsEnableHeight = 1
 	return c
 }
+
+func ConsensusParamsWithBlob() *types.ConsensusParams {
+	c := ConsensusParams()
+	c.Feature.BlobEnableHeight = 1
+	c.Blob.MaxBytes = 819200
+	return c
+}

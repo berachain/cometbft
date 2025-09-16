@@ -298,3 +298,7 @@ func makeStateWithParams(nVals, height int, params *types.ConsensusParams, chain
 func makeState(nVals, height int, chainID string) (sm.State, dbm.DB, map[string]types.PrivValidator) {
 	return makeStateWithParams(nVals, height, test.ConsensusParams(), chainID)
 }
+
+func makeStateWithBlob(nVals, height int, chainID string) (sm.State, dbm.DB, map[string]types.PrivValidator) {
+	return makeStateWithParams(nVals, height, test.ConsensusParamsWithBlob(), chainID)
+}

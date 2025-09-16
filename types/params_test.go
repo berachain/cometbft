@@ -147,65 +147,62 @@ func TestConsensusParamsValidation(t *testing.T) {
 			valid: false,
 		},
 		{
-			name: "blobBytes set to 0",
-			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   0,
-				evidenceAge: 2,
-			}),
-			valid: false,
-		},
-		{
 			name: "blobBytes set to a big valid value",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   80 * 1024,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        80 * 1024,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: true,
 		},
 		{
 			name: "blobBytes set to a small valid value",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   10,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        10,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: true,
 		},
 		{
 			name: "blobBytes set to the biggest valid value",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   800 * 1024,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        800 * 1024,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: true,
 		},
 		{
 			name: "blobBytes, biggest valid value, off-by-1",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   800*1024 + 1,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        800*1024 + 1,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: false,
 		},
 		{
 			name: "blobBytes, biggest valid value, off-by-1kB",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   801 * 1024,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        801 * 1024,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: false,
 		},
 		{
 			name: "blobBytes, value set to 1MB (too big)",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   1024 * 1024,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        1024 * 1024,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: false,
 		},
@@ -213,18 +210,20 @@ func TestConsensusParamsValidation(t *testing.T) {
 		{
 			name: "blobBytes -1",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   -1,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        -1,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
-			valid: true,
+			valid: false,
 		},
 		{
 			name: "blobBytes -2",
 			params: makeParams(makeParamsArgs{
-				blockBytes:  1,
-				blobBytes:   -2,
-				evidenceAge: 2,
+				blockBytes:       1,
+				blobBytes:        -2,
+				evidenceAge:      2,
+				blobEnableHeight: 1,
 			}),
 			valid: false,
 		},
@@ -454,6 +453,7 @@ type makeParamsArgs struct {
 	sbtEnableHeight     int64
 	precision           time.Duration
 	messageDelay        time.Duration
+	blobEnableHeight    int64
 }
 
 func makeParams(args makeParamsArgs) ConsensusParams {
@@ -485,6 +485,7 @@ func makeParams(args makeParamsArgs) ConsensusParams {
 			VoteExtensionsEnableHeight: args.voteExtensionHeight,
 			PbtsEnableHeight:           args.pbtsHeight,
 			SBTEnableHeight:            args.sbtEnableHeight,
+			BlobEnableHeight:           args.blobEnableHeight,
 		},
 	}
 }

@@ -274,6 +274,7 @@ func TestStateBadProposal(t *testing.T) {
 	voteCh := subscribe(cs1.eventBus, types.EventQueryVote)
 
 	propBlk, propBlob, err := cs1.createProposalBlock(ctx)
+
 	require.NoError(t, err)
 
 	// make the second validator the proposer by incrementing round

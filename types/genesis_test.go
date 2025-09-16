@@ -74,7 +74,7 @@ func TestBasicGenesisDoc(t *testing.T) {
 				"synchrony":  {"precision": "1", "message_delay": "10"},
 				"validator": {"pub_key_types":["bls12_381"]},
 				"block": {"max_bytes": "100"},
-				"blob": {"max_bytes": "819200"},
+				"blob": {"max_bytes": "0"},
 				"evidence": {"max_age_num_blocks": "100", "max_age_duration": "10"},
 				"feature": {"vote_extension_enable_height": "0", "pbts_enable_height": "0"}
 			}

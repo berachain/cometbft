@@ -557,7 +557,10 @@ func randState(nValidators int) (*State, []*validatorStub) {
 func randStateWithBlob(nValidators int) (*State, []*validatorStub) {
 	app := kvstore.NewInMemoryApplication()
 	app.SetGenerateBlobs()
-	return randStateWithApp(nValidators, app)
+	state, valset := randStateWithApp(nValidators, app)
+	state.state.ConsensusParams.Feature.BlobEnableHeight = 1
+	state.state.ConsensusParams.Blob.MaxBytes = 819200
+	return state, valset
 }
 
 func randStateWithAppWithHeight(

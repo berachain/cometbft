@@ -300,16 +300,15 @@ func (params ConsensusParams) ValidateBasic() error {
 			params.Block.MaxGas)
 	}
 
-	// if params.Blob.MaxBytes == 0 {
-	// 	return errors.New("blob.MaxBytes cannot be 0")
-	// }
-	// if params.Blob.MaxBytes < -1 {
-	// 	return fmt.Errorf("blob.MaxBytes must be -1 or greater than 0. Got %d",
-	// 		params.Blob.MaxBytes)
-	// }
-	if params.Blob.MaxBytes > MaxBlobSizeBytes {
-		return fmt.Errorf("blob.MaxBytes is too big. %d > %d",
-			params.Blob.MaxBytes, MaxBlobSizeBytes)
+	if params.Feature.BlobEnableHeight > 0 {
+		if params.Blob.MaxBytes > MaxBlobSizeBytes {
+			return fmt.Errorf("blob.MaxBytes is too big. %d > %d",
+				params.Blob.MaxBytes, MaxBlobSizeBytes)
+		}
+		if params.Blob.MaxBytes <= 0 {
+			return fmt.Errorf("blob.MaxBytes must be greater than 0 if provided, Got %d",
+				params.Blob.MaxBytes)
+		}
 	}
 
 	if params.Evidence.MaxAgeNumBlocks <= 0 {
