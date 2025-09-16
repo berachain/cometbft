@@ -558,8 +558,22 @@ func (params ConsensusParams) Update(params2 *cmtproto.ConsensusParams) Consensu
 			res.Feature.SBTEnableHeight = params2.Feature.GetSbtEnableHeight().GetValue()
 		}
 
-		if params2.Feature.BlobEnableHeight != nil {
+		// We can enable blobs only once.
+		// Once enabled we cannot disable them again.
+		if params2.Feature.BlobEnableHeight != nil && params.Feature.BlobEnableHeight == 0 {
 			res.Feature.BlobEnableHeight = params2.Feature.GetBlobEnableHeight().GetValue()
+			// Set the value of blob.MaxBytes if it was not set before.
+			// This ensures that if we enable blobs, we also set a limit for their size.
+			// If we don't do this, the default value of blob.MaxBytes is 0, which means
+			// blobs are disabled.
+			// If we don't set a limit here, then we would have to require that
+			// blob.MaxBytes is always set when enabling blobs. This would be
+			// inconvenient for users, so we set a default limit here.
+			if params2.Blob == nil {
+				res.Blob.MaxBytes = MaxBlobSizeBytes
+			} else {
+				res.Blob.MaxBytes = params2.Blob.MaxBytes
+			}
 		}
 	}
 
