@@ -618,6 +618,7 @@ func (params *ConsensusParams) ToProto() cmtproto.ConsensusParams {
 			PbtsEnableHeight:           &gogo.Int64Value{Value: params.Feature.PbtsEnableHeight},
 			VoteExtensionsEnableHeight: &gogo.Int64Value{Value: params.Feature.VoteExtensionsEnableHeight},
 			SbtEnableHeight:            &gogo.Int64Value{Value: params.Feature.SBTEnableHeight},
+			BlobEnableHeight:           &gogo.Int64Value{Value: params.Feature.BlobEnableHeight},
 		},
 		Synchrony: &cmtproto.SynchronyParams{
 			MessageDelay: &params.Synchrony.MessageDelay,
@@ -650,6 +651,7 @@ func ConsensusParamsFromProto(pbParams cmtproto.ConsensusParams) ConsensusParams
 			VoteExtensionsEnableHeight: pbParams.GetFeature().GetVoteExtensionsEnableHeight().GetValue(),
 			PbtsEnableHeight:           pbParams.GetFeature().GetPbtsEnableHeight().GetValue(),
 			SBTEnableHeight:            pbParams.GetFeature().GetSbtEnableHeight().GetValue(),
+			BlobEnableHeight:           pbParams.GetFeature().GetBlobEnableHeight().GetValue(),
 		},
 	}
 	if pbParams.GetSynchrony().GetMessageDelay() != nil {
