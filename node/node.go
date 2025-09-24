@@ -340,7 +340,13 @@ func NewNodeWithCliParams(ctx context.Context,
 		DBKeyLayout:          config.Storage.ExperimentalKeyLayout,
 	})
 
-	blockStore := store.NewBlockStore(blockStoreDB, store.WithMetrics(bstMetrics), store.WithCompaction(config.Storage.Compact, config.Storage.CompactionInterval), store.WithDBKeyLayout(config.Storage.ExperimentalKeyLayout), store.WithDBKeyLayout(config.Storage.ExperimentalKeyLayout))
+	blockStore := store.NewBlockStore(
+		blockStoreDB,
+		store.WithMetrics(bstMetrics),
+		store.WithCompaction(config.Storage.Compact, config.Storage.CompactionInterval),
+		store.WithDBKeyLayout(config.Storage.ExperimentalKeyLayout),
+		store.WithDBKeyLayout(config.Storage.ExperimentalKeyLayout),
+	)
 	logger.Info("Blockstore version", "version", blockStore.GetVersion())
 
 	// The key will be deleted if it existed.
@@ -449,7 +455,6 @@ func NewNodeWithCliParams(ctx context.Context,
 		proxyApp.Consensus(),
 		mempool,
 		evidencePool,
-		blockStore,
 		sm.BlockExecutorWithPruner(pruner),
 		sm.BlockExecutorWithMetrics(smMetrics),
 	)

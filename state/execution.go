@@ -27,9 +27,6 @@ type BlockExecutor struct {
 	// save state, validators, consensus params, abci responses here
 	store Store
 
-	// use blockstore for the pruning functions.
-	blockStore BlockStore
-
 	pruner *Pruner
 
 	// execute the app against this
@@ -70,18 +67,17 @@ func NewBlockExecutor(
 	proxyApp proxy.AppConnConsensus,
 	mempool mempool.Mempool,
 	evpool EvidencePool,
-	blockStore BlockStore,
 	options ...BlockExecutorOption,
 ) *BlockExecutor {
 	res := &BlockExecutor{
-		store:      stateStore,
-		proxyApp:   proxyApp,
-		eventBus:   types.NopEventBus{},
-		mempool:    mempool,
-		evpool:     evpool,
-		logger:     logger,
-		metrics:    NopMetrics(),
-		blockStore: blockStore,
+		store:    stateStore,
+		proxyApp: proxyApp,
+		eventBus: types.NopEventBus{},
+		mempool:  mempool,
+		evpool:   evpool,
+		logger:   logger,
+		metrics:  NopMetrics(),
+		// blockStore: blockStore,
 	}
 
 	for _, option := range options {

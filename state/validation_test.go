@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -17,7 +16,6 @@ import (
 	mpmocks "github.com/cometbft/cometbft/mempool/mocks"
 	sm "github.com/cometbft/cometbft/state"
 	"github.com/cometbft/cometbft/state/mocks"
-	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	cmterrors "github.com/cometbft/cometbft/types/errors"
 	cmttime "github.com/cometbft/cometbft/types/time"
@@ -51,15 +49,12 @@ func TestValidateBlockHeader(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
-
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
-		blockStore,
 	)
 	lastCommit := &types.Commit{}
 	var lastExtCommit *types.ExtendedCommit
@@ -156,15 +151,12 @@ func TestValidateBlockCommit(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
-
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
-		blockStore,
 	)
 	lastCommit := &types.Commit{}
 	var lastExtCommit *types.ExtendedCommit
@@ -308,7 +300,6 @@ func TestValidateBlockEvidence(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 	state.ConsensusParams.Evidence.MaxBytes = 1000
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
 
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
@@ -316,7 +307,6 @@ func TestValidateBlockEvidence(t *testing.T) {
 		proxyApp.Consensus(),
 		mp,
 		evpool,
-		blockStore,
 	)
 	lastCommit := &types.Commit{}
 	var lastExtCommit *types.ExtendedCommit
