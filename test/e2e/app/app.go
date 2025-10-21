@@ -429,7 +429,7 @@ func (app *Application) FinalizeBlock(_ context.Context, req *abci.FinalizeBlock
 	}
 
 	// Verify blob.
-	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "finalizeBlock")
+	blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "finalizeBlock")
 	if blobEnabled {
 		blob, exists, err := app.GetBlob(req.Height)
 		if err != nil {
@@ -688,7 +688,7 @@ func (app *Application) PrepareProposal(
 	}
 
 	var blob []byte
-	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
+	blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
 	if blobEnabled {
 		// Generate blob for the current height.
 		blob, _ = CreateBlob(req.Height)
@@ -720,7 +720,7 @@ func (app *Application) ProcessProposal(_ context.Context, req *abci.ProcessProp
 		return nil, err
 	}
 
-	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
+	blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
 	if !blobEnabled && len(req.Blob) != 0 {
 		app.logger.Error("received blob when blobs are not enabled")
 		return &abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_REJECT}, nil
@@ -876,7 +876,7 @@ func (app *Application) getAppHeight() int64 {
 	return appHeight + 1
 }
 
-func (app *Application) checkHeightAndBlobsEnabled(height int64, callsite string) (int64, bool) {
+func (app *Application) checkHeightAndBlobsEnabled(height int64, callsite string) bool {
 	appHeight := app.getAppHeight()
 	if height != appHeight {
 		panic(fmt.Errorf(
@@ -895,7 +895,7 @@ func (app *Application) checkHeightAndBlobsEnabled(height int64, callsite string
 	}
 	currentHeight := appHeight
 
-	return appHeight, blobHeight != 0 && currentHeight >= blobHeight
+	return blobHeight != 0 && currentHeight >= blobHeight
 }
 
 func (app *Application) checkHeightAndExtensions(isPrepareProcessProposal bool, height int64, callsite string) (int64, bool) {
