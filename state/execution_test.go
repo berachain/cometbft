@@ -1146,6 +1146,7 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 		})
 	}
 }
+
 func TestProcessProposalNextProposerAddress(t *testing.T) {
 	const height = 2
 
@@ -1222,6 +1223,7 @@ func TestProcessProposalNextProposerAddress(t *testing.T) {
 	nextProposerAddr := state.NextValidators.GetProposer().Address
 	require.Equal(t, nextProposerAddr, app.NextProposerAddress)
 }
+
 func TestCreateProposalWithBlob(t *testing.T) {
 	const height = 2
 
