@@ -1994,6 +1994,9 @@ func (m *NewValidBlockMessage) ValidateBasic() error {
 	if err := m.BlockPartSetHeader.ValidateBasic(); err != nil {
 		return cmterrors.ErrWrongField{Field: "BlockPartSetHeader", Err: err}
 	}
+	if err := m.BlockParts.ValidateBasic(); err != nil {
+		return fmt.Errorf("validating BlockParts: %w", err)
+	}
 	if m.BlockParts.Size() == 0 {
 		return cmterrors.ErrRequiredField{Field: "blockParts"}
 	}
@@ -2047,6 +2050,9 @@ func (m *ProposalPOLMessage) ValidateBasic() error {
 	}
 	if m.ProposalPOLRound < 0 {
 		return cmterrors.ErrNegativeField{Field: "ProposalPOLRound"}
+	}
+	if err := m.ProposalPOL.ValidateBasic(); err != nil {
+		return fmt.Errorf("validating ProposalPOL: %w", err)
 	}
 	if m.ProposalPOL.Size() == 0 {
 		return cmterrors.ErrRequiredField{Field: "ProposalPOL"}
@@ -2238,6 +2244,9 @@ func (m *VoteSetBitsMessage) ValidateBasic() error {
 	}
 	if err := m.BlockID.ValidateBasic(); err != nil {
 		return cmterrors.ErrWrongField{Field: "BlockID", Err: err}
+	}
+	if err := m.Votes.ValidateBasic(); err != nil {
+		return fmt.Errorf("validating Votes: %w", err)
 	}
 	// NOTE: Votes.Size() can be zero if the node does not have any
 	if m.Votes.Size() > types.MaxVotesCount {
