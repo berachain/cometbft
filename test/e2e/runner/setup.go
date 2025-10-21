@@ -166,17 +166,18 @@ func MakeGenesis(testnet *e2e.Testnet) (types.GenesisDoc, error) {
 	genesis.ConsensusParams.Version.App = 1
 	genesis.ConsensusParams.Evidence.MaxAgeNumBlocks = e2e.EvidenceAgeHeight
 	genesis.ConsensusParams.Evidence.MaxAgeDuration = e2e.EvidenceAgeTime
-	if testnet.BlockMaxBytes != 0 {
-		genesis.ConsensusParams.Block.MaxBytes = testnet.BlockMaxBytes
-	}
-	if testnet.BlobMaxBytes != 0 {
-		genesis.ConsensusParams.Blob.MaxBytes = testnet.BlobMaxBytes
-	}
+
 	if testnet.VoteExtensionsUpdateHeight == -1 {
 		genesis.ConsensusParams.Feature.VoteExtensionsEnableHeight = testnet.VoteExtensionsEnableHeight
 	}
+
+	if testnet.BlobUpdateHeight == -1 {
+		genesis.ConsensusParams.Feature.BlobEnableHeight = testnet.BlobEnableHeight
+		genesis.ConsensusParams.Blob.MaxBytes = types.MaxBlobSizeBytes
+	}
 	if testnet.PbtsUpdateHeight == -1 {
 		genesis.ConsensusParams.Feature.PbtsEnableHeight = testnet.PbtsEnableHeight
+
 	}
 	for validator, power := range testnet.Validators {
 		genesis.Validators = append(genesis.Validators, types.GenesisValidator{
@@ -415,6 +416,8 @@ func MakeAppConfig(node *e2e.Node) ([]byte, error) {
 		"abci_requests_logging_enabled": node.Testnet.ABCITestsEnabled,
 		"pbts_enable_height":            node.Testnet.PbtsEnableHeight,
 		"pbts_update_height":            node.Testnet.PbtsUpdateHeight,
+		"blob_enable_height":            node.Testnet.BlobEnableHeight,
+		"blob_update_height":            node.Testnet.BlobUpdateHeight,
 	}
 	switch node.ABCIProtocol {
 	case e2e.ProtocolUNIX:

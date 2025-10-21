@@ -40,6 +40,7 @@ const (
 	suffixVoteExtHeight string = "VoteExtensionsHeight"
 	suffixPbtsHeight    string = "PbtsHeight"
 	suffixInitialHeight string = "InitialHeight"
+	suffixBlobHeight    string = "BlobHeight"
 	txTTL               uint64 = 15 // height difference at which transactions should be invalid
 )
 
@@ -135,6 +136,17 @@ type Config struct {
 	// -1 denotes it is set at genesis.
 	// 0 denotes it is set at InitChain.
 	PbtsUpdateHeight int64 `toml:"pbts_update_height"`
+
+	// BlobEnableHeight configures the first height during which
+	// we will disseminate blobs
+	BlobEnableHeight int64 `toml:"blob_enable_height"`
+
+	// BlobUpdateHeight configures the height at which consensus
+	// param BlobEnableHeight will be set.
+	// -1 denotes it is set at genesis.
+	// 0 denotes it is set at InitChain.
+	// Note that after this height BlobParams.MaxBytes cannot be 0
+	BlobUpdateHeight int64 `toml:"blob_update_height"`
 }
 
 func DefaultConfig(dir string) *Config {
@@ -154,7 +166,7 @@ func DefaultConfig(dir string) *Config {
 // 3 - blob is variable length string that contains "BLOBXXX" where XXX is height multiplied by 0x80 in hex
 // 4 - blob is the size of MaxBlobSizeBytes and contains height truncated into two bytes repeated.
 func blobOracle(height int64) ([]byte, bool) {
-	switch height % 4 {
+	switch height % 5 {
 	case 1:
 		truncatedHeight := byte(height % 0x100)
 		data := bytes.Repeat([]byte{truncatedHeight}, 8)
@@ -260,6 +272,18 @@ func (app *Application) updateFeatureEnableHeights(currentHeight int64) *cmtprot
 		app.logger.Info("updating PBTS Height in app_state", "height", app.cfg.PbtsEnableHeight)
 		app.state.Set(prefixReservedKey+suffixPbtsHeight, strconv.FormatInt(app.cfg.PbtsEnableHeight, 10))
 	}
+
+	if app.cfg.BlobUpdateHeight == currentHeight {
+		app.logger.Info("enabling Blobs on the fly",
+			"current_height", currentHeight,
+			"enable_height", app.cfg.BlobEnableHeight)
+		params.Feature.BlobEnableHeight = &gogo.Int64Value{Value: app.cfg.BlobEnableHeight}
+		retNil = false
+		app.logger.Info("updating Blob Height in app_state", "height", app.cfg.BlobEnableHeight)
+		app.state.Set(prefixReservedKey+suffixBlobHeight, strconv.FormatInt(app.cfg.BlobEnableHeight, 10))
+		params.Blob = &cmtproto.BlobParams{}
+		params.Blob.MaxBytes = cmttypes.MaxBlobSizeBytes
+	}
 	if retNil {
 		return nil
 	}
@@ -287,6 +311,9 @@ func (app *Application) InitChain(_ context.Context, req *abci.InitChainRequest)
 	app.state.Set(prefixReservedKey+suffixVoteExtHeight, strconv.FormatInt(req.ConsensusParams.Feature.VoteExtensionsEnableHeight.GetValue(), 10))
 	app.logger.Info("setting PBTS Height in app_state", "height", req.ConsensusParams.Feature.PbtsEnableHeight.GetValue())
 	app.state.Set(prefixReservedKey+suffixPbtsHeight, strconv.FormatInt(req.ConsensusParams.Feature.PbtsEnableHeight.GetValue(), 10))
+	app.logger.Info("setting Blob Height in app_state", "height", req.ConsensusParams.Feature.BlobEnableHeight.GetValue())
+	app.state.Set(prefixReservedKey+suffixBlobHeight, strconv.FormatInt(req.ConsensusParams.Feature.BlobEnableHeight.GetValue(), 10))
+
 	app.logger.Info("setting initial height in app_state", "initial_height", req.InitialHeight)
 	app.state.Set(prefixReservedKey+suffixInitialHeight, strconv.FormatInt(req.InitialHeight, 10))
 	// Get validators from genesis
@@ -402,20 +429,22 @@ func (app *Application) FinalizeBlock(_ context.Context, req *abci.FinalizeBlock
 	}
 
 	// Verify blob.
-	blob, exists, err := app.GetBlob(req.Height)
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch blob for height %d, %s", req.Height, err.Error())
-	}
-	if exists && !VerifyBlob(req.Height, blob) {
-		return nil, fmt.Errorf("blob verification failed for height %d", req.Height)
-	}
+	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "finalizeBlock")
+	if blobEnabled {
+		blob, exists, err := app.GetBlob(req.Height)
+		if err != nil {
+			return nil, fmt.Errorf("could not fetch blob for height %d, %s", req.Height, err.Error())
+		}
+		if exists && !VerifyBlob(req.Height, blob) {
+			return nil, fmt.Errorf("blob verification failed for height %d", req.Height)
+		}
 
-	// This is a short-term cache so we delete the entry after we received it.
-	delete(app.blobCache, req.Height)
-	if len(app.blobCache) != 0 {
-		app.logger.Error("blob cache should be empty", "size", len(app.blobCache))
+		// This is a short-term cache so we delete the entry after we received it.
+		delete(app.blobCache, req.Height)
+		if len(app.blobCache) != 0 {
+			app.logger.Error("blob cache should be empty", "size", len(app.blobCache))
+		}
 	}
-
 	for _, ev := range req.Misbehavior {
 		app.logger.Info("Misbehavior. Slashing validator",
 			"validator_address", ev.GetValidator().Address,
@@ -658,17 +687,25 @@ func (app *Application) PrepareProposal(
 		txs = append(txs, tx)
 	}
 
-	// Generate blob for the current height.
-	blob, exists := CreateBlob(req.Height)
-
+	var blob []byte
+	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
+	if blobEnabled {
+		// Generate blob for the current height.
+		blob, _ = CreateBlob(req.Height)
+		if len(blob) > 10 {
+			app.logger.Debug("Proposal produces blob", "blob", blob[:9])
+		} else {
+			app.logger.Debug("Proposal produces blob", "blob", blob)
+		}
+	}
 	if app.cfg.PrepareProposalDelay != 0 {
 		time.Sleep(app.cfg.PrepareProposalDelay)
 	}
 
-	if !exists {
+	if !blobEnabled {
 		return &abci.PrepareProposalResponse{Txs: txs}, nil
 	}
-	fmt.Println("BLOB_1: ", blob)
+
 	return &abci.PrepareProposalResponse{Txs: txs, Blob: blob}, nil
 }
 
@@ -683,20 +720,25 @@ func (app *Application) ProcessProposal(_ context.Context, req *abci.ProcessProp
 		return nil, err
 	}
 
-	fmt.Println("BLOB: ", req.Blob)
-
-	if !VerifyBlob(req.Height, req.Blob) {
-		app.logger.Error("invalid blob, rejecting proposal", "received height", req.Height, "received", req.Blob)
+	_, blobEnabled := app.checkHeightAndBlobsEnabled(req.Height, "processProposal")
+	if !blobEnabled && len(req.Blob) != 0 {
+		app.logger.Error("received blob when blobs are not enabled")
 		return &abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_REJECT}, nil
 	}
-	// Blob verification
-	if len(req.Blob) != 0 {
-		// Proposal will be accepted by us and blob exists and valid, so we store it in the cache.
-		app.blobCache[req.Height] = req.Blob
-	} else {
-		// Proposal will be accepted by us and there is no blob.
-		// We make a note of it in the cache so we can inform FinalizeBlock. A real application will have better methods for this.
-		app.blobCache[req.Height] = noBlobBytes()
+	if blobEnabled {
+		if !VerifyBlob(req.Height, req.Blob) {
+			app.logger.Error("invalid blob, rejecting proposal", "received height", req.Height, "received", req.Blob)
+			return &abci.ProcessProposalResponse{Status: abci.PROCESS_PROPOSAL_STATUS_REJECT}, nil
+		}
+		// Blob verification
+		if len(req.Blob) != 0 {
+			// Proposal will be accepted by us and blob exists and valid, so we store it in the cache.
+			app.blobCache[req.Height] = req.Blob
+		} else {
+			// Proposal will be accepted by us and there is no blob.
+			// We make a note of it in the cache so we can inform FinalizeBlock. A real application will have better methods for this.
+			app.blobCache[req.Height] = noBlobBytes()
+		}
 	}
 
 	_, areExtensionsEnabled := app.checkHeightAndExtensions(true, req.Height, "ProcessProposal")
@@ -832,6 +874,28 @@ func (app *Application) getAppHeight() int64 {
 		appHeight = initialHeight - 1
 	}
 	return appHeight + 1
+}
+
+func (app *Application) checkHeightAndBlobsEnabled(height int64, callsite string) (int64, bool) {
+	appHeight := app.getAppHeight()
+	if height != appHeight {
+		panic(fmt.Errorf(
+			"got unexpected height in %s request; expected %d, actual %d",
+			callsite, appHeight, height,
+		))
+	}
+
+	blobHeightStr := app.state.Get(prefixReservedKey + suffixBlobHeight)
+	if len(blobHeightStr) == 0 {
+		panic("blob height not set in database")
+	}
+	blobHeight, err := strconv.ParseInt(blobHeightStr, 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("malformed blob height %q in database", blobHeightStr))
+	}
+	currentHeight := appHeight
+
+	return appHeight, blobHeight != 0 && currentHeight >= blobHeight
 }
 
 func (app *Application) checkHeightAndExtensions(isPrepareProcessProposal bool, height int64, callsite string) (int64, bool) {

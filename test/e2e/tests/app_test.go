@@ -139,3 +139,32 @@ func TestApp_VoteExtensions(t *testing.T) {
 		}
 	})
 }
+
+func TestApp_Blob(t *testing.T) {
+	testNode(t, func(t *testing.T, node e2e.Node) {
+		t.Helper()
+
+		client, err := node.Client()
+		require.NoError(t, err)
+		info, err := client.ABCIInfo(ctx)
+		require.NoError(t, err)
+
+		// This special value should have been created by way of vote extensions
+		resp, err := client.ABCIQuery(ctx, "", []byte("reservedTxKey_"+"BlobHeight"))
+		require.NoError(t, err)
+
+		// if extensions are not enabled on the network, we should expect
+		// the app to have any extension value set (via a normal tx).
+		if node.Testnet.BlobUpdateHeight != 0 &&
+			info.Response.LastBlockHeight > node.Testnet.BlobEnableHeight {
+			valString := string(resp.Response.Value)
+			assert.NotEmpty(t, valString, "expected blob max bytes to be set")
+			blobMaxBytes, err := strconv.ParseInt(valString, 10, 64)
+			if err != nil {
+				t.Fatalf("failed to parse blob max bytes: %v", err)
+			}
+			require.NoError(t, err)
+			require.Equal(t, node.Testnet.BlobEnableHeight, blobMaxBytes)
+		}
+	})
+}

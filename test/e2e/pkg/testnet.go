@@ -341,6 +341,39 @@ func (t Testnet) Validate() error {
 	if t.BlobMaxBytes > types.MaxBlobSizeBytes {
 		return fmt.Errorf("value of BlobMaxBytes cannot be higher than %d", types.MaxBlobSizeBytes)
 	}
+
+	if t.BlobUpdateHeight < -1 {
+		return fmt.Errorf("value of BlobUpdateHeight must be positive, 0 (InitChain), "+
+			"or -1 (Genesis); update height %d", t.BlobUpdateHeight)
+	}
+	if t.BlobEnableHeight < 0 {
+		return fmt.Errorf("value of BlobEnableHeight must be positive, or 0 (disable); "+
+			"enable height %d", t.BlobEnableHeight)
+	}
+	if t.BlobUpdateHeight > 0 && t.BlobUpdateHeight < t.InitialHeight {
+		return fmt.Errorf("a value of BlobUpdateHeight greater than 0 "+
+			"must not be less than InitialHeight; "+
+			"update height %d, initial height %d",
+			t.BlobUpdateHeight, t.InitialHeight,
+		)
+	}
+	if t.BlobEnableHeight > 0 {
+		if t.BlobEnableHeight < t.InitialHeight {
+			return fmt.Errorf("a value of BlobEnableHeight greater than 0 "+
+				"must not be less than InitialHeight; "+
+				"enable height %d, initial height %d",
+				t.BlobEnableHeight, t.InitialHeight,
+			)
+		}
+		if t.BlobEnableHeight <= t.BlobUpdateHeight {
+			return fmt.Errorf("a value of BlobEnableHeight greater than 0 "+
+				"must be greater than BlobUpdateHeight; "+
+				"update height %d, enable height %d",
+				t.BlobUpdateHeight, t.BlobEnableHeight,
+			)
+		}
+	}
+
 	if t.VoteExtensionsUpdateHeight < -1 {
 		return fmt.Errorf("value of VoteExtensionsUpdateHeight must be positive, 0 (InitChain), "+
 			"or -1 (Genesis); update height %d", t.VoteExtensionsUpdateHeight)

@@ -155,6 +155,18 @@ type Manifest struct {
 	// configuration files for all nodes. The format is "key = value".
 	// Example: "p2p.send_rate = 512000".
 	Config []string `toml:"config"`
+
+	// BlobEnableHeight configures the first height during which
+	// the chain will start using blobs.
+	BlobEnableHeight int64 `toml:"blob_enable_height"`
+
+	// BlobUpdateHeight configures the height at which consensus
+	// param BlobEnableHeight will be set.
+	// -1 denotes it is set at genesis.
+	// 0 denotes it is set at InitChain.
+	// Note that at this height it will set the value of BlobParams.MaxBytes to be
+	// something > 0.
+	BlobUpdateHeight int64 `toml:"blob_update_height"`
 }
 
 // ManifestNode represents a node in a testnet manifest.
