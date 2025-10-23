@@ -184,9 +184,6 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 		return nil, nil, err
 	}
 
-	if rpp.Blob != nil && !state.ConsensusParams.Feature.BlobEnabled(block.Height) {
-		return nil, nil, errors.New("blobs are disabled but application returned one")
-	}
 	var (
 		preparedBlock = state.MakeBlock(height, txl, commit, evidence, proposerAddr)
 		blob          = rpp.Blob
