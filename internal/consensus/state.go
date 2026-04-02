@@ -2600,7 +2600,7 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 			"commit_height", commit.Height,
 			"cs_height", cs.Height,
 			"peer", peerID)
-		return added, err
+		return
 	}
 
 	// Check to see if the chain is configured to extend votes.
@@ -2608,25 +2608,27 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 	if extEnabled {
 		// We don't support receiving commits with vote extensions enabled ATM.
 		cs.Logger.Error("Received commit with vote extensions enabled", "height", commit.Height, "peer_ID", peerID)
-		return added, err
+		return
 	}
 
 	if cs.Votes.GetCommit(commit.Round) != nil {
 		cs.Logger.Debug("Received commit, but we already have one", "height", commit.Height, "peer_ID", peerID)
-		return added, err
+		return
 	}
 	if !commit.HasAggregatedSignature() {
 		// Only accept aggregated commits
 		cs.Logger.Error("Received non aggregated commit", "commit", commit.Height, "peer_ID", peerID, "commit", commit)
-		return added, err
+		return
 	}
 	// No need to check blockID. If the commit is valid, 2/3 of the voting power has signed it.
 	err = cs.Validators.VerifyCommit(cs.state.ChainID, commit.BlockID, cs.Height, commit)
 	if err != nil {
-		panic(err)
+		cs.Logger.Error("Failed to verify commit from peer", "err", err, "height", cs.Height, "round", commit.Round, "peer_ID", peerID)
+		return
 	}
 	height := cs.Height
 	cs.Votes.SetCommit(commit)
+	added = true
 
 	// TODO We need something similar for Commits
 	// if err := cs.eventBus.PublishEventVote(types.EventDataVote{Vote: vote}); err != nil {
@@ -2642,7 +2644,7 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (added bool, err
 	// We skip timeoutCommit as this function is hit only when the node is late
 	cs.enterNewRound(cs.Height, 0)
 
-	return added, err
+	return
 }
 
 // CONTRACT: cs.privValidator is not nil.
