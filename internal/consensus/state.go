@@ -2862,7 +2862,7 @@ func (cs *State) calculateProposalTimestampDifferenceMetric() {
 		isTimely := cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)
 		diff := cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp)
 		// Clamp overflowed durations to avoid recording garbage metric values.
-		// time.Sub returns math.MinInt64 when the difference exceeds ~292 years.
+		// time.Sub sub/overflows when the difference exceeds ~±292 years.
 		if diff == time.Duration(math.MinInt64) || diff == time.Duration(math.MaxInt64) {
 			return
 		}
