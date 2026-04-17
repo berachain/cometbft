@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -1447,10 +1448,13 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 		if cs.Proposal.POLRound == -1 && !cs.proposalIsTimely() {
 			lowerBound, upperBound := cs.timelyProposalMargins()
 			// TODO: use Warn level once available.
+			// Use .String() to avoid passing a raw time.Duration to the logger,
+			// which can panic in some logger implementations (e.g. phuslu/log)
+			// when time.Sub overflows to math.MinInt64 for far-future timestamps.
 			logger.Info("prevote step: Proposal is not timely; prevoting nil",
 				"timestamp", cs.Proposal.Timestamp.Format(time.RFC3339Nano),
 				"receive_time", cs.ProposalReceiveTime.Format(time.RFC3339Nano),
-				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp),
+				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp).String(),
 				"lower_bound", lowerBound,
 				"upper_bound", upperBound)
 			cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{}, nil)
@@ -1461,7 +1465,7 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 			logger.Debug("prevote step: Proposal is timely",
 				"timestamp", cs.Proposal.Timestamp.Format(time.RFC3339Nano),
 				"receive_time", cs.ProposalReceiveTime.Format(time.RFC3339Nano),
-				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp))
+				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp).String())
 		}
 	}
 
@@ -2856,9 +2860,15 @@ func (cs *State) calculateProposalTimestampDifferenceMetric() {
 		sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Proposal.Round)
 
 		isTimely := cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)
+		diff := cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp)
+		// Clamp overflowed durations to avoid recording garbage metric values.
+		// time.Sub sub/overflows when the difference exceeds ~±292 years.
+		if diff == time.Duration(math.MinInt64) || diff == time.Duration(math.MaxInt64) {
+			return
+		}
 		cs.metrics.ProposalTimestampDifference.
 			With("is_timely", strconv.FormatBool(isTimely)).
-			Observe(cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp).Seconds())
+			Observe(diff.Seconds())
 	}
 }
 
