@@ -528,6 +528,18 @@ func verifyAggregatedCommit(
 		// them by index else we need to retrieve them by address
 		if lookUpByIndex {
 			val = vals.Validators[idx]
+			// Bind the validator identity used for signature verification
+			// (vals.Validators[idx]) to the validator identity carried in
+			// CommitSig.ValidatorAddress, which is later consumed by
+			// downstream consensus/app paths (e.g. BuildExtendedCommitInfo).
+			// Canonical vote sign bytes do not include ValidatorAddress, so
+			// without this check an attacker could rotate addresses across
+			// indexes and still produce a commit that aggregate verification
+			// accepts, only to crash the proposer path later.
+			if !bytes.Equal(val.Address, commitSig.ValidatorAddress) {
+				return fmt.Errorf("validator address mismatch at index %d: expected %X, got %X",
+					idx, val.Address, commitSig.ValidatorAddress)
+			}
 		} else {
 			valIdx, val = vals.GetByAddressMut(commitSig.ValidatorAddress)
 
