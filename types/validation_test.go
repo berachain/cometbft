@@ -351,8 +351,7 @@ func TestValidatorSet_VerifyCommit_AggregatedCommitAddressMismatch(t *testing.T)
 	// signature remains cryptographically valid for the validator set by
 	// index because canonical vote sign bytes exclude ValidatorAddress.
 	require.NotEqual(t, commit.Signatures[0].ValidatorAddress, commit.Signatures[1].ValidatorAddress)
-	commit.Signatures[0].ValidatorAddress, commit.Signatures[1].ValidatorAddress =
-		commit.Signatures[1].ValidatorAddress, commit.Signatures[0].ValidatorAddress
+	commit.Signatures[0].ValidatorAddress, commit.Signatures[1].ValidatorAddress = commit.Signatures[1].ValidatorAddress, commit.Signatures[0].ValidatorAddress
 
 	err := valSet.VerifyCommit(chainID, blockID, height, commit)
 	require.Error(t, err, "aggregated commit with rotated validator addresses must be rejected")
