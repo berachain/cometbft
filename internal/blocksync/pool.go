@@ -185,6 +185,19 @@ func (pool *BlockPool) removeTimedoutPeers() {
 	pool.sortPeers()
 }
 
+// HasPendingRequestFrom reports whether we have at least one outstanding block
+// request directed at the given peer.
+func (pool *BlockPool) HasPendingRequestFrom(peerID p2p.ID) bool {
+	pool.mtx.Lock()
+	defer pool.mtx.Unlock()
+	for _, r := range pool.requesters {
+		if r.didRequestFrom(peerID) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsCaughtUp returns true if this node is caught up, false - otherwise.
 // TODO: relax conditions, prevent abuse.
 func (pool *BlockPool) IsCaughtUp() (isCaughtUp bool, height, maxPeerHeight int64) {
