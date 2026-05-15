@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/bls12381"
 )
@@ -122,6 +123,47 @@ func TestValidatorValidateBasic(t *testing.T) {
 		} else {
 			require.NoError(t, err)
 		}
+	}
+}
+
+func TestValidatorFromProtoNoPanicOnNilPubKey(t *testing.T) {
+	testCases := []struct {
+		name string
+		vp   *cmtproto.Validator
+	}{
+		{
+			name: "empty PubKeyType, nil PubKeyBytes, nil PubKey",
+			vp: &cmtproto.Validator{
+				PubKeyType:  "",
+				PubKeyBytes: nil,
+				PubKey:      nil,
+			},
+		},
+		{
+			name: "unknown PubKeyType, nil PubKey",
+			vp: &cmtproto.Validator{
+				PubKeyType:  "unknown",
+				PubKeyBytes: nil,
+				PubKey:      nil,
+			},
+		},
+		{
+			name: "valid PubKeyType, short PubKeyBytes, nil PubKey",
+			vp: &cmtproto.Validator{
+				PubKeyType:  bls12381.KeyType,
+				PubKeyBytes: []byte{0x01, 0x02},
+				PubKey:      nil,
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				v, err := ValidatorFromProto(tc.vp)
+				require.Error(t, err)
+				require.Nil(t, v)
+			})
+		})
 	}
 }
 
