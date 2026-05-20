@@ -172,6 +172,9 @@ func ValidatorFromProto(vp *cmtproto.Validator) (*Validator, error) {
 
 	pk, err := ce.PubKeyFromTypeAndBytes(vp.PubKeyType, vp.PubKeyBytes)
 	if err != nil {
+		if vp.PubKey == nil {
+			return nil, fmt.Errorf("validator pubkey decode failed and legacy pub_key is nil: %w", err)
+		}
 		pk, err = ce.PubKeyFromProto(*vp.PubKey)
 		if err != nil {
 			return nil, err
