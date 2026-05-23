@@ -6,6 +6,10 @@
 
 ### BUG FIXES
 
+- `[rpc/jsonrpc]` reject non-finite, fractional, and out-of-int64-range
+  numeric IDs in request decoding instead of silently saturating to
+  `math.MinInt`, which previously made distinct large IDs collide.
+  ([\#5861](https://github.com/cometbft/cometbft/pull/5861))
 - `[p2p]` fix race and goroutine leak in `TestTransportMultiplexAcceptNonBlocking` test
   ([\#5878](https://github.com/cometbft/cometbft/pull/5878))
 - `[evidence]` fix flaky `TestReactorsGossipNoCommittedEvidence` test
