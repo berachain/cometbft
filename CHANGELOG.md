@@ -10,6 +10,10 @@
   numeric IDs in request decoding instead of silently saturating to
   `math.MinInt`, which previously made distinct large IDs collide.
   ([\#5861](https://github.com/cometbft/cometbft/pull/5861))
+- `[blocksync]` hold `pool.mtx` and recompute `maxPeerHeight` in `Enable()`
+  ([\#5888](https://github.com/cometbft/cometbft/pull/5888))
+- `[inspect]` fix flaky `TestInspectRun` and consolidate start/stop handshake
+  ([\#5891](https://github.com/cometbft/cometbft/pull/5891))
 - `[p2p]` fix race and goroutine leak in `TestTransportMultiplexAcceptNonBlocking` test
   ([\#5878](https://github.com/cometbft/cometbft/pull/5878))
 - `[evidence]` fix flaky `TestReactorsGossipNoCommittedEvidence` test
@@ -1171,4 +1175,3 @@ Friendly reminder, we have a [bug bounty program](https://hackerone.com/cosmos).
 ## Previous changes
 
 For changes released before the creation of CometBFT, please refer to the Tendermint Core [CHANGELOG.md](https://github.com/tendermint/tendermint/blob/a9feb1c023e172b542c972605311af83b777855b/CHANGELOG.md).
-
