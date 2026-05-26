@@ -52,7 +52,7 @@ func idFromInterface(idInterface any) (jsonrpcid, error) {
 			return nil, fmt.Errorf("json-rpc ID must be a finite number, got %v", id)
 		}
 		if id != math.Trunc(id) {
-			return nil, fmt.Errorf("json-rpc ID must be an integer in int range, got %v", id)
+			return nil, fmt.Errorf("json-rpc ID must be a whole number, got %v", id)
 		}
 		// float64(math.MaxInt64) rounds UP to 2^63 because 2^63 - 1 has no
 		// exact float64 representation; we therefore reject the closed
@@ -61,7 +61,7 @@ func idFromInterface(idInterface any) (jsonrpcid, error) {
 		// float64(math.MinInt64) == -2^63 is exactly representable so the
 		// lower bound stays strict.
 		if id >= float64(math.MaxInt64) || id < float64(math.MinInt64) {
-			return nil, fmt.Errorf("json-rpc ID must be an integer in int range, got %v", id)
+			return nil, fmt.Errorf("json-rpc ID out of int64 range, got %v", id)
 		}
 		return JSONRPCIntID(int(id)), nil
 	default:

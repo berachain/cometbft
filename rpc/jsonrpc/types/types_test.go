@@ -89,7 +89,7 @@ func TestIDFromInterface_FloatRange(t *testing.T) {
 	t.Run("fractional_rejected", func(t *testing.T) {
 		_, err := idFromInterface(1.5)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "integer in int range")
+		require.Contains(t, err.Error(), "whole number")
 	})
 
 	t.Run("nan_rejected", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestIDFromInterface_FloatRange(t *testing.T) {
 	t.Run("two_to_63_rejected", func(t *testing.T) {
 		_, err := idFromInterface(math.Pow(2, 63))
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "integer in int range")
+		require.Contains(t, err.Error(), "out of int64 range")
 	})
 
 	// -2^63 is the int64 minimum and is exactly representable in float64;
@@ -126,13 +126,13 @@ func TestIDFromInterface_FloatRange(t *testing.T) {
 	t.Run("below_neg_two_to_63_rejected", func(t *testing.T) {
 		_, err := idFromInterface(-math.Pow(2, 63) - 2049)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "integer in int range")
+		require.Contains(t, err.Error(), "out of int64 range")
 	})
 
 	t.Run("very_large_finite_rejected", func(t *testing.T) {
 		_, err := idFromInterface(1e20)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "integer in int range")
+		require.Contains(t, err.Error(), "out of int64 range")
 	})
 
 	// Regression pin for #5846: five distinct oversized inputs that
