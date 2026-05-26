@@ -1967,6 +1967,36 @@ func TestSelfVerifyVoteExtensionRejectPanics(t *testing.T) {
 	t.Fatal("signVote did not panic")
 }
 
+// TestSelfVerifyVoteExtensionAccepts confirms that a non-empty extension
+// accepted by the local app's VerifyVoteExtension signs normally.
+func TestSelfVerifyVoteExtensionAccepts(t *testing.T) {
+	extension := []byte("accepted-extension")
+	m := abcimocks.NewApplication(t)
+	m.On("PrepareProposal", mock.Anything, mock.Anything).Return(&abci.ResponsePrepareProposal{}, nil)
+	m.On("ProcessProposal", mock.Anything, mock.Anything).
+		Return(&abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_ACCEPT}, nil).Maybe()
+	m.On("ExtendVote", mock.Anything, mock.Anything).Return(&abci.ResponseExtendVote{
+		VoteExtension: extension,
+	}, nil).Once()
+	m.On("VerifyVoteExtension", mock.Anything, mock.Anything).Return(&abci.ResponseVerifyVoteExtension{
+		Status: abci.ResponseVerifyVoteExtension_ACCEPT,
+	}, nil).Once()
+
+	cs1, _ := randStateWithAppWithHeight(1, m, 1)
+
+	block, err := cs1.createProposalBlock(context.Background())
+	require.NoError(t, err)
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		vote, err := cs1.signVote(cmtproto.PrecommitType, block.Hash(), parts.Header(), block)
+		require.NoError(t, err)
+		require.Equal(t, extension, vote.Extension)
+	})
+	m.AssertExpectations(t)
+}
+
 // TestStateDoesntCrashOnInvalidVote tests that the state does not crash when
 // receiving an invalid vote. In particular, one with the incorrect
 // ValidatorIndex.

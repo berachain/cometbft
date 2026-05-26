@@ -2473,7 +2473,7 @@ func (cs *State) signVote(
 			// extension is caught downstream by SignAndCheckVote and produces a
 			// recoverable error, which is the existing behavior we want to preserve.
 			if len(vote.Extension) > 0 {
-				if err := cs.blockExec.VerifyVoteExtension(context.TODO(), vote); err != nil {
+				if err := cs.blockExec.VerifyVoteExtension(context.Background(), vote); err != nil {
 					panic(fmt.Errorf(
 						"validator %X failed self-verification of its own vote extension at height %d: %w; "+
 							"application ExtendVote and VerifyVoteExtension handlers are inconsistent",
