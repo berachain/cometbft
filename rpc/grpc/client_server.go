@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	cmtnet "github.com/cometbft/cometbft/libs/net"
 	"github.com/cometbft/cometbft/rpc/core"
@@ -33,7 +34,7 @@ func StartGRPCServer(env *core.Environment, ln net.Listener) error {
 //
 // Deprecated: A new gRPC API will be introduced after v0.38.
 func StartGRPCClient(protoAddr string) BroadcastAPIClient {
-	conn, err := grpc.Dial(protoAddr, grpc.WithInsecure(), grpc.WithContextDialer(dialerFunc))
+	conn, err := grpc.Dial(protoAddr, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithContextDialer(dialerFunc))
 	if err != nil {
 		panic(err)
 	}
