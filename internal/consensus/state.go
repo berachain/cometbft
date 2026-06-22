@@ -1408,10 +1408,6 @@ func (cs *State) timelyProposalMargins() (time.Duration, time.Duration) {
 }
 
 func (cs *State) proposalIsTimely() bool {
-	if cs.Proposal.Round > 10 {
-		return true
-	}
-
 	sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Proposal.Round)
 
 	return cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)

@@ -649,3 +649,89 @@ func TestPbtsAdaptiveMessageDelay(t *testing.T) {
 	}
 	t.Error("Did not decide after round", round)
 }
+
+// TestPBTSFarFutureProposalRejectedAtHighRound is a regression test for the
+// removal of `if cs.Proposal.Round > 10 { return true }` in proposalIsTimely.
+//
+// With that check in place a malicious proposer at round >10 could get an
+// arbitrarily far-future block.Time prevoted by honest validators; once
+// committed it poisons LastBlockTime and halts the chain.
+func TestPBTSFarFutureProposalRejectedAtHighRound(t *testing.T) {
+	const numValidators = 4
+	election := func(h int64, r int32) int {
+		return (int(h-1) + int(r)) % numValidators
+	}
+
+	c := test.ConsensusParams()
+	app := kvstore.NewInMemoryApplication()
+	genesisTime := cmttime.Now().Add(-10 * time.Second)
+	cs, vss := randStateWithAppImplGenesisTime(numValidators, app, c, genesisTime)
+
+	myPubKey, err := vss[0].GetPubKey()
+	require.NoError(t, err)
+	myAddress := myPubKey.Address()
+
+	proposalCh := subscribe(cs.eventBus, types.EventQueryCompleteProposal)
+	newRoundCh := subscribe(cs.eventBus, types.EventQueryNewRound)
+	voteCh := subscribe(cs.eventBus, types.EventQueryVote)
+
+	height, round := cs.Height, cs.Round
+	chainID := cs.state.ChainID
+
+	// One year ahead
+	const farFutureOffset = 365 * 24 * time.Hour
+	const lastRound = int32(12)
+	sawHighRound := false
+
+	startTestRound(cs, height, round)
+
+	for ; round <= lastRound; round++ {
+		t.Log("Starting round", round)
+		ensureNewRound(newRoundCh, height, round)
+		proposer := election(height, round)
+
+		if proposer == 0 {
+			// The observed validator is the proposer: let it propose its own
+			// (timely) block; the stubs vote nil to skip the round.
+			ensureNewProposal(proposalCh, height, round)
+			ensurePrevote(voteCh, height, round)
+		} else {
+			block, blockParts, blockID := createProposalBlockWithTime(t, cs, cmttime.Now().Add(farFutureOffset))
+			proposal := types.NewProposal(height, round, -1, blockID, block.Header.Time)
+			signProposal(t, proposal, chainID, vss[proposer])
+			require.NoError(t, cs.SetProposalAndBlock(proposal, blockParts, "peer"))
+
+			ensureProposal(proposalCh, height, round, blockID)
+			ensurePrevote(voteCh, height, round)
+
+			// Ensure far-future proposal have been prevoted nil at any round.
+			gotVote := cs.Votes.Prevotes(round).GetByAddress(myAddress)
+			require.NotNil(t, gotVote, "observed validator did not prevote at round %d", round)
+			require.True(t, gotVote.BlockID.IsNil(),
+				"round %d: far-future proposal must be prevoted nil, got block %X",
+				round, gotVote.BlockID.Hash)
+			if round > 10 {
+				sawHighRound = true
+			}
+		}
+
+		// nil vote for stubs to broadcast to keep advancing in rounds.
+		var vote types.BlockID
+
+		for _, vs := range vss[2:] {
+			signAddVotes(cs, types.PrevoteType, chainID, vote, false, vs)
+			ensurePrevote(voteCh, height, round)
+		}
+		ensurePrecommit(voteCh, height, round)
+		for _, vs := range vss[2:] {
+			signAddVotes(cs, types.PrecommitType, chainID, vote, true, vs)
+			ensurePrecommit(voteCh, height, round)
+		}
+
+		incrementRound(vss[1:]...)
+	}
+
+	require.True(t, sawHighRound, "test never exercised a round > 10")
+	require.Equal(t, height, cs.Height,
+		"a far-future proposal was committed: chain would halt on a poisoned LastBlockTime")
+}
