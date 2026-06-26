@@ -41,23 +41,32 @@ func init() {
 	}
 }
 
-// PubKeyToProto takes crypto.PubKey and transforms it to a protobuf Pubkey
+// PubKeyToProto takes crypto.PubKey and transforms it to a protobuf Pubkey.
+//
+// NOTE: it switches on the key type, not the concrete Go type, because BLS
+// public keys appear both as values and as pointers (PubKeyFromProto returns
+// a pointer), and both must serialize identically.
 func PubKeyToProto(k crypto.PubKey) (pc.PublicKey, error) {
 	var kp pc.PublicKey
-	switch k := k.(type) {
-	case ed25519.PubKey:
+
+	if k == nil {
+		return kp, fmt.Errorf("toproto: key type %v is not supported", k)
+	}
+
+	switch k.Type() {
+	case ed25519.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Ed25519{
-				Ed25519: k,
+				Ed25519: k.Bytes(),
 			},
 		}
-	case secp256k1.PubKey:
+	case secp256k1.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Secp256K1{
-				Secp256K1: k,
+				Secp256K1: k.Bytes(),
 			},
 		}
-	case bls12381.PubKey:
+	case bls12381.KeyType:
 		if !bls12381.Enabled {
 			return kp, ErrUnsupportedKey{Key: k}
 		}

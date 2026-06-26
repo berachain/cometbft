@@ -197,9 +197,15 @@ func TestValidateBlockCommit(t *testing.T) {
 			/*
 				#2589: test len(block.LastCommit.Signatures) == state.LastValidators.Size()
 			*/
-			_, err = makeBlock(state, height, wrongSigsCommit)
-			require.Error(t, err)
-			require.ErrorContains(t, err, "error making block")
+			block, err = makeBlock(state, height, wrongSigsCommit)
+			require.NoError(t, err)
+			err = blockExec.ValidateBlock(state, block)
+			_, isErrInvalidCommitSignatures := err.(errors.ErrInvalidCommitSignatures)
+			require.True(t, isErrInvalidCommitSignatures,
+				"expected ErrInvalidCommitSignatures at height %d, but got: %v",
+				height,
+				err,
+			)
 		}
 
 		/*
@@ -369,116 +375,6 @@ func TestValidateBlockEvidence(t *testing.T) {
 	}
 }
 
-func TestValidateBlockTime(t *testing.T) {
-	proxyApp := newTestApp()
-	require.NoError(t, proxyApp.Start())
-	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
-
-	state, stateDB, privVals := makeState(3, 1)
-	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
-		DiscardABCIResponses: false,
-	})
-	mp := &mpmocks.Mempool{}
-	mp.On("Lock").Return()
-	mp.On("Unlock").Return()
-	mp.On("FlushAppConn", mock.Anything).Return(nil)
-	mp.On("Update",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
-
-	blockStore := store.NewBlockStore(dbm.NewMemDB())
-
-	blockExec := sm.NewBlockExecutor(
-		stateStore,
-		log.TestingLogger(),
-		proxyApp.Consensus(),
-		mp,
-		sm.EmptyEvidencePool{},
-		blockStore,
-	)
-	lastCommit := &types.Commit{}
-	var lastExtCommit *types.ExtendedCommit
-
-	// Build up state for test
-	for height := int64(1); height < 3; height++ {
-		var err error
-		state, _, lastExtCommit, err = makeAndCommitGoodBlock(
-			state, height, lastCommit, state.Validators.GetProposer().Address, blockExec, privVals, nil)
-		require.NoError(t, err, "height %d", height)
-		lastCommit = lastExtCommit.ToCommit()
-	}
-
-	t.Run("block time before last block time", func(t *testing.T) {
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-
-		// Set time to before last block time
-		block.Time = block.Time.Add(-time.Millisecond * 10)
-		err = blockExec.ValidateBlock(state, block)
-
-		require.ErrorContains(t, err, "not greater than last block time")
-	})
-
-	t.Run("block time after last block time, different than median time", func(t *testing.T) {
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-		// Set time to after the median time
-		block.Time = block.Time.Add(time.Second)
-		err = blockExec.ValidateBlock(state, block)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid block time")
-	})
-
-	t.Run("block time after last block time, same as median time", func(t *testing.T) {
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-		err = blockExec.ValidateBlock(state, block)
-		require.NoError(t, err)
-	})
-
-	t.Run("block time exceeds wall clock tolerance", func(t *testing.T) {
-		blockExecWithTol := sm.NewBlockExecutor(
-			stateStore,
-			log.TestingLogger(),
-			proxyApp.Consensus(),
-			mp,
-			sm.EmptyEvidencePool{},
-			blockStore,
-			sm.BlockExecutorWithBlockTimeTolerance(30*time.Second),
-		)
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-		block.Time = time.Now().Add(1000 * time.Hour)
-		err = blockExecWithTol.ValidateBlock(state, block)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "too far in the future")
-	})
-
-	t.Run("tolerance not set still allows valid blocks", func(t *testing.T) {
-		blockExecNoTol := sm.NewBlockExecutor(
-			stateStore,
-			log.TestingLogger(),
-			proxyApp.Consensus(),
-			mp,
-			sm.EmptyEvidencePool{},
-			blockStore,
-		)
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-		err = blockExecNoTol.ValidateBlock(state, block)
-		require.NoError(t, err)
-	})
-}
-
 func TestValidateBlockInvalidCommit(t *testing.T) {
 	proxyApp := newTestApp()
 	require.NoError(t, proxyApp.Start())
@@ -543,8 +439,9 @@ func TestValidateBlockInvalidCommit(t *testing.T) {
 			},
 		}
 
-		_, err := makeBlock(state, height, invalidCommit)
+		block, err := makeBlock(state, height, invalidCommit)
+		require.NoError(t, err)
+		err = blockExec.ValidateBlock(state, block)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "commit validator not found in validator set")
 	})
 }

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/cosmos/gogoproto/proto"
@@ -16,6 +18,7 @@ import (
 	cfg "github.com/cometbft/cometbft/config"
 	cstypes "github.com/cometbft/cometbft/consensus/types"
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	cmtevents "github.com/cometbft/cometbft/libs/events"
 	"github.com/cometbft/cometbft/libs/fail"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
@@ -36,8 +39,9 @@ var msgQueueSize = 1000
 
 // msgs from the reactor which may update the state
 type msgInfo struct {
-	Msg    Message `json:"msg"`
-	PeerID p2p.ID  `json:"peer_key"`
+	Msg         Message   `json:"msg"`
+	PeerID      p2p.ID    `json:"peer_key"`
+	ReceiveTime time.Time `json:"receive_time"`
 }
 
 // internally generated messages which may update the state
@@ -121,7 +125,7 @@ type State struct {
 	// some functions can be overwritten for testing
 	decideProposal func(height int64, round int32)
 	doPrevote      func(height int64, round int32)
-	setProposal    func(proposal *types.Proposal) error
+	setProposal    func(proposal *types.Proposal, recvTime time.Time) error
 
 	// closed when we finish shutting down
 	done chan struct{}
@@ -474,21 +478,80 @@ func (cs *State) OpenWAL(walFile string) (WAL, error) {
 // AddVote inputs a vote.
 func (cs *State) AddVote(vote *types.Vote, peerID p2p.ID) (added bool, err error) {
 	if peerID == "" {
-		cs.internalMsgQueue <- msgInfo{&VoteMessage{vote}, ""}
+		cs.internalMsgQueue <- msgInfo{&VoteMessage{vote}, "", time.Time{}}
 	} else {
-		cs.peerMsgQueue <- msgInfo{&VoteMessage{vote}, peerID}
+		cs.peerMsgQueue <- msgInfo{&VoteMessage{vote}, peerID, time.Time{}}
 	}
 
 	// TODO: wait for event?!
 	return false, nil
 }
 
+// AddCommit ingests a whole aggregated commit received from a peer (gossiped
+// instead of individual votes once signatures have been aggregated). It is
+// used by nodes that fall behind to catch up to the rest of the network.
+func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (bool, error) {
+	cs.Logger.Debug(
+		"Adding whole commit",
+		"commit_height", commit.Height,
+		"commit_round", commit.Round,
+		"commit_blockId", commit.BlockID,
+		"cs_height", cs.Height,
+		"cs_round", cs.Round,
+	)
+
+	// Height mismatch is ignored.
+	// Not necessarily a bad peer, but not favorable behavior.
+	if commit.Height != cs.Height {
+		cs.Logger.Debug("Commit ignored and not added",
+			"commit_height", commit.Height,
+			"cs_height", cs.Height,
+			"peer", peerID)
+		return false, nil
+	}
+
+	// Check to see if the chain is configured to extend votes.
+	extEnabled := cs.isVoteExtensionsEnabled(commit.Height)
+	if extEnabled {
+		// We don't support receiving commits with vote extensions enabled ATM.
+		cs.Logger.Error("Received commit with vote extensions enabled", "height", commit.Height, "peer_ID", peerID)
+		return false, nil
+	}
+
+	if cs.Votes.GetCommit(commit.Round) != nil {
+		cs.Logger.Debug("Received commit, but we already have one", "height", commit.Height, "peer_ID", peerID)
+		return false, nil
+	}
+	if !commit.HasAggregatedSignature() {
+		// Only accept aggregated commits
+		cs.Logger.Error("Received non aggregated commit", "commit", commit.Height, "peer_ID", peerID, "commit", commit)
+		return false, nil
+	}
+	// No need to check blockID. If the commit is valid, 2/3 of the voting power has signed it.
+	if err := cs.Validators.VerifyCommit(cs.state.ChainID, commit.BlockID, cs.Height, commit); err != nil {
+		cs.Logger.Error("Failed to verify commit from peer", "err", err, "height", cs.Height, "round", commit.Round, "peer_ID", peerID)
+		return false, err
+	}
+	height := cs.Height
+	cs.Votes.SetCommit(commit)
+
+	// Executed as Commit could be from a higher round
+	cs.enterNewRound(height, commit.Round)
+	cs.enterPrecommit(height, commit.Round)
+
+	cs.enterCommit(height, commit.Round)
+	// We skip timeoutCommit as this function is hit only when the node is late
+	cs.enterNewRound(cs.Height, 0)
+
+	return true, nil
+}
+
 // SetProposal inputs a proposal.
 func (cs *State) SetProposal(proposal *types.Proposal, peerID p2p.ID) error {
 	if peerID == "" {
-		cs.internalMsgQueue <- msgInfo{&ProposalMessage{proposal}, ""}
+		cs.internalMsgQueue <- msgInfo{&ProposalMessage{proposal}, "", cmttime.Now()}
 	} else {
-		cs.peerMsgQueue <- msgInfo{&ProposalMessage{proposal}, peerID}
+		cs.peerMsgQueue <- msgInfo{&ProposalMessage{proposal}, peerID, cmttime.Now()}
 	}
 
 	// TODO: wait for event?!
@@ -498,9 +561,9 @@ func (cs *State) SetProposal(proposal *types.Proposal, peerID p2p.ID) error {
 // AddProposalBlockPart inputs a part of the proposal block.
 func (cs *State) AddProposalBlockPart(height int64, round int32, part *types.Part, peerID p2p.ID) error {
 	if peerID == "" {
-		cs.internalMsgQueue <- msgInfo{&BlockPartMessage{height, round, part}, ""}
+		cs.internalMsgQueue <- msgInfo{&BlockPartMessage{height, round, part}, "", time.Time{}}
 	} else {
-		cs.peerMsgQueue <- msgInfo{&BlockPartMessage{height, round, part}, peerID}
+		cs.peerMsgQueue <- msgInfo{&BlockPartMessage{height, round, part}, peerID, time.Time{}}
 	}
 
 	// TODO: wait for event?!
@@ -593,7 +656,7 @@ func (cs *State) reconstructSeenCommit(state sm.State) {
 // the method will panic on an absent ExtendedCommit or an ExtendedCommit without
 // extension data.
 func (cs *State) reconstructLastCommit(state sm.State) {
-	extensionsEnabled := state.ConsensusParams.ABCI.VoteExtensionsEnabled(state.LastBlockHeight)
+	extensionsEnabled := state.ConsensusParams.Feature.VoteExtensionsEnabled(state.LastBlockHeight)
 	if !extensionsEnabled {
 		cs.reconstructSeenCommit(state)
 		return
@@ -621,7 +684,7 @@ func (cs *State) votesFromExtendedCommit(state sm.State) (*types.VoteSet, error)
 	return vs, nil
 }
 
-func (cs *State) votesFromSeenCommit(state sm.State) (*types.VoteSet, error) {
+func (cs *State) votesFromSeenCommit(state sm.State) (types.VoteSetReader, error) {
 	commit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	if commit == nil {
 		commit = cs.blockStore.LoadBlockCommit(state.LastBlockHeight)
@@ -633,11 +696,10 @@ func (cs *State) votesFromSeenCommit(state sm.State) (*types.VoteSet, error) {
 		return nil, fmt.Errorf("heights don't match in votesFromSeenCommit %v!=%v",
 			commit.Height, state.LastBlockHeight)
 	}
-	vs := commit.ToVoteSet(state.ChainID, state.LastValidators)
-	if !vs.HasTwoThirdsMajority() {
-		return nil, ErrCommitQuorumNotMet
-	}
-	return vs, nil
+	// With BLS aggregation the individual precommit votes cannot be
+	// reconstructed from an aggregated seen commit, so the whole *Commit
+	// stands in for the vote set.
+	return commit, nil
 }
 
 // Updates State and increments height to match that of state.
@@ -689,14 +751,18 @@ func (cs *State) updateToState(state sm.State) {
 	case state.LastBlockHeight == 0: // Very first commit should be empty.
 		cs.LastCommit = (*types.VoteSet)(nil)
 	case cs.CommitRound > -1 && cs.Votes != nil: // Otherwise, use cs.Votes
-		if !cs.Votes.Precommits(cs.CommitRound).HasTwoThirdsMajority() {
-			panic(fmt.Sprintf(
-				"wanted to form a commit, but precommits (H/R: %d/%d) didn't have 2/3+: %v",
-				state.LastBlockHeight, cs.CommitRound, cs.Votes.Precommits(cs.CommitRound),
-			))
-		}
+		if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+			cs.LastCommit = commit
+		} else {
+			if !cs.Votes.Precommits(cs.CommitRound).HasTwoThirdsMajority() {
+				panic(fmt.Sprintf(
+					"wanted to form a commit, but precommits (H/R: %d/%d) didn't have 2/3+: %v",
+					state.LastBlockHeight, cs.CommitRound, cs.Votes.Precommits(cs.CommitRound),
+				))
+			}
 
-		cs.LastCommit = cs.Votes.Precommits(cs.CommitRound)
+			cs.LastCommit = cs.Votes.Precommits(cs.CommitRound)
+		}
 
 	case cs.LastCommit == nil:
 		// NOTE: when consensus starts, it has no votes. reconstructLastCommit
@@ -717,19 +783,28 @@ func (cs *State) updateToState(state sm.State) {
 	cs.updateHeight(height)
 	cs.updateRoundStep(0, cstypes.RoundStepNewHeight)
 
+	// The app can set a delay between the time when this block is committed
+	// and the next height is started (ADR-115, previously `timeout_commit`
+	// in config.toml).
+	timeoutCommit := state.NextBlockDelay
+	// If the ABCI app didn't set a delay, use the deprecated config value.
+	if timeoutCommit == 0 {
+		timeoutCommit = cs.config.TimeoutCommit
+	}
 	if cs.CommitTime.IsZero() {
 		// "Now" makes it easier to sync up dev nodes.
 		// We add timeoutCommit to allow transactions
 		// to be gathered for the first block.
 		// And alternative solution that relies on clocks:
 		// cs.StartTime = state.LastBlockTime.Add(timeoutCommit)
-		cs.StartTime = cs.config.Commit(cmttime.Now())
+		cs.StartTime = cmttime.Now().Add(timeoutCommit)
 	} else {
-		cs.StartTime = cs.config.Commit(cs.CommitTime)
+		cs.StartTime = cs.CommitTime.Add(timeoutCommit)
 	}
 
 	cs.Validators = validators
 	cs.Proposal = nil
+	cs.ProposalReceiveTime = time.Time{}
 	cs.ProposalBlock = nil
 	cs.ProposalBlockParts = nil
 	cs.LockedRound = -1
@@ -738,7 +813,7 @@ func (cs *State) updateToState(state sm.State) {
 	cs.ValidRound = -1
 	cs.ValidBlock = nil
 	cs.ValidBlockParts = nil
-	if state.ConsensusParams.ABCI.VoteExtensionsEnabled(height) {
+	if state.ConsensusParams.Feature.VoteExtensionsEnabled(height) {
 		cs.Votes = cstypes.NewExtendedHeightVoteSet(state.ChainID, height, validators)
 	} else {
 		cs.Votes = cstypes.NewHeightVoteSet(state.ChainID, height, validators)
@@ -922,7 +997,7 @@ func (cs *State) handleMsg(mi msgInfo) {
 	case *ProposalMessage:
 		// will not cause transition.
 		// once proposal is set, we can receive block parts
-		err = cs.setProposal(msg.Proposal)
+		err = cs.setProposal(msg.Proposal, mi.ReceiveTime)
 
 	case *BlockPartMessage:
 		// if the proposal is complete, we'll enterPrevote or tryFinalizeCommit
@@ -970,6 +1045,16 @@ func (cs *State) handleMsg(mi msgInfo) {
 		// TODO: If rs.Height == vote.Height && rs.Round < vote.Round,
 		// the peer is sending us CatchupCommit precommits.
 		// We could make note of this and help filter in broadcastHasVoteMessage().
+
+	case *CommitMessage:
+		_, err := cs.AddCommit(msg.Commit, peerID)
+		// XXX The function above returns `added`
+		// If this boolean is true we should implement
+		// stats for commit messages
+		// cs.statsMsgQueue <- mi
+		if err != nil {
+			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit, "err", err)
+		}
 
 	case *ingestVerifiedBlockRequest:
 		cs.handleIngestVerifiedBlockRequest(msg)
@@ -1185,6 +1270,16 @@ func (cs *State) enterPropose(height int64, round int32) {
 		return
 	}
 
+	// If this validator is the proposer of this round, and the previous block time is later than
+	// our local clock time, wait to propose until our local clock time has passed the block time.
+	if cs.isPBTSEnabled(height) && cs.privValidatorPubKey != nil && cs.isProposer(cs.privValidatorPubKey.Address()) {
+		proposerWaitTime := proposerWaitTime(cmttime.DefaultSource{}, cs.state.LastBlockTime)
+		if proposerWaitTime > 0 {
+			cs.scheduleTimeout(proposerWaitTime, height, round, cstypes.RoundStepNewRound)
+			return
+		}
+	}
+
 	logger.Debug("entering propose step", "current", log.NewLazySprintf("%v/%v/%v", cs.Height, cs.Round, cs.Step))
 
 	defer func() {
@@ -1272,17 +1367,17 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 
 	// Make proposal
 	propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockID)
+	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockID, block.Header.Time)
 	p := proposal.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {
 		proposal.Signature = p.Signature
 
 		// send proposal and block parts on internal msg queue
-		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, ""})
+		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, "", cmttime.Now()})
 
 		for i := 0; i < int(blockParts.Total()); i++ {
 			part := blockParts.GetPart(i)
-			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, ""})
+			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, "", time.Time{}})
 		}
 
 		cs.Logger.Debug("signed proposal", "height", height, "round", round, "proposal", proposal)
@@ -1320,15 +1415,34 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 
 	// TODO(sergio): wouldn't it be easier if CreateProposalBlock accepted cs.LastCommit directly?
 	var lastExtCommit *types.ExtendedCommit
+	lastCommitAsVs, ok := cs.LastCommit.(*types.VoteSet)
 	switch {
 	case cs.Height == cs.state.InitialHeight:
 		// We're creating a proposal for the first block.
 		// The commit is empty, but not nil.
 		lastExtCommit = &types.ExtendedCommit{}
 
-	case cs.LastCommit.HasTwoThirdsMajority():
-		// Make the commit from LastCommit
-		lastExtCommit = cs.LastCommit.MakeExtendedCommit(cs.state.ConsensusParams.ABCI)
+	case ok && lastCommitAsVs.HasTwoThirdsMajority():
+		// Make the commit from LastCommit.
+		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
+		_, blsKey2 := cs.privValidatorPubKey.(bls12381.PubKey)
+		canBeAggregated := (blsKey || blsKey2) &&
+			cs.state.Validators.AllKeysHaveSameType()
+		if canBeAggregated {
+			if !cs.isPBTSEnabled(cs.Height) {
+				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
+			}
+			lastExtCommit = lastCommitAsVs.MakeBLSCommit()
+		} else {
+			lastExtCommit = lastCommitAsVs.MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+		}
+	case !ok:
+		lastCommitAsCommit, ok := cs.LastCommit.(*types.Commit)
+		if !ok {
+			return nil, errors.New("last commit is neither a VoteSet nor a Commit")
+		}
+		// XXX This will need to be extended to support vote extensions.
+		lastExtCommit = lastCommitAsCommit.WrappedExtendedCommit()
 
 	default: // This shouldn't happen.
 		return nil, ErrProposalWithoutPreviousCommit
@@ -1379,6 +1493,74 @@ func (cs *State) enterPrevote(height int64, round int32) {
 	// (so we have more time to try and collect +2/3 prevotes for a single block)
 }
 
+func (cs *State) timelyProposalMargins() (time.Duration, time.Duration) {
+	sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Round)
+
+	// cs.ProposalReceiveTime - cs.Proposal.Timestamp >= -1 * Precision
+	// cs.ProposalReceiveTime - cs.Proposal.Timestamp <= MessageDelay + Precision
+	return -sp.Precision, sp.MessageDelay + sp.Precision
+}
+
+func (cs *State) proposalIsTimely() bool {
+	if cs.Proposal.Round > 10 {
+		return true
+	}
+
+	sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Proposal.Round)
+
+	return cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)
+}
+
+// isPBTSEnabled returns true if PBTS is enabled at the given height.
+func (cs *State) isPBTSEnabled(height int64) bool {
+	return cs.state.ConsensusParams.Feature.PbtsEnabled(height)
+}
+
+func (cs *State) isVoteExtensionsEnabled(height int64) bool {
+	return cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(height)
+}
+
+// canAggregateCommits returns true if the validator set uses BLS12-381 keys
+// exclusively, in which case precommit signatures are aggregated into a
+// single commit signature (mirrors the routing in types.isAggregatedCommit).
+func (cs *State) canAggregateCommits() bool {
+	proposerKey := cs.Validators.GetProposer().PubKey
+	_, blsKey := proposerKey.(*bls12381.PubKey)
+	_, blsKey2 := proposerKey.(bls12381.PubKey)
+	return (blsKey || blsKey2) && cs.Validators.AllKeysHaveSameType()
+}
+
+// proposerWaitTime determines how long the proposer should wait to propose its next block.
+// If the result is zero, a block can be proposed immediately.
+//
+// Block times must be monotonically increasing, so if the block time of the previous
+// block is larger than the proposer's current time, then the proposer will sleep
+// until its local clock exceeds the previous block time.
+func proposerWaitTime(lt cmttime.Source, bt time.Time) time.Duration {
+	t := lt.Now()
+	if bt.After(t) {
+		return bt.Sub(t)
+	}
+	return 0
+}
+
+func (cs *State) calculateProposalTimestampDifferenceMetric() {
+	if cs.Proposal != nil && cs.Proposal.POLRound == -1 {
+		sp := cs.state.ConsensusParams.Synchrony.InRound(cs.Proposal.Round)
+
+		isTimely := cs.Proposal.IsTimely(cs.ProposalReceiveTime, sp)
+		diff := cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp)
+		// Clamp overflowed durations to avoid recording garbage metric values.
+		// time.Sub sub/overflows when the difference exceeds ~±292 years.
+		if diff == time.Duration(math.MinInt64) || diff == time.Duration(math.MaxInt64) {
+			return
+		}
+		cs.metrics.ProposalTimestampDifference.
+			With("is_timely", strconv.FormatBool(isTimely)).
+			Observe(diff.Seconds())
+	}
+}
+
 func (cs *State) defaultDoPrevote(height int64, round int32) {
 	logger := cs.Logger.With("height", height, "round", round)
 
@@ -1394,6 +1576,46 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 		logger.Debug("prevote step: ProposalBlock is nil")
 		cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
 		return
+	}
+
+	// We did not receive a valid proposal for this round (and thus executing
+	// this from a timeout).
+	if cs.Proposal == nil {
+		logger.Debug("prevote step: did not receive a valid Proposal; prevoting nil")
+		cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
+		return
+	}
+
+	// Timestamp validation using Proposer-Based TimeStamp (PBTS) algorithm.
+	// See: https://github.com/cometbft/cometbft/blob/main/spec/consensus/proposer-based-timestamp/
+	if cs.isPBTSEnabled(height) {
+		if !cs.Proposal.Timestamp.Equal(cs.ProposalBlock.Header.Time) {
+			logger.Debug("prevote step: proposal timestamp not equal; prevoting nil")
+			cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
+			return
+		}
+
+		if cs.Proposal.POLRound == -1 && !cs.proposalIsTimely() {
+			lowerBound, upperBound := cs.timelyProposalMargins()
+			// Use .String() to avoid passing a raw time.Duration to the logger,
+			// which can panic in some logger implementations
+			// when time.Sub overflows to math.MinInt64 for far-future timestamps.
+			logger.Info("prevote step: Proposal is not timely; prevoting nil",
+				"timestamp", cs.Proposal.Timestamp.Format(time.RFC3339Nano),
+				"receive_time", cs.ProposalReceiveTime.Format(time.RFC3339Nano),
+				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp).String(),
+				"lower_bound", lowerBound,
+				"upper_bound", upperBound)
+			cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
+			return
+		}
+
+		if cs.Proposal.POLRound == -1 {
+			logger.Debug("prevote step: Proposal is timely",
+				"timestamp", cs.Proposal.Timestamp.Format(time.RFC3339Nano),
+				"receive_time", cs.ProposalReceiveTime.Format(time.RFC3339Nano),
+				"timestamp_difference", cs.ProposalReceiveTime.Sub(cs.Proposal.Timestamp).String())
+		}
 	}
 
 	// Validate proposal block, from consensus' perspective
@@ -1655,9 +1877,15 @@ func (cs *State) enterCommit(height int64, commitRound int32) {
 		cs.tryFinalizeCommit(height)
 	}()
 
-	blockID, ok := cs.Votes.Precommits(commitRound).TwoThirdsMajority()
-	if !ok {
-		panic("RunActionCommit() expects +2/3 precommits")
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(commitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(commitRound).TwoThirdsMajority()
+		if !ok || blockID.IsNil() {
+			panic("RunActionCommit() expects +2/3 precommits")
+		}
 	}
 
 	// The Locked* fields no longer matter.
@@ -1700,10 +1928,16 @@ func (cs *State) tryFinalizeCommit(height int64) {
 		panic(fmt.Sprintf("tryFinalizeCommit() cs.Height: %v vs height: %v", cs.Height, height))
 	}
 
-	blockID, ok := cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
-	if !ok || len(blockID.Hash) == 0 {
-		logger.Error("failed attempt to finalize commit; there was no +2/3 majority or +2/3 was for nil")
-		return
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		if !ok || len(blockID.Hash) == 0 {
+			logger.Error("failed attempt to finalize commit; there was no +2/3 majority or +2/3 was for nil")
+			return
+		}
 	}
 
 	if !cs.ProposalBlock.HashesTo(blockID.Hash) {
@@ -1732,14 +1966,20 @@ func (cs *State) finalizeCommit(height int64) {
 		return
 	}
 
-	cs.calculatePrevoteMessageDelayMetrics()
+	var blockID types.BlockID
+	if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+		blockID = commit.BlockID
+	} else {
+		cs.calculatePrevoteMessageDelayMetrics()
 
-	blockID, ok := cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		var ok bool
+		blockID, ok = cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
+		if !ok {
+			panic("cannot finalize commit; commit does not have 2/3 majority")
+		}
+	}
 	block, blockParts := cs.ProposalBlock, cs.ProposalBlockParts
 
-	if !ok {
-		panic("cannot finalize commit; commit does not have 2/3 majority")
-	}
 	if !blockParts.HasHeader(blockID.PartSetHeader) {
 		panic("expected ProposalBlockParts header to be commit header")
 	}
@@ -1765,10 +2005,17 @@ func (cs *State) finalizeCommit(height int64) {
 
 	// Save to blockStore.
 	if cs.blockStore.Height() < block.Height {
-		// NOTE: the seenCommit is local justification to commit this block,
-		// but may differ from the LastCommit included in the next block
-		seenExtendedCommit := cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.ABCI)
-		if cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(block.Height) {
+		var seenExtendedCommit *types.ExtendedCommit
+		if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
+			seenExtendedCommit = commit.WrappedExtendedCommit()
+		} else if cs.canAggregateCommits() {
+			// NOTE: the seenCommit is local justification to commit this block,
+			// but may differ from the LastCommit included in the next block
+			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeBLSCommit()
+		} else {
+			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeExtendedCommit(cs.state.ConsensusParams.Feature)
+		}
+		if cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(block.Height) {
 			cs.blockStore.SaveBlockWithExtendedCommit(block, blockParts, seenExtendedCommit)
 		} else {
 			cs.blockStore.SaveBlock(block, blockParts, seenExtendedCommit.ToCommit())
@@ -1825,6 +2072,9 @@ func (cs *State) finalizeCommit(height int64) {
 
 	// must be called before we update state
 	cs.recordMetrics(height, block)
+	cs.metrics.NextBlockDelay.Observe(
+		stateCopy.NextBlockDelay.Seconds(),
+	)
 
 	// NewHeightStep!
 	cs.updateToState(stateCopy)
@@ -1937,10 +2187,10 @@ func (cs *State) recordMetrics(height int64, block *types.Block) {
 
 //-----------------------------------------------------------------------------
 
-func (cs *State) defaultSetProposal(proposal *types.Proposal) error {
+func (cs *State) defaultSetProposal(proposal *types.Proposal, recvTime time.Time) error {
 	// Already have one
 	// TODO: possibly catch double proposals
-	if cs.Proposal != nil {
+	if cs.Proposal != nil || proposal == nil {
 		return nil
 	}
 
@@ -1975,6 +2225,8 @@ func (cs *State) defaultSetProposal(proposal *types.Proposal) error {
 
 	proposal.Signature = p.Signature
 	cs.Proposal = proposal
+	cs.ProposalReceiveTime = recvTime
+	cs.calculateProposalTimestampDifferenceMetric()
 	// We don't update cs.ProposalBlockParts if it is already set.
 	// This happens if we're already in cstypes.RoundStepCommit or if there is a valid block in the current round.
 	// TODO: We can check if Proposal is for a different block as this is a sign of misbehavior!
@@ -2192,7 +2444,14 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		added, err = cs.LastCommit.AddVote(vote)
+		lastCommitAsVs, ok := cs.LastCommit.(*types.VoteSet)
+		if !ok {
+			// LastCommit is a whole aggregated *types.Commit; individual late
+			// precommits cannot be added to it.
+			cs.Logger.Debug("Cannot add precommit vote to a commit; precommit ignored", "vote", vote)
+			return added, err
+		}
+		added, err = lastCommitAsVs.AddVote(vote)
 		if !added {
 			// If the vote wasn't added but there's no error, it's a duplicate vote
 			if err == nil {
@@ -2201,7 +2460,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 			return added, err
 		}
 
-		cs.Logger.Debug("added vote to last precommits", "last_commit", cs.LastCommit.StringShort())
+		cs.Logger.Debug("added vote to last precommits", "last_commit", lastCommitAsVs.StringShort())
 		if err := cs.eventBus.PublishEventVote(types.EventDataVote{Vote: vote}); err != nil {
 			return added, err
 		}
@@ -2209,7 +2468,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 		cs.evsw.FireEvent(types.EventVote, vote)
 
 		// if we can skip timeoutCommit and have all the votes now,
-		if cs.config.SkipTimeoutCommit && cs.LastCommit.HasAll() {
+		if cs.config.SkipTimeoutCommit && lastCommitAsVs.HasAll() {
 			// go straight to new round (skip timeout commit)
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
 			cs.enterNewRound(cs.Height, 0)
@@ -2226,7 +2485,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 	}
 
 	// Check to see if the chain is configured to extend votes.
-	extEnabled := cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
 	if extEnabled {
 		// The chain is configured to extend votes, check that the vote is
 		// not for a nil block and verify the extensions signature against the
@@ -2438,12 +2697,15 @@ func (cs *State) signVote(
 		ValidatorIndex:   valIdx,
 		Height:           cs.Height,
 		Round:            cs.Round,
-		Timestamp:        cs.voteTime(),
 		Type:             msgType,
 		BlockID:          types.BlockID{Hash: hash, PartSetHeader: header},
+		// Vote timestamps are pinned to zero: they are excluded from the
+		// signed bytes so that BLS signatures can be aggregated, and the
+		// block time comes from the proposer (PBTS) instead of BFT Time.
+		Timestamp: time.Time{},
 	}
 
-	extEnabled := cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
 	if msgType == cmtproto.PrecommitType && !vote.BlockID.IsZero() {
 		// if the signedMessage type is for a non-nil precommit, add
 		// VoteExtension
@@ -2462,27 +2724,6 @@ func (cs *State) signVote(
 	}
 
 	return vote, err
-}
-
-func (cs *State) voteTime() time.Time {
-	now := cmttime.Now()
-	minVoteTime := now
-	// Minimum time increment between blocks
-	const timeIota = time.Millisecond
-	// TODO: We should remove next line in case we don't vote for v in case cs.ProposalBlock == nil,
-	// even if cs.LockedBlock != nil. See https://github.com/cometbft/cometbft/tree/v0.38.x/spec/.
-	if cs.LockedBlock != nil {
-		// See the BFT time spec
-		// https://github.com/cometbft/cometbft/blob/v0.38.x/spec/consensus/bft-time.md
-		minVoteTime = cs.LockedBlock.Time.Add(timeIota)
-	} else if cs.ProposalBlock != nil {
-		minVoteTime = cs.ProposalBlock.Time.Add(timeIota)
-	}
-
-	if now.After(minVoteTime) {
-		return now
-	}
-	return minVoteTime
 }
 
 // sign the vote and publish on internalMsgQueue
@@ -2515,12 +2756,12 @@ func (cs *State) signAddVote(
 		return
 	}
 	hasExt := len(vote.ExtensionSignature) > 0
-	extEnabled := cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(vote.Height)
+	extEnabled := cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(vote.Height)
 	if vote.Type == cmtproto.PrecommitType && !vote.BlockID.IsZero() && hasExt != extEnabled {
 		panic(fmt.Errorf("vote extension absence/presence does not match extensions enabled %t!=%t, height %d, type %v",
 			hasExt, extEnabled, vote.Height, vote.Type))
 	}
-	cs.sendInternalMessage(msgInfo{&VoteMessage{vote}, ""})
+	cs.sendInternalMessage(msgInfo{&VoteMessage{vote}, "", time.Time{}})
 	cs.Logger.Debug("signed and pushed vote", "height", cs.Height, "round", cs.Round, "vote", vote)
 }
 

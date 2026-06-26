@@ -360,7 +360,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 
 			cs.state.LastBlockHeight = testCase.storedHeight
 			cs.state.LastValidators = cs.state.Validators.Copy()
-			cs.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
+			cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
 
 			propBlock, err := cs.createProposalBlock(ctx)
 			require.NoError(t, err)
@@ -392,7 +392,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, added)
 
-			veHeightParam := types.ABCIParams{VoteExtensionsEnableHeight: veHeight}
+			veHeightParam := types.FeatureParams{VoteExtensionsEnableHeight: veHeight}
 			if testCase.includeExtensions {
 				cs.blockStore.SaveBlockWithExtendedCommit(propBlock, blockParts, voteSet.MakeExtendedCommit(veHeightParam))
 			} else {
@@ -1136,7 +1136,8 @@ func TestMarshalJSONPeerState(t *testing.T) {
 			"last_commit_round": -1,
 			"last_commit": null,
 			"catchup_commit_round": -1,
-			"catchup_commit": null
+			"catchup_commit": null,
+			"has_catchup_commit": false
 		},
 		"stats":{
 			"votes":"0",

@@ -70,13 +70,16 @@ func (cs *State) readReplayMessage(msg *TimedWALMessage, newStepSub types.Subscr
 		case *ProposalMessage:
 			p := msg.Proposal
 			cs.Logger.Info("Replay: Proposal", "height", p.Height, "round", p.Round, "header",
-				p.BlockID.PartSetHeader, "pol", p.POLRound, "peer", peerID)
+				p.BlockID.PartSetHeader, "pol", p.POLRound, "peer", peerID, "receive_time", m.ReceiveTime)
 		case *BlockPartMessage:
 			cs.Logger.Info("Replay: BlockPart", "height", msg.Height, "round", msg.Round, "peer", peerID)
 		case *VoteMessage:
 			v := msg.Vote
 			cs.Logger.Info("Replay: Vote", "height", v.Height, "round", v.Round, "type", v.Type,
 				"blockID", v.BlockID, "peer", peerID, "extensionLen", len(v.Extension), "extSigLen", len(v.ExtensionSignature))
+		case *CommitMessage:
+			c := msg.Commit
+			cs.Logger.Info("Replay: Commit", "height", c.Height, "round", c.Round, "peer", peerID)
 		}
 
 		cs.handleMsg(m)

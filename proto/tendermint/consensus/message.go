@@ -18,7 +18,14 @@ var (
 	_ p2p.Wrapper = &NewRoundStep{}
 	_ p2p.Wrapper = &HasVote{}
 	_ p2p.Wrapper = &BlockPart{}
+	_ p2p.Wrapper = &Commit{}
 )
+
+func (m *Commit) Wrap() proto.Message {
+	cm := &Message{}
+	cm.Sum = &Message_Commit{Commit: m}
+	return cm
+}
 
 func (m *VoteSetBits) Wrap() proto.Message {
 	cm := &Message{}
@@ -104,6 +111,9 @@ func (m *Message) Unwrap() (proto.Message, error) {
 
 	case *Message_VoteSetBits:
 		return m.GetVoteSetBits(), nil
+
+	case *Message_Commit:
+		return m.GetCommit(), nil
 
 	default:
 		return nil, fmt.Errorf("unknown message: %T", msg)

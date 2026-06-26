@@ -36,10 +36,12 @@ var (
 // Changing this to 'minimal-signature-size' would render CometBFT not Ethereum
 // compatible.
 type (
-	blstPublicKey          = blst.P1Affine
-	blstSignature          = blst.P2Affine
-	blstAggregateSignature = blst.P1Aggregate
-	blstAggregatePublicKey = blst.P2Aggregate
+	blstPublicKey = blst.P1Affine
+	blstSignature = blst.P2Affine
+	// Signatures live in G2 under min-pubkey-size, so an aggregate
+	// signature is a P2 aggregate (and an aggregate public key is P1).
+	blstAggregateSignature = blst.P2Aggregate
+	blstAggregatePublicKey = blst.P1Aggregate
 )
 
 // -------------------------------------.

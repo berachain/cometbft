@@ -53,7 +53,7 @@ func genesisDocWithValsPowers(powers []int64) (*types.GenesisDoc, []types.PrivVa
 	sort.Sort(types.PrivValidatorsByAddress(privValidators))
 
 	consPar := types.DefaultConsensusParams()
-	consPar.ABCI.VoteExtensionsEnableHeight = 1
+	consPar.Feature.VoteExtensionsEnableHeight = 1
 	return &types.GenesisDoc{
 		GenesisTime:     cmttime.Now(),
 		ChainID:         test.DefaultTestChainID,
@@ -164,12 +164,18 @@ func newReactor(
 
 	// let's add some blocks in
 	for blockHeight := int64(1); blockHeight <= maxBlockHeight; blockHeight++ {
-		voteExtensionIsEnabled := genDoc.ConsensusParams.ABCI.VoteExtensionsEnabled(blockHeight)
+		voteExtensionIsEnabled := genDoc.ConsensusParams.Feature.VoteExtensionsEnabled(blockHeight)
 
 		lastExtCommit := seenExtCommit.Clone()
 
 		thisBlock, err := state.MakeBlock(blockHeight, nil, lastExtCommit.ToCommit(), nil, state.Validators.Proposer.Address)
 		require.NoError(t, err)
+		if options.deterministicVoteTimes {
+			// Under PBTS the proposer stamps the block with its wall clock;
+			// pin it so independently constructed test chains with the same
+			// genesis produce identical block IDs and LastBlockID links.
+			thisBlock.Time = genDoc.GenesisTime.Add(time.Duration(blockHeight) * time.Second)
+		}
 
 		thisParts, err := thisBlock.MakePartSet(types.BlockPartSizeBytes)
 		require.NoError(t, err)
@@ -435,7 +441,7 @@ func ExtendedCommitNetworkHelper(t *testing.T, maxBlockHeight int64, enableVoteE
 	config = test.ResetTestRoot("blocksync_reactor_test")
 	defer os.RemoveAll(config.RootDir)
 	genDoc, privVals := genesisDocWithValsPowers(valPowers)
-	genDoc.ConsensusParams.ABCI.VoteExtensionsEnableHeight = enableVoteExtensionAt
+	genDoc.ConsensusParams.Feature.VoteExtensionsEnableHeight = enableVoteExtensionAt
 
 	reactorPairs := make([]ReactorPair, 1, 2)
 	reactorPairs[0] = newReactor(t, log.TestingLogger(), genDoc, privVals, 0)
@@ -855,7 +861,7 @@ func (bcR *ByzantineReactor) respondToPeer(msg *bcproto.BlockRequest, src p2p.Pe
 		return false
 	}
 	var extCommit *types.ExtendedCommit
-	voteExtensionEnabled := state.ConsensusParams.ABCI.VoteExtensionsEnabled(msg.Height)
+	voteExtensionEnabled := state.ConsensusParams.Feature.VoteExtensionsEnabled(msg.Height)
 	incorrectBlock := bcR.corruptedBlock == msg.Height
 	if voteExtensionEnabled && !incorrectBlock || !voteExtensionEnabled && incorrectBlock {
 		extCommit = bcR.store.LoadBlockExtendedCommit(msg.Height)

@@ -17,6 +17,7 @@ import (
 	cmtcons "github.com/cometbft/cometbft/proto/tendermint/consensus"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestMsgToProto(t *testing.T) {
@@ -49,10 +50,10 @@ func TestMsgToProto(t *testing.T) {
 	proposal := types.Proposal{
 		Type:      cmtproto.ProposalType,
 		Height:    1,
-		Round:     1,
+		Round:     2,
 		POLRound:  1,
 		BlockID:   bi,
-		Timestamp: time.Now(),
+		Timestamp: cmttime.Now(),
 		Signature: cmtrand.Bytes(20),
 	}
 	pbProposal := proposal.ToProto()

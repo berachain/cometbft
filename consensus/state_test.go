@@ -27,6 +27,7 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	smmocks "github.com/cometbft/cometbft/state/mocks"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 /*
@@ -216,7 +217,7 @@ func TestStateBadProposal(t *testing.T) {
 	propBlockParts, err := propBlock.MakePartSet(partSize)
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: propBlock.Hash(), PartSetHeader: propBlockParts.Header()}
-	proposal := types.NewProposal(vs2.Height, round, -1, blockID)
+	proposal := types.NewProposal(vs2.Height, round, -1, blockID, propBlock.Header.Time)
 	p := proposal.ToProto()
 	if err := vs2.SignProposal(cs1.state.ChainID, p); err != nil {
 		t.Fatal("failed to sign bad proposal", err)
@@ -289,7 +290,7 @@ func TestStateOversizedBlock(t *testing.T) {
 			incrementRound(vss[1:]...)
 
 			blockID := types.BlockID{Hash: propBlock.Hash(), PartSetHeader: propBlockParts.Header()}
-			proposal := types.NewProposal(height, round, -1, blockID)
+			proposal := types.NewProposal(height, round, -1, blockID, propBlock.Header.Time)
 			p := proposal.ToProto()
 			if err := vs2.SignProposal(cs1.state.ChainID, p); err != nil {
 				t.Fatal("failed to sign bad proposal", err)
@@ -1170,7 +1171,7 @@ func TestStateLockPOLSafety2(t *testing.T) {
 
 	round++ // moving to the next round
 	// in round 2 we see the polkad block from round 0
-	newProp := types.NewProposal(height, round, 0, propBlockID0)
+	newProp := types.NewProposal(height, round, 0, propBlockID0, cmttime.Now())
 	p := newProp.ToProto()
 	if err := vs3.SignProposal(cs1.state.ChainID, p); err != nil {
 		t.Fatal(err)
@@ -1579,7 +1580,7 @@ func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
 	m.On("Commit", mock.Anything, mock.Anything).Return(&abci.ResponseCommit{}, nil).Maybe()
 	cs1, vss := randStateWithApp(4, m)
 	height, round := cs1.Height, cs1.Round
-	cs1.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = cs1.Height
+	cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = cs1.Height
 
 	proposalCh := subscribe(cs1.eventBus, types.EventQueryCompleteProposal)
 	newRoundCh := subscribe(cs1.eventBus, types.EventQueryNewRound)
@@ -1879,7 +1880,7 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 			m.On("FinalizeBlock", mock.Anything, mock.Anything).Return(&abci.ResponseFinalizeBlock{}, nil).Maybe()
 			m.On("Commit", mock.Anything, mock.Anything).Return(&abci.ResponseCommit{}, nil).Maybe()
 			cs1, vss := randStateWithAppWithHeight(numValidators, m, testCase.enableHeight)
-			cs1.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = testCase.enableHeight
+			cs1.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.enableHeight
 			height, round := cs1.Height, cs1.Round
 
 			timeoutCh := subscribe(cs1.eventBus, types.EventQueryTimeoutPropose)
@@ -1943,7 +1944,7 @@ func TestStateDoesntCrashOnInvalidVote(t *testing.T) {
 
 	voteMessage := &VoteMessage{vote}
 	assert.NotPanics(t, func() {
-		cs.handleMsg(msgInfo{voteMessage, peer.ID()})
+		cs.handleMsg(msgInfo{voteMessage, peer.ID(), time.Time{}})
 	})
 
 	added, err := cs.AddVote(vote, peer.ID())
@@ -2454,26 +2455,26 @@ func TestStateOutputsBlockPartsStats(t *testing.T) {
 	}
 
 	cs.ProposalBlockParts = types.NewPartSetFromHeader(parts.Header())
-	cs.handleMsg(msgInfo{msg, peer.ID()})
+	cs.handleMsg(msgInfo{msg, peer.ID(), time.Time{}})
 
 	statsMessage := <-cs.statsMsgQueue
 	require.Equal(t, msg, statsMessage.Msg, "")
 	require.Equal(t, peer.ID(), statsMessage.PeerID, "")
 
 	// sending the same part from different peer
-	cs.handleMsg(msgInfo{msg, "peer2"})
+	cs.handleMsg(msgInfo{msg, "peer2", time.Time{}})
 
 	// sending the part with the same height, but different round
 	msg.Round = 1
-	cs.handleMsg(msgInfo{msg, peer.ID()})
+	cs.handleMsg(msgInfo{msg, peer.ID(), time.Time{}})
 
 	// sending the part from the smaller height
 	msg.Height = 0
-	cs.handleMsg(msgInfo{msg, peer.ID()})
+	cs.handleMsg(msgInfo{msg, peer.ID(), time.Time{}})
 
 	// sending the part from the bigger height
 	msg.Height = 3
-	cs.handleMsg(msgInfo{msg, peer.ID()})
+	cs.handleMsg(msgInfo{msg, peer.ID(), time.Time{}})
 
 	select {
 	case <-cs.statsMsgQueue:
@@ -2526,20 +2527,20 @@ func TestStateOutputVoteStats(t *testing.T) {
 	vote := signVote(vss[1], cmtproto.PrecommitType, randBytes, types.PartSetHeader{}, true)
 
 	voteMessage := &VoteMessage{vote}
-	cs.handleMsg(msgInfo{voteMessage, peer.ID()})
+	cs.handleMsg(msgInfo{voteMessage, peer.ID(), time.Time{}})
 
 	statsMessage := <-cs.statsMsgQueue
 	require.Equal(t, voteMessage, statsMessage.Msg, "")
 	require.Equal(t, peer.ID(), statsMessage.PeerID, "")
 
 	// sending the same part from different peer
-	cs.handleMsg(msgInfo{&VoteMessage{vote}, "peer2"})
+	cs.handleMsg(msgInfo{&VoteMessage{vote}, "peer2", time.Time{}})
 
 	// sending the vote for the bigger height
 	incrementHeight(vss[1])
 	vote = signVote(vss[1], cmtproto.PrecommitType, randBytes, types.PartSetHeader{}, true)
 
-	cs.handleMsg(msgInfo{&VoteMessage{vote}, peer.ID()})
+	cs.handleMsg(msgInfo{&VoteMessage{vote}, peer.ID(), time.Time{}})
 
 	select {
 	case <-cs.statsMsgQueue:
@@ -2558,7 +2559,7 @@ func TestHandleMsgReleasesLockBeforeStatsMsgQueueSend(t *testing.T) {
 	// Unbuffered channel with no consumer simulates a saturated queue.
 	cs.statsMsgQueue = make(chan msgInfo)
 
-	go cs.handleMsg(msgInfo{&VoteMessage{vote}, peer.ID()})
+	go cs.handleMsg(msgInfo{&VoteMessage{vote}, peer.ID(), time.Time{}})
 	time.Sleep(20 * time.Millisecond)
 
 	rsResult := make(chan *cstypes.RoundState, 1)

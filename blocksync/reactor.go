@@ -300,7 +300,7 @@ func (r *Reactor) respondToPeer(msg *bcproto.BlockRequest, src p2p.Peer) {
 	}
 
 	var extCommit *types.ExtendedCommit
-	if state.ConsensusParams.ABCI.VoteExtensionsEnabled(msg.Height) {
+	if state.ConsensusParams.Feature.VoteExtensionsEnabled(msg.Height) {
 		extCommit = r.store.LoadBlockExtendedCommit(msg.Height)
 		if extCommit == nil {
 			r.Logger.Error("Found block in store with no extended commit", "block", block)
@@ -528,7 +528,7 @@ FOR_LOOP:
 			//
 			missingExtension := true
 			if state.LastBlockHeight == 0 ||
-				!state.ConsensusParams.ABCI.VoteExtensionsEnabled(state.LastBlockHeight) ||
+				!state.ConsensusParams.Feature.VoteExtensionsEnabled(state.LastBlockHeight) ||
 				blocksSynced > 0 ||
 				initialCommitHasExtensions {
 				missingExtension = false
@@ -623,7 +623,7 @@ FOR_LOOP:
 
 			// vote extension validations
 			presentExtCommit := extCommit != nil
-			extensionsEnabled := state.ConsensusParams.ABCI.VoteExtensionsEnabled(first.Height)
+			extensionsEnabled := state.ConsensusParams.Feature.VoteExtensionsEnabled(first.Height)
 
 			if presentExtCommit != extensionsEnabled {
 				err = fmt.Errorf("non-nil extended commit must be received iff vote extensions are enabled for its height "+

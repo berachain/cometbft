@@ -14,6 +14,37 @@
 
 ### API-BREAKING
 
+## Berachain fork (unreleased)
+
+_Berachain-specific changes layered on top of upstream CometBFT, based on upstream cometbft
+v0.39.4 (`f96ff7cc2`). These ports keep consensus sign/state bytes byte-compatible with the
+bera-v1.x line, so an existing bera-v1.x network can restart on this binary (consensus-compatible
+with bera-v1.x networks). Upstream backports are tracked in the sections above. At release, this
+section becomes `## v0.39.4-bera.N`._
+
+### FEATURES
+
+- `[consensus,types,state]` Port Proposer-Based Timestamps (PBTS) from the bera-v1.x line.
+  Block timestamps are set by the proposer and validated against synchrony parameters instead of
+  the BFT-median of vote times; per-vote timestamps are removed. PBTS is always enabled on this fork.
+  ([\#51](https://github.com/berachain/cometbft/pull/51))
+- `[consensus,crypto,types]` Port BLS12-381 signature aggregation. For all-BLS validator sets,
+  precommit signatures are aggregated into a single commit that is gossiped whole and used for
+  fast catch-up of lagging nodes.
+  ([\#51](https://github.com/berachain/cometbft/pull/51))
+- `[state,abci]` Add `NextBlockDelay` (ADR-115): the application controls the delay before the next
+  height starts, replacing the static `timeout_commit`. Also adds `next_proposer_address` to
+  `ProcessProposal`.
+  ([\#51](https://github.com/berachain/cometbft/pull/51))
+
+### STATE-BREAKING
+
+- `[types,state]` New consensus parameters (`SynchronyParams`, `FeatureParams`) and the removal of
+  per-vote timestamps change consensus sign bytes and persisted-state encoding. These match the
+  bera-v1.x line byte-for-byte, so an existing bera-v1.x network can restart on this binary; the
+  encoding is not compatible with pristine upstream v0.39.x state.
+  ([\#51](https://github.com/berachain/cometbft/pull/51))
+
 ## v0.39.4
 
 *July 28, 2026*

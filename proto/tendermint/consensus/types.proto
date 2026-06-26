@@ -52,6 +52,12 @@ message Vote {
   tendermint.types.Vote vote = 1;
 }
 
+// An entire Commit is sent when signatures are aggregated and we cannot
+// extract a single signature.
+message Commit {
+  tendermint.types.Commit commit = 1;
+}
+
 // HasVote is sent to indicate that a particular vote has been received.
 message HasVote {
   int64 height = 1;
@@ -94,5 +100,8 @@ message Message {
     HasVote has_vote = 7;
     VoteSetMaj23 vote_set_maj23 = 8;
     VoteSetBits vote_set_bits = 9;
+    // 10 is reserved for has_proposal_block_part (bera-v1.x numbering).
+    Commit commit = 11;
   }
+  reserved 10;
 }

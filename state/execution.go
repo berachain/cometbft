@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -146,7 +147,7 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 		&abci.RequestPrepareProposal{
 			MaxTxBytes:         maxDataBytes,
 			Txs:                block.Txs.ToSliceOfBytes(),
-			LocalLastCommit:    buildExtendedCommitInfoFromStore(lastExtCommit, blockExec.store, state.InitialHeight, state.ConsensusParams.ABCI),
+			LocalLastCommit:    buildExtendedCommitInfoFromStore(lastExtCommit, blockExec.store, state.InitialHeight, state.ConsensusParams.Feature),
 			Misbehavior:        block.Evidence.Evidence.ToABCI(),
 			Height:             block.Height,
 			Time:               block.Time,
@@ -179,14 +180,15 @@ func (blockExec *BlockExecutor) ProcessProposal(
 	state State,
 ) (bool, error) {
 	resp, err := blockExec.proxyApp.ProcessProposal(context.TODO(), &abci.RequestProcessProposal{
-		Hash:               block.Header.Hash(),
-		Height:             block.Height,
-		Time:               block.Time,
-		Txs:                block.Txs.ToSliceOfBytes(),
-		ProposedLastCommit: buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
-		Misbehavior:        block.Evidence.Evidence.ToABCI(),
-		ProposerAddress:    block.ProposerAddress,
-		NextValidatorsHash: block.NextValidatorsHash,
+		Hash:                block.Header.Hash(),
+		Height:              block.Height,
+		Time:                block.Time,
+		Txs:                 block.Txs.ToSliceOfBytes(),
+		ProposedLastCommit:  buildLastCommitInfoFromStore(block, blockExec.store, state.InitialHeight),
+		Misbehavior:         block.Evidence.Evidence.ToABCI(),
+		ProposerAddress:     block.ProposerAddress,
+		NextValidatorsHash:  block.NextValidatorsHash,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
 	})
 	if err != nil {
 		return false, err
@@ -335,6 +337,10 @@ func (blockExec *BlockExecutor) applyBlock(state State, blockID types.BlockID, b
 	}
 	if abciResponse.ConsensusParamUpdates != nil {
 		blockExec.metrics.ConsensusParamUpdates.Add(1)
+	}
+
+	if err := validateNextBlockDelay(abciResponse.NextBlockDelay); err != nil {
+		return state, fmt.Errorf("error in next block delay: %w", err)
 	}
 
 	// Update the state with the block and responses.
@@ -615,7 +621,7 @@ func BuildLastCommitInfo(block *types.Block, lastValSet *types.ValidatorSet, ini
 // data, it returns an empty record.
 //
 // Assumes that the commit signatures are sorted according to validator index.
-func buildExtendedCommitInfoFromStore(ec *types.ExtendedCommit, store Store, initialHeight int64, ap types.ABCIParams) abci.ExtendedCommitInfo {
+func buildExtendedCommitInfoFromStore(ec *types.ExtendedCommit, store Store, initialHeight int64, fp types.FeatureParams) abci.ExtendedCommitInfo {
 	if ec.Height < initialHeight {
 		// There are no extended commits for heights below the initial height.
 		return abci.ExtendedCommitInfo{}
@@ -626,13 +632,13 @@ func buildExtendedCommitInfoFromStore(ec *types.ExtendedCommit, store Store, ini
 		panic(fmt.Errorf("failed to load validator set at height %d, initial height %d: %w", ec.Height, initialHeight, err))
 	}
 
-	return BuildExtendedCommitInfo(ec, valSet, initialHeight, ap)
+	return BuildExtendedCommitInfo(ec, valSet, initialHeight, fp)
 }
 
 // BuildExtendedCommitInfo builds an ExtendedCommitInfo from the given block and validator set.
 // If you want to load the validator set from the store instead of providing it,
 // use buildExtendedCommitInfoFromStore.
-func BuildExtendedCommitInfo(ec *types.ExtendedCommit, valSet *types.ValidatorSet, initialHeight int64, ap types.ABCIParams) abci.ExtendedCommitInfo {
+func BuildExtendedCommitInfo(ec *types.ExtendedCommit, valSet *types.ValidatorSet, initialHeight int64, fp types.FeatureParams) abci.ExtendedCommitInfo {
 	if ec.Height < initialHeight {
 		// There are no extended commits for heights below the initial height.
 		return abci.ExtendedCommitInfo{}
@@ -669,7 +675,7 @@ func BuildExtendedCommitInfo(ec *types.ExtendedCommit, valSet *types.ValidatorSe
 		// during that height, we ensure they are present and deliver the data to
 		// the proposer. If they were not enabled during this previous height, we
 		// will not deliver extension data.
-		if err := ecs.EnsureExtension(ap.VoteExtensionsEnabled(ec.Height)); err != nil {
+		if err := ecs.EnsureExtension(fp.VoteExtensionsEnabled(ec.Height)); err != nil {
 			panic(fmt.Errorf("commit at height %d has problems with vote extension data; err %w", ec.Height, err))
 		}
 
@@ -780,7 +786,15 @@ func updateState(
 		LastHeightConsensusParamsChanged: lastHeightParamsChanged,
 		LastResultsHash:                  TxResultsHash(abciResponse.TxResults),
 		AppHash:                          nil,
+		NextBlockDelay:                   abciResponse.NextBlockDelay,
 	}, nil
+}
+
+func validateNextBlockDelay(nextBlockDelay time.Duration) error {
+	if nextBlockDelay < 0 {
+		return errors.New("negative duration")
+	}
+	return nil
 }
 
 // Fire NewBlock, NewBlockHeader.

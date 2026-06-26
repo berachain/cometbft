@@ -76,6 +76,12 @@ func MsgToProto(msg Message) (proto.Message, error) {
 			Vote: vote,
 		}
 
+	case *CommitMessage:
+		commit := msg.Commit.ToProto()
+		pb = &cmtcons.Commit{
+			Commit: commit,
+		}
+
 	case *HasVoteMessage:
 		pb = &cmtcons.HasVote{
 			Height: msg.Height,
@@ -181,6 +187,15 @@ func MsgFromProto(p proto.Message) (Message, error) {
 			Round:  msg.Round,
 			Part:   parts,
 		}
+	case *cmtcons.Commit:
+		commit, err := types.CommitFromProto(msg.Commit)
+		if err != nil {
+			return nil, cmterrors.ErrMsgToProto{MessageName: "Commit", Err: err}
+		}
+
+		pb = &CommitMessage{
+			Commit: commit,
+		}
 	case *cmtcons.Vote:
 		// Vote validation will be handled in the vote message ValidateBasic
 		// call below.
@@ -252,6 +267,9 @@ func WALToProto(msg WALMessage) (*cmtcons.WALMessage, error) {
 			},
 		}
 	case msgInfo:
+		// NOTE: ReceiveTime is intentionally dropped (bera-v1.x persists it), so a
+		// WAL-replayed proposal has a zero time. Only affects PBTS timeliness in a
+		// rare crash window and is safe.
 		consMsg, err := MsgToProto(msg.Msg)
 		if err != nil {
 			return nil, err
@@ -317,6 +335,7 @@ func WALFromProto(msg *cmtcons.WALMessage) (WALMessage, error) {
 		if err != nil {
 			return nil, cmterrors.ErrMsgFromProto{MessageName: "MsgInfo", Err: err}
 		}
+		// ReceiveTime is not persisted, so it is zero here (see WALToProto).
 		pb = msgInfo{
 			Msg:    walMsg,
 			PeerID: p2p.ID(msg.MsgInfo.PeerID),

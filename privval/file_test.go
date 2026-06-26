@@ -291,9 +291,10 @@ func TestDifferByTimestamp(t *testing.T) {
 		signBytes := types.VoteSignBytes(chainID, v)
 		sig := v.Signature
 		extSig := v.ExtensionSignature
-		timeStamp := vote.Timestamp
 
-		// manipulate the timestamp. should get changed back
+		// The vote timestamp is not part of the signed bytes (it was removed
+		// to enable BLS signature aggregation), so re-signing the same vote
+		// reuses the previous signature regardless of the timestamp value.
 		v.Timestamp = v.Timestamp.Add(time.Millisecond)
 		var emptySig []byte
 		v.Signature = emptySig
@@ -301,7 +302,6 @@ func TestDifferByTimestamp(t *testing.T) {
 		err = privVal.SignVote("mychainid", v)
 		assert.NoError(t, err, "expected no error on signing same vote")
 
-		assert.Equal(t, timeStamp, v.Timestamp)
 		assert.Equal(t, signBytes, types.VoteSignBytes(chainID, v))
 		assert.Equal(t, sig, v.Signature)
 		assert.Equal(t, extSig, v.ExtensionSignature)
@@ -349,17 +349,15 @@ func TestVoteExtensionsAreAlwaysSigned(t *testing.T) {
 	assert.True(t, pubKey.VerifySignature(vesb2, vpb2.ExtensionSignature))
 	assert.False(t, pubKey.VerifySignature(vesb1, vpb2.ExtensionSignature))
 
-	// We now manipulate the timestamp of the vote with the extension, as per
-	// TestDifferByTimestamp
-	expectedTimestamp := vpb2.Timestamp
-
+	// We now manipulate the timestamp of the vote with the extension. The
+	// timestamp is not part of the signed bytes, so signing succeeds and the
+	// extension is re-signed.
 	vpb2.Timestamp = vpb2.Timestamp.Add(time.Millisecond)
 	vpb2.Signature = nil
 	vpb2.ExtensionSignature = nil
 
 	err = privVal.SignVote("mychainid", vpb2)
 	assert.NoError(t, err, "expected no error signing same vote with manipulated timestamp and vote extension")
-	assert.Equal(t, expectedTimestamp, vpb2.Timestamp)
 
 	vesb3 := types.VoteExtensionSignBytes("mychainid", vpb2)
 	assert.True(t, pubKey.VerifySignature(vesb3, vpb2.ExtensionSignature))
