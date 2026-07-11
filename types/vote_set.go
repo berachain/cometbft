@@ -740,7 +740,7 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	sigs := make([]ExtendedCommitSig, len(voteSet.votes))
 	for i, v := range voteSet.votes {
 		sig := v.ExtendedCommitSig()
-		sig.CommitSig.Signature = []byte{} // clear the signature
+		sig.Signature = []byte{} // clear the signature
 
 		// if block ID exists but doesn't match, exclude sig
 		if sig.BlockIDFlag == BlockIDFlagCommit && !v.BlockID.Equals(*voteSet.maj23) {
@@ -765,8 +765,8 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 			if !v.BlockID.Equals(*voteSet.maj23) {
 				continue
 			}
-			sigs[i].CommitSig.Signature = agSig1
-			sigs[i].CommitSig.BlockIDFlag = BlockIDFlagAggCommit
+			sigs[i].Signature = agSig1
+			sigs[i].BlockIDFlag = BlockIDFlagAggCommit
 			break
 		}
 	}
@@ -775,8 +775,8 @@ func (voteSet *VoteSet) MakeBLSCommit() *ExtendedCommit {
 	if agSig2 != nil {
 		for i, v := range voteSet.votes {
 			if v != nil && v.BlockID.IsNil() {
-				sigs[i].CommitSig.Signature = agSig2
-				sigs[i].CommitSig.BlockIDFlag = BlockIDFlagAggNil
+				sigs[i].Signature = agSig2
+				sigs[i].BlockIDFlag = BlockIDFlagAggNil
 				break
 			}
 		}

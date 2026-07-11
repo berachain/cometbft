@@ -42,10 +42,9 @@ var (
 type (
 	blstPublicKey = blst.P1Affine
 	blstSignature = blst.P2Affine
-	// Signatures live in G2 under min-pubkey-size, so an aggregate
-	// signature is a P2 aggregate (and an aggregate public key is P1).
+	// Signatures live in G2 under min-pubkey-size, so an aggregate signature
+	// is a P2 aggregate.
 	blstAggregateSignature = blst.P2Aggregate
-	blstAggregatePublicKey = blst.P1Aggregate
 )
 
 // -------------------------------------.

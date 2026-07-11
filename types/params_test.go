@@ -2,10 +2,11 @@ package types
 
 import (
 	"bytes"
-	gogo "github.com/cosmos/gogoproto/types"
 	"sort"
 	"testing"
 	"time"
+
+	gogo "github.com/cosmos/gogoproto/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

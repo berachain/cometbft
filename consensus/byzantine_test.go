@@ -185,8 +185,8 @@ func TestByzantinePrevoteEquivocation(t *testing.T) {
 		}
 
 		var extCommit *types.ExtendedCommit
-		switch {
-		case lazyProposer.Height == lazyProposer.state.InitialHeight:
+		switch lazyProposer.Height {
+		case lazyProposer.state.InitialHeight:
 			// We're creating a proposal for the first block.
 			// The commit is empty, but not nil.
 			extCommit = &types.ExtendedCommit{}
@@ -226,7 +226,7 @@ func TestByzantinePrevoteEquivocation(t *testing.T) {
 
 		// Make proposal
 		propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-		proposal := types.NewProposal(height, round, lazyProposer.ValidRound, propBlockID, block.Header.Time)
+		proposal := types.NewProposal(height, round, lazyProposer.ValidRound, propBlockID, block.Time)
 		p := proposal.ToProto()
 		if err := lazyProposer.privValidator.SignProposal(lazyProposer.state.ChainID, p); err == nil {
 			proposal.Signature = p.Signature
@@ -482,7 +482,7 @@ func byzantineDecideProposalFunc(ctx context.Context, t *testing.T, height int64
 	blockParts1, err := block1.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(t, err)
 	polRound, propBlockID := cs.ValidRound, types.BlockID{Hash: block1.Hash(), PartSetHeader: blockParts1.Header()}
-	proposal1 := types.NewProposal(height, round, polRound, propBlockID, block1.Header.Time)
+	proposal1 := types.NewProposal(height, round, polRound, propBlockID, block1.Time)
 	p1 := proposal1.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p1); err != nil {
 		t.Error(err)
@@ -499,7 +499,7 @@ func byzantineDecideProposalFunc(ctx context.Context, t *testing.T, height int64
 	blockParts2, err := block2.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(t, err)
 	polRound, propBlockID = cs.ValidRound, types.BlockID{Hash: block2.Hash(), PartSetHeader: blockParts2.Header()}
-	proposal2 := types.NewProposal(height, round, polRound, propBlockID, block2.Header.Time)
+	proposal2 := types.NewProposal(height, round, polRound, propBlockID, block2.Time)
 	p2 := proposal2.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p2); err != nil {
 		t.Error(err)
@@ -663,7 +663,7 @@ func TestRejectOversizedProposals(t *testing.T) {
 	propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
 	propBlockID.PartSetHeader.Total = 4294967295
 
-	proposal := types.NewProposal(height, round, -1, propBlockID, block.Header.Time)
+	proposal := types.NewProposal(height, round, -1, propBlockID, block.Time)
 	p := proposal.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err != nil {
 		t.Error(err)

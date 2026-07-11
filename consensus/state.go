@@ -1367,7 +1367,7 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 
 	// Make proposal
 	propBlockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockID, block.Header.Time)
+	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockID, block.Time)
 	p := proposal.ToProto()
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, p); err == nil {
 		proposal.Signature = p.Signature
@@ -1589,7 +1589,7 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 	// Timestamp validation using Proposer-Based TimeStamp (PBTS) algorithm.
 	// See: https://github.com/cometbft/cometbft/blob/main/spec/consensus/proposer-based-timestamp/
 	if cs.isPBTSEnabled(height) {
-		if !cs.Proposal.Timestamp.Equal(cs.ProposalBlock.Header.Time) {
+		if !cs.Proposal.Timestamp.Equal(cs.ProposalBlock.Time) {
 			logger.Debug("prevote step: proposal timestamp not equal; prevoting nil")
 			cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
 			return

@@ -155,18 +155,18 @@ func TestAggregationPBTSRejectsUntimelyProposal(t *testing.T) {
 			// to the same skewed value and exercise the timeliness check.
 			genesisTime := cs.state.LastBlockTime // == genesis time at InitialHeight
 			skewed := cmttime.Canonical(genesisTime.Add(tc.tsOffset))
-			propBlock.Header.Time = skewed
+			propBlock.Time = skewed
 
 			// Set the proposer address in the header to the chosen proposer.
 			ppk, err := prop.GetPubKey()
 			require.NoError(t, err)
-			propBlock.Header.ProposerAddress = ppk.Address()
+			propBlock.ProposerAddress = ppk.Address()
 
 			propBlockParts, err := propBlock.MakePartSet(types.BlockPartSizeBytes)
 			require.NoError(t, err)
 			blockID := types.BlockID{Hash: propBlock.Hash(), PartSetHeader: propBlockParts.Header()}
 
-			proposal := types.NewProposal(height, round, -1, blockID, propBlock.Header.Time)
+			proposal := types.NewProposal(height, round, -1, blockID, propBlock.Time)
 			pp := proposal.ToProto()
 			require.NoError(t, prop.SignProposal(cs.state.ChainID, pp))
 			proposal.Signature = pp.Signature

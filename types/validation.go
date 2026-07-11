@@ -155,7 +155,7 @@ func verifyCommitLightInternal(
 	if isAggregatedCommit(vals, commit) {
 		// ignore all commit signatures that are not for the block
 		ignore := func(c CommitSig) bool {
-			return !(c.BlockIDFlag == BlockIDFlagAggCommit || c.BlockIDFlag == BlockIDFlagAggCommitAbsent)
+			return c.BlockIDFlag != BlockIDFlagAggCommit && c.BlockIDFlag != BlockIDFlagAggCommitAbsent
 		}
 
 		return verifyAggregatedCommit(chainID, vals, commit,
@@ -270,7 +270,7 @@ func verifyCommitLightTrustingInternal(
 	if isAggregatedCommit(vals, commit) {
 		// ignore all commit signatures that are not for the block
 		ignore := func(c CommitSig) bool {
-			return !(c.BlockIDFlag == BlockIDFlagAggCommit || c.BlockIDFlag == BlockIDFlagAggCommitAbsent)
+			return c.BlockIDFlag != BlockIDFlagAggCommit && c.BlockIDFlag != BlockIDFlagAggCommitAbsent
 		}
 
 		return verifyAggregatedCommit(chainID, vals, commit,
