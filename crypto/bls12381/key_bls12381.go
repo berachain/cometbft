@@ -22,6 +22,10 @@ const (
 )
 
 var (
+	// ErrPubKeyDecompression is returned when the decompression of a compressed
+	// 48-byte long BLS12-381 public key fails.
+	ErrPubKeyDecompression = errors.New("bls12381: public key decompression error")
+
 	// ErrDeserialization is returned when deserialization fails.
 	ErrDeserialization = errors.New("bls12381: deserialization error")
 	// ErrInfinitePubKey is returned when the public key is infinite. It is part
@@ -176,11 +180,32 @@ func NewPublicKeyFromBytes(bz []byte) (*PubKey, error) {
 	return &PubKey{pk: pk}, nil
 }
 
+// NewPublicKeyFromCompressedBytes returns a new BLS12-381 public key from the
+// given bytes. bz must be a compressed BLS12-381 public key of length 48 bytes.
+func NewPublicKeyFromCompressedBytes(bz []byte) (*PubKey, error) {
+	pk := new(blstPublicKey).Uncompress(bz)
+	if pk == nil {
+		return nil, ErrPubKeyDecompression
+	}
+	// Subgroup and infinity check
+	if !pk.KeyValidate() {
+		return nil, ErrInfinitePubKey
+	}
+	return &PubKey{pk: pk}, nil
+}
+
 // Address returns the address of the key.
 //
 // The function will panic if the public key is invalid.
 func (pubKey PubKey) Address() crypto.Address {
 	return crypto.Address(tmhash.SumTruncated(pubKey.pk.Serialize()))
+}
+
+// Compress returns a compressed 48-byte long BLS12-381 public key.
+// It does not modify the original public key. Rather, it returns a new slice
+// storing the compressed key.
+func (pubKey PubKey) Compress() []byte {
+	return pubKey.pk.Compress()
 }
 
 // VerifySignature verifies the given signature.

@@ -302,6 +302,29 @@ func TestSignerVoteKeepAlive(t *testing.T) {
 	}
 }
 
+func TestSignerSignBytes(t *testing.T) {
+	for _, tc := range getSignerTestCases(t) {
+		t.Cleanup(func() {
+			if err := tc.signerServer.Stop(); err != nil {
+				t.Error(err)
+			}
+		})
+		t.Cleanup(func() {
+			if err := tc.signerClient.Close(); err != nil {
+				t.Error(err)
+			}
+		})
+
+		bytes := cmtrand.Bytes(32)
+		signature, err := tc.signerClient.SignBytes(bytes)
+		require.NoError(t, err)
+
+		pubKey, err := tc.mockPV.GetPubKey()
+		require.NoError(t, err)
+		require.True(t, pubKey.VerifySignature(bytes, signature))
+	}
+}
+
 func TestSignerSignProposalErrors(t *testing.T) {
 	for _, tc := range getSignerTestCases(t) {
 		// Replace service with a mock that always fails
