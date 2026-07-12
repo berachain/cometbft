@@ -21,6 +21,7 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	sm "github.com/cometbft/cometbft/state"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 // blsConsensusNetFromGenesis is like blsConsensusNet but builds the network from
@@ -115,10 +116,13 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 	require.True(t, commit.HasAggregatedSignature(),
 		"producer commit at height %d is not aggregated", catchUpHeight)
 
-	chainID := prodCss[0].state.ChainID
-	genValSet := prodCss[0].state.Validators.Copy()
-
 	stopConsensusNet(log.TestingLogger(), reactors, eventBuses)
+
+	// GetState copies under the lock, avoiding a race with any state updates
+	// still in flight on the receive routine.
+	prodState := prodCss[0].GetState()
+	chainID := prodState.ChainID
+	genValSet := prodState.Validators.Copy()
 
 	// ---- Late joiner: a fresh node bootstrapped from the same genesis. ----
 	lateDB := dbm.NewMemDB()
@@ -209,18 +213,25 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 		"late joiner must still be at the catch-up height after rejections")
 	late.mtx.RUnlock()
 
-	// Feed the aggregated commit exactly as the reactor's CommitMessage handler
-	// does. AddCommit is the load-bearing catch-up entry point: it
+	// Feed the aggregated commit through the real ingestion path, a
+	// CommitMessage on the peer message queue handled by the receive routine
+	// (handleMsg -> AddCommit). AddCommit is the load-bearing catch-up entry
+	// point: it
 	//   (a) rejects non-aggregated commits,
 	//   (b) VERIFIES the aggregated commit against the local validator set
 	//       (routing through verifyAggregatedCommit), and
 	//   (c) stores it in the HeightVoteSet and enters the commit step.
 	// A lagging validator uses this to adopt a block it never voted on.
-	late.mtx.Lock()
-	added, err := late.AddCommit(commit, "producer-peer")
-	late.mtx.Unlock()
-	require.NoError(t, err, "AddCommit on the aggregated commit failed verification")
-	require.True(t, added, "aggregated commit was not added by the late joiner")
+	// State-mutating calls must run on the receive routine's goroutine (the
+	// unlocked RoundState read in receiveRoutine assumes a single writer), so
+	// the test must not call AddCommit directly here.
+	late.peerMsgQueue <- msgInfo{&CommitMessage{commit}, "producer-peer", cmttime.Now()}
+	require.Eventually(t, func() bool {
+		late.mtx.RLock()
+		defer late.mtx.RUnlock()
+		return late.Votes.GetCommit(commit.Round) != nil
+	}, 5*time.Second, 20*time.Millisecond,
+		"aggregated commit was not added by the late joiner")
 
 	// The aggregated commit is now adopted by the late joiner: it is stored in the
 	// round's HeightVoteSet, is aggregated, and verifies against the validator set.
@@ -254,23 +265,16 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 	// (the aggregated commit; individual precommit votes cannot be reconstructed)
 	// and advances the node to the next height. This is the catch-up *advance*
 	// the VoteSetReader/LastCommit change unblocks.
-	// Drive the exact sequence the message loop runs for a BlockPartMessage:
-	// addProposalBlockPart, then (once complete) handleCompleteProposal, which in
-	// the commit step calls tryFinalizeCommit -> finalizeCommit.
+	// Deliver the parts on the peer message queue. The message loop runs
+	// addProposalBlockPart, then (once complete) handleCompleteProposal, which
+	// in the commit step calls tryFinalizeCommit -> finalizeCommit.
 	for i := 0; i < int(blockParts.Total()); i++ {
 		part := blockParts.GetPart(i)
-		late.mtx.Lock()
-		added, err := late.addProposalBlockPart(
+		late.peerMsgQueue <- msgInfo{
 			&BlockPartMessage{Height: catchUpHeight, Round: commit.Round, Part: part},
 			"producer-peer",
-		)
-		complete := added && late.ProposalBlockParts.IsComplete()
-		if complete {
-			late.handleCompleteProposal(catchUpHeight)
+			cmttime.Now(),
 		}
-		late.mtx.Unlock()
-		require.NoError(t, err, "feeding block part %d failed", i)
-		require.True(t, added, "block part %d was not added", i)
 	}
 
 	// The caught-up node now finalizes the height and ADVANCES past it. This is
@@ -320,5 +324,5 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 		"LastCommit *Commit has wrong BlockID")
 
 	t.Logf("late joiner finalized height %d via aggregated commit and advanced to height %d "+
-		"(LastCommit is the adopted aggregated *Commit)", catchUpHeight, late.Height)
+		"(LastCommit is the adopted aggregated *Commit)", catchUpHeight, nextHeight)
 }

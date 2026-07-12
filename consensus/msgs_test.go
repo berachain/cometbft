@@ -439,6 +439,12 @@ func TestConsMsgsVectors(t *testing.T) {
 			"3a1808ffffffffffffffff7f10ffffffff07180120ffffffff07",
 		},
 		{
+			"HasProposalBlockPart", &cmtcons.Message{Sum: &cmtcons.Message_HasProposalBlockPart{
+				HasProposalBlockPart: &cmtcons.HasProposalBlockPart{Height: 1, Round: 1, Index: 1},
+			}},
+			"5206080110011801",
+		},
+		{
 			"VoteSetMaj23", &cmtcons.Message{Sum: &cmtcons.Message_VoteSetMaj23{
 				VoteSetMaj23: &cmtcons.VoteSetMaj23{Height: 1, Round: 1, Type: cmtproto.PrevoteType, BlockID: pbBi},
 			}},
@@ -460,4 +466,29 @@ func TestConsMsgsVectors(t *testing.T) {
 			require.Equal(t, tc.expBytes, hex.EncodeToString(bz))
 		})
 	}
+}
+
+// TestHasProposalBlockPartWireCompat pins the decode path for the
+// has_proposal_block_part gossip hint (oneof field 10) exactly as the
+// bera-v1.x line encodes it. Mixed-version gossip during a rolling upgrade
+// depends on these bytes unwrapping instead of failing as an unknown sum.
+func TestHasProposalBlockPartWireCompat(t *testing.T) {
+	oldLineBytes, err := hex.DecodeString("5206080510011802")
+	require.NoError(t, err)
+
+	var m cmtcons.Message
+	require.NoError(t, proto.Unmarshal(oldLineBytes, &m))
+
+	unwrapped, err := m.Unwrap()
+	require.NoError(t, err)
+
+	msg, err := MsgFromProto(unwrapped)
+	require.NoError(t, err)
+	require.NoError(t, msg.ValidateBasic())
+
+	hpbp, ok := msg.(*HasProposalBlockPartMessage)
+	require.True(t, ok)
+	require.Equal(t, int64(5), hpbp.Height)
+	require.Equal(t, int32(1), hpbp.Round)
+	require.Equal(t, int32(2), hpbp.Index)
 }

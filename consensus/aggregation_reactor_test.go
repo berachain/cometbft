@@ -164,11 +164,13 @@ func TestReactorAggregatedCommits(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Assert the real properties on every validator's block store.
-	chainID := css[0].state.ChainID
+	// The network is still running, so read consensus state via GetState(),
+	// which copies under the lock.
+	chainID := css[0].GetState().ChainID
 	checkedAgg := 0
 	for i := 0; i < N; i++ {
 		bs := css[i].blockStore
-		valSet := css[i].state.Validators // genesis valset (unchanged across these heights)
+		valSet := css[i].GetState().Validators // genesis valset (unchanged across these heights)
 		require.GreaterOrEqual(t, bs.Height(), int64(targetHeight),
 			"validator %d only reached height %d", i, bs.Height())
 

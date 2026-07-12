@@ -286,6 +286,8 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			ps.ApplyNewValidBlockMessage(msg)
 		case *HasVoteMessage:
 			ps.ApplyHasVoteMessage(msg)
+		case *HasProposalBlockPartMessage:
+			ps.ApplyHasProposalBlockPartMessage(msg)
 		case *VoteSetMaj23Message:
 			rs := conR.getRoundState()
 			height, votes := rs.Height, rs.Votes
@@ -485,6 +487,24 @@ func (conR *Reactor) subscribeToBroadcastEvents() {
 
 	err = conR.conS.evsw.AddListenerForEvent(
 		subscriber,
+		types.EventProposalBlockPart,
+		func(data cmtevents.EventData) {
+			conR.broadcastHasProposalBlockPartMessage(data.(*BlockPartMessage))
+
+			// update reactor's view of round state
+			// NOTE this is safe to do without locking cs because the eventBus is
+			// synchronous. If it were not, we could pass rs in this event
+			// instead
+			rs := conR.conS.getRoundState()
+			conR.updateRoundState(&rs)
+		},
+	)
+	if err != nil {
+		conR.Logger.Error("Error adding listener for ProposalBlockPart events", "err", err)
+	}
+
+	err = conR.conS.evsw.AddListenerForEvent(
+		subscriber,
 		types.EventNewConsensusParams,
 		func(data cmtevents.EventData) {
 			consensusParams := data.(types.ConsensusParams)
@@ -580,6 +600,21 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 			}
 		}
 	*/
+}
+
+// Broadcasts HasProposalBlockPartMessage to peers that care.
+func (conR *Reactor) broadcastHasProposalBlockPartMessage(partMsg *BlockPartMessage) {
+	msg := &cmtcons.HasProposalBlockPart{
+		Height: partMsg.Height,
+		Round:  partMsg.Round,
+		Index:  int32(partMsg.Part.Index),
+	}
+	go func() {
+		conR.Switch.TryBroadcast(p2p.Envelope{
+			ChannelID: StateChannel,
+			Message:   msg,
+		})
+	}()
 }
 
 func makeRoundStepMessage(rs *cstypes.RoundState) (nrsMsg *cmtcons.NewRoundStep) {
@@ -1263,6 +1298,17 @@ func (ps *PeerState) SetHasProposalBlockPart(height int64, round int32, index in
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 
+	ps.setHasProposalBlockPart(height, round, index)
+}
+
+func (ps *PeerState) setHasProposalBlockPart(height int64, round int32, index int) {
+	ps.logger.Debug("setHasProposalBlockPart",
+		"peerH/R",
+		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
+		"H/R",
+		log.NewLazySprintf("%d/%d", height, round),
+		"index", index)
+
 	if ps.PRS.Height != height || ps.PRS.Round != round {
 		return
 	}
@@ -1722,6 +1768,18 @@ func (ps *PeerState) ApplyHasVoteMessage(msg *HasVoteMessage) {
 	ps.setHasVote(msg.Height, msg.Round, msg.Type, msg.Index)
 }
 
+// ApplyHasProposalBlockPartMessage updates the peer state for the new block part.
+func (ps *PeerState) ApplyHasProposalBlockPartMessage(msg *HasProposalBlockPartMessage) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if ps.PRS.Height != msg.Height {
+		return
+	}
+
+	ps.setHasProposalBlockPart(msg.Height, msg.Round, int(msg.Index))
+}
+
 // ApplyVoteSetBitsMessage updates the peer state for the bit-array of votes
 // it claims to have for the corresponding BlockID.
 // `ourVotes` is a BitArray of votes we have for msg.BlockID
@@ -1780,6 +1838,7 @@ func init() {
 	cmtjson.RegisterType(&VoteMessage{}, "tendermint/Vote")
 	cmtjson.RegisterType(&CommitMessage{}, "tendermint/Commit")
 	cmtjson.RegisterType(&HasVoteMessage{}, "tendermint/HasVote")
+	cmtjson.RegisterType(&HasProposalBlockPartMessage{}, "tendermint/HasProposalBlockPart")
 	cmtjson.RegisterType(&VoteSetMaj23Message{}, "tendermint/VoteSetMaj23")
 	cmtjson.RegisterType(&VoteSetBitsMessage{}, "tendermint/VoteSetBits")
 }
