@@ -2069,6 +2069,11 @@ type CommitMessage struct {
 
 // ValidateBasic checks whether the commit within the message is well-formed.
 func (m *CommitMessage) ValidateBasic() error {
+	// Bound the signature count here since Commit.ValidateBasic skips it for
+	// height-zero commits. Mirrors the blocksync guard in #5860.
+	if n := len(m.Commit.Signatures); n > types.MaxVotesCount {
+		return fmt.Errorf("too many commit signatures: %d (max %d)", n, types.MaxVotesCount)
+	}
 	return m.Commit.ValidateBasic()
 }
 

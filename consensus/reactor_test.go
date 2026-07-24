@@ -986,6 +986,36 @@ func TestBlockPartMessageValidateBasic(t *testing.T) {
 	assert.Equal(t, true, message.ValidateBasic() != nil, "Validate Basic had an unexpected result")
 }
 
+func TestCommitMessageValidateBasic(t *testing.T) {
+	// A height-zero commit bypasses Commit.ValidateBasic's per-signature checks,
+	// so the signature-count guard in CommitMessage.ValidateBasic is what bounds
+	// an otherwise arbitrarily large gossiped commit.
+	commitWithSigs := func(n int) *types.Commit {
+		return &types.Commit{Height: 0, Round: 0, Signatures: make([]types.CommitSig, n)}
+	}
+
+	testCases := []struct {
+		testName  string
+		numSigs   int
+		expectErr bool
+	}{
+		{"at cap", types.MaxVotesCount, false},
+		{"above cap", types.MaxVotesCount + 1, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			message := CommitMessage{Commit: commitWithSigs(tc.numSigs)}
+			err := message.ValidateBasic()
+			if tc.expectErr {
+				require.ErrorContains(t, err, "too many commit signatures")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestHasVoteMessageValidateBasic(t *testing.T) {
 	const (
 		validSignedMsgType   cmtproto.SignedMsgType = 0x01
