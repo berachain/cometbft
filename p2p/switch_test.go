@@ -902,7 +902,6 @@ func (r *filteringTestReactor) FilterMsgBytes(chID byte, _ Peer, _ []byte) error
 }
 
 func TestSwitchMsgBytesFilter(t *testing.T) {
-
 	// Berachain adaptation from upstream #5860: BroadcastAsync renamed
 	// to Broadcast — this fork's Broadcast is identical body to upstream's
 	// BroadcastAsync

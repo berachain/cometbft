@@ -607,7 +607,7 @@ func newFilterReactor(t *testing.T, started bool) *Reactor {
 
 // seedRequester inserts a bpRequester targeting peerID at the given height,
 // bypassing makeRequestersRoutine so the test can drive pool state directly.
-func seedRequester(r *Reactor, height int64, peerID p2p.ID) {
+func seedRequester(r *Reactor, height int64, peerID p2p.ID) { //nolint:unparam // callers currently always pass height 1
 	req := newBPRequester(r.pool, height)
 	req.peerID = peerID
 	r.pool.mtx.Lock()
@@ -622,7 +622,6 @@ func mockPeer(id p2p.ID) *p2pmocks.Peer {
 }
 
 func TestFilterMsgBytes(t *testing.T) {
-
 	// Berachain adaptation from upstream #5860 for TestFilterMsgBytes:
 	//   - Upstream uses an enabled atomic.Bool on the Reactor; this fork uses
 	//     pool.IsRunning(). newFilterReactor takes a `started bool` and stops

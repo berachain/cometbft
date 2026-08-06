@@ -39,6 +39,7 @@ linters:
     - predeclared
     - tagliatelle
     - testifylint
+    - thelper
     - varnamelen
     - wrapcheck
     - wsl
