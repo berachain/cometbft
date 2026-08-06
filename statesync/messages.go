@@ -16,9 +16,7 @@ const (
 	chunkMsgSize = int(16e6)
 )
 
-var (
-	ErrExceedsMaxSnapshotChunks = errors.New("amount of chunks in the snapshot exceeds the maximum allowed number of chunks")
-)
+var ErrExceedsMaxSnapshotChunks = errors.New("amount of chunks in the snapshot exceeds the maximum allowed number of chunks")
 
 // validateMsg validates a message.
 func validateMsg(pb proto.Message, maxSnapshotChunks uint32) error {
