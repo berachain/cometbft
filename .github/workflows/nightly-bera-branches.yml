@@ -1,0 +1,51 @@
+# Runs the unit test suite nightly on the actively maintained Berachain fork
+# branches. Scheduled workflows only trigger from the default branch, so this
+# file lives on main and checks out each target branch explicitly.
+name: nightly-bera-branches
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ['bera-v1.x', 'bera-v0.39.x']
+        part: ['00', '01', '02', '03', '04', '05']
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ matrix.branch }}
+
+      - run: echo "GO_VERSION=$(cat .github/workflows/go-version.env | grep GO_VERSION | cut -d '=' -f2)" >> $GITHUB_ENV
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run Go Tests
+        run: make test-group-${{ matrix.part }} NUM_SPLIT=6
+
+  # Post to Slack if any job above fails
+  notify-slack:
+    needs: tests
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post failure to Slack
+        env:
+          CORE_SLACK_WEBHOOK_URL: ${{ secrets.CORE_SLACK_WEBHOOK_URL }}
+          TEXT: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} ${{ github.workflow }} workflow failed
+        run: |
+          if [ -z "$CORE_SLACK_WEBHOOK_URL" ]; then
+            echo "CORE_SLACK_WEBHOOK_URL not set; skipping Slack notification."
+            exit 0
+          fi
+          curl -sSf -H 'Content-type: application/json' --data "{\"text\": \"$TEXT\"}" "$CORE_SLACK_WEBHOOK_URL"
