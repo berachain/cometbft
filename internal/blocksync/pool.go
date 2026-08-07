@@ -258,6 +258,9 @@ func (pool *BlockPool) PopRequest() {
 	delete(pool.requesters, pool.height)
 	pool.height++
 
+	// Re-evaluate maxPeerHeight: peers whose pruned base was just beyond the previous pool.height may now be able to contribute
+	pool.updateMaxPeerHeight()
+
 	// Notify the next minBlocksForSingleRequest requesters about new height, so
 	// they can potentially request a block from the second peer.
 	for i := int64(0); i < minBlocksForSingleRequest && i < int64(len(pool.requesters)); i++ {
