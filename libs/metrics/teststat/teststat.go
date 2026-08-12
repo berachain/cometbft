@@ -49,7 +49,8 @@ func TestCounter(counter metrics.Counter, value func() float64) error {
 // FillCounter puts some deltas through the counter and returns the total value.
 func FillCounter(counter metrics.Counter) float64 {
 	a := rand.Perm(100)
-	n := rand.Intn(len(a)) //nolint:gosec
+	// n >= 1, otherwise Prometheus never exposes the untouched metric.
+	n := rand.Intn(len(a)-1) + 1 //nolint:gosec
 
 	var want float64
 	for i := 0; i < n; i++ {
@@ -64,7 +65,8 @@ func FillCounter(counter metrics.Counter) float64 {
 // to check that the gauge has the correct final value.
 func TestGauge(gauge metrics.Gauge, value func() []float64) error {
 	a := rand.Perm(100)
-	n := rand.Intn(len(a)) //nolint:gosec
+	// n >= 1, otherwise want is empty and want[len(want)-1] below panics.
+	n := rand.Intn(len(a)-1) + 1 //nolint:gosec
 
 	var want []float64
 	for i := 0; i < n; i++ {
