@@ -3,6 +3,7 @@ package blocksync
 import (
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,20 +49,16 @@ func (p testPeer) runInputRoutine() {
 	}()
 }
 
-// Request desired, pretend like we got the block immediately.
+// simulateInput pretends a block was received immediately.
 func (p testPeer) simulateInput(input inputData) {
 	block := &types.Block{Header: types.Header{Height: input.request.Height}, LastCommit: &types.Commit{}} // real blocks have LastCommit
 	extCommit := &types.ExtendedCommit{
 		Height: input.request.Height,
 	}
-	// If this peer is malicious
 	if p.malicious {
 		realHeight := p.height - MaliciousLie
-		// And the requested height is above the real height
 		if input.request.Height > realHeight {
-			// Then provide a fake block
-			block.LastCommit = nil // Fake block, no LastCommit
-			// or provide no block at all, if we are close to the real height
+			block.LastCommit = nil
 			if input.request.Height <= realHeight+BlackholeSize {
 				input.pool.RedoRequestFrom(input.request.Height, p.id)
 				return
@@ -116,17 +113,27 @@ func TestBlockPoolBasic(t *testing.T) {
 
 	err := pool.Start()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
+	done := make(chan struct{})
+	var (
+		wg        sync.WaitGroup
+		closeDone sync.Once
+	)
+	stopDispatcher := func() {
+		closeDone.Do(func() { close(done) })
+	}
+	defer func() {
 		if err := pool.Stop(); err != nil {
 			t.Error(err)
 		}
-	})
+		stopDispatcher()
+		wg.Wait()
+		peers.stop()
+	}()
 
 	peers.start()
-	defer peers.stop()
 
 	// Introduce each peer.
 	go func() {
@@ -135,7 +142,6 @@ func TestBlockPoolBasic(t *testing.T) {
 		}
 	}()
 
-	// Start a goroutine to pull blocks
 	go func() {
 		for {
 			if !pool.IsRunning() {
@@ -150,18 +156,39 @@ func TestBlockPoolBasic(t *testing.T) {
 		}
 	}()
 
-	// Pull from channels
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case req, ok := <-requestsCh:
+				if !ok {
+					return
+				}
+				t.Logf("Pulled new BlockRequest %v", req)
+				isTerminal := req.Height == 300
+				select {
+				case peers[req.PeerID].inputChan <- inputData{t, pool, req}:
+					if isTerminal {
+						stopDispatcher()
+					}
+				case <-done:
+					return
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case err := <-errorsCh:
 			t.Error(err)
-		case request := <-requestsCh:
-			t.Logf("Pulled new BlockRequest %v", request)
-			if request.Height == 300 {
-				return // Done!
-			}
-
-			peers[request.PeerID].inputChan <- inputData{t, pool, request}
+			stopDispatcher()
+			return
+		case <-done:
+			return
 		}
 	}
 }
@@ -559,4 +586,53 @@ func TestBlockPoolMaxPeerHeightRefreshesOnPopRequest(t *testing.T) {
 	// maxPeerHeight to its advertised height without B re-sending status.
 	require.EqualValues(t, 100, pool.MaxPeerHeight(),
 		"peer B must contribute to maxPeerHeight once pool.height reaches its base")
+}
+
+func TestBlockPoolHasPendingRequestFrom(t *testing.T) {
+	requestsCh := make(chan BlockRequest, 10)
+	errorsCh := make(chan peerError, 10)
+
+	pool := NewBlockPool(1, requestsCh, errorsCh)
+	pool.SetLogger(log.TestingLogger())
+
+	const (
+		primary   = p2p.ID("primary")
+		secondary = p2p.ID("secondary")
+		stranger  = p2p.ID("stranger")
+	)
+
+	// check initial state
+	require.False(t, pool.HasPendingRequestFrom(primary))
+	require.False(t, pool.HasPendingRequestFrom(secondary))
+	require.False(t, pool.HasPendingRequestFrom(stranger))
+
+	// Install a requester for height 1 targeting `primary`. We set the
+	// fields directly so we don't have to spin up the request goroutine.
+	pool.mtx.Lock()
+	req1 := newBPRequester(pool, 1)
+	req1.peerID = primary
+	pool.requesters[1] = req1
+	pool.mtx.Unlock()
+
+	require.True(t, pool.HasPendingRequestFrom(primary), "requested peer should be reported as pending")
+	require.False(t, pool.HasPendingRequestFrom(stranger), "non-requested peer must not be reported as pending")
+
+	// A second requester at height 2 also covers the secondPeerID slot.
+	pool.mtx.Lock()
+	req2 := newBPRequester(pool, 2)
+	req2.peerID = primary
+	req2.secondPeerID = secondary
+	pool.requesters[2] = req2
+	pool.mtx.Unlock()
+
+	require.True(t, pool.HasPendingRequestFrom(secondary), "secondary peer slot should count as pending")
+
+	// Removing both requesters drops the pending state.
+	pool.mtx.Lock()
+	delete(pool.requesters, 1)
+	delete(pool.requesters, 2)
+	pool.mtx.Unlock()
+
+	require.False(t, pool.HasPendingRequestFrom(primary))
+	require.False(t, pool.HasPendingRequestFrom(secondary))
 }
