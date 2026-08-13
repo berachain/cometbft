@@ -14,6 +14,52 @@
 
 ### API-BREAKING
 
+## v0.39.4
+
+*July 28, 2026*
+
+### BUG FIXES
+
+- `[blocksync]` tolerate late BlockResponse from honest peers after switching to consensus
+  ([\#5959](https://github.com/cometbft/cometbft/pull/5959))
+- `[consensus]` Fix `double_sign_check_height = 1` performing no double-sign
+  checks due to off-by-one error in loop condition (`i < N` should be
+  `i <= N`). The value `1` now correctly checks the previous block as intended.
+  ([\#5668](https://github.com/cometbft/cometbft/pull/5668))
+- `[blocksync]` fix flaky `TestBlockPoolBasic` deadlock under `-race`
+  ([\#5867](https://github.com/cometbft/cometbft/pull/5867))
+- `[mempool]` fix setRecheckFull/setDone race causing spurious ErrRecheckFull.
+  ([\#5837](https://github.com/cometbft/cometbft/pull/5837))
+- `[abci]` fix deadlock when response callback re-enters the client.
+  ([\#5850](https://github.com/cometbft/cometbft/pull/5850))
+- `[node]` use kernel-assigned ephemeral ports and fix `OnStart` cleanup
+  ([\#5868](https://github.com/cometbft/cometbft/pull/5868))
+- `[node]` close partial listeners on startRPC failure
+  ([\#5869](https://github.com/cometbft/cometbft/pull/5869))
+- `[consensus]` release cs.mtx before sending to statsMsgQueue
+  ([\#5813](https://github.com/cometbft/cometbft/pull/5813))
+- `[mempool]` truncate proto field number to int32 in filter's ReadTag
+  ([\#5948](https://github.com/cometbft/cometbft/pull/5948))
+
+### IMPROVEMENTS
+
+- `[state]` skip the proposer-priority advance when loading validators for the
+  block-replay commit-info path (`LoadValidatorsFast`); up to ~900x faster at
+  the largest checkpoint offsets.
+  ([\#5204](https://github.com/cometbft/cometbft/issues/5204))
+- `[blocksync]` validate blocksync response sender and signature count
+  ([\#5860](https://github.com/cometbft/cometbft/pull/5860))
+- `[autofile]` skip fsync in `FlushAndSync` when no new data was written
+  ([\#5866](https://github.com/cometbft/cometbft/pull/5866))
+- `[mempool]` Implement `MsgBytesFilter` in Reactor to prevent heap amplification attack
+  ([\#5946](https://github.com/cometbft/cometbft/pull/5946))
+
+### FEATURES
+
+- `[config]` Add EventBusBufferCapacity setting.
+  ([\#5849](https://github.com/cometbft/cometbft/pull/5849))
+
+
 ## v0.39.3
 
 *May 5, 2026*
@@ -102,6 +148,8 @@
   ([\#5717](https://github.com/cometbft/cometbft/pull/5717))
 
 ### IMPROVEMENTS
+
+- `[consensus]` perf(consensus): skip fsync for unsigned internal messages (block parts) ([\#5695](https://github.com/cometbft/cometbft/pull/5695))
 - `[ci]`: add lp2p testnet ([\#5643](https://github.com/cometbft/cometbft/pull/5643))
 - `[mempool]` feat!(p2p): introduce follower-mode. Improve lib-p2p integraap access
 - `[types]` Add validation for `AuthorityParams.Authority` field in consensus params, enforcing a maximum length of 256 characters ([#5511](https://github.com/cometbft/cometbft/pull/5511))

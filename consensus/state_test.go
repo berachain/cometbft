@@ -25,6 +25,7 @@ import (
 	cmtrand "github.com/cometbft/cometbft/libs/rand"
 	p2pmock "github.com/cometbft/cometbft/p2p/mock"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	smmocks "github.com/cometbft/cometbft/state/mocks"
 	"github.com/cometbft/cometbft/types"
 )
 
@@ -84,10 +85,9 @@ func TestStateProposerSelection0(t *testing.T) {
 	}
 
 	// Wait for complete proposal.
-	ensureNewProposal(proposalCh, height, round)
+	blockID := ensureNewProposal(proposalCh, height, round)
 
-	rs := cs1.GetRoundState()
-	signAddVotes(cs1, cmtproto.PrecommitType, rs.ProposalBlock.Hash(), rs.ProposalBlockParts.Header(), true, vss[1:]...)
+	signAddVotes(cs1, cmtproto.PrecommitType, blockID.Hash, blockID.PartSetHeader, true, vss[1:]...)
 
 	// Wait for new round so next validator is set.
 	ensureNewRound(newRoundCh, height+1, 0)
@@ -381,8 +381,7 @@ func TestStateFullRound1(t *testing.T) {
 
 	ensureNewRound(newRoundCh, height, round)
 
-	ensureNewProposal(propCh, height, round)
-	propBlockHash := cs.GetRoundState().ProposalBlock.Hash()
+	propBlockHash := ensureNewProposal(propCh, height, round).Hash
 
 	ensurePrevote(voteCh, height, round) // wait for prevote
 	validatePrevote(t, cs, round, vss[0], propBlockHash)
@@ -476,10 +475,9 @@ func TestStateLockNoPOL(t *testing.T) {
 
 	ensureNewRound(newRoundCh, height, round)
 
-	ensureNewProposal(proposalCh, height, round)
-	roundState := cs1.GetRoundState()
-	theBlockHash := roundState.ProposalBlock.Hash()
-	thePartSetHeader := roundState.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	theBlockHash := blockID.Hash
+	thePartSetHeader := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round) // prevote
 
@@ -685,10 +683,9 @@ func TestStateLockPOLRelock(t *testing.T) {
 	startTestRound(cs1, height, round)
 
 	ensureNewRound(newRoundCh, height, round)
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
-	theBlockHash := rs.ProposalBlock.Hash()
-	theBlockParts := rs.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	theBlockHash := blockID.Hash
+	theBlockParts := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round) // prevote
 
@@ -785,10 +782,9 @@ func TestStateLockPOLUnlock(t *testing.T) {
 	startTestRound(cs1, height, round)
 	ensureNewRound(newRoundCh, height, round)
 
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
-	theBlockHash := rs.ProposalBlock.Hash()
-	theBlockParts := rs.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	theBlockHash := blockID.Hash
+	theBlockParts := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round)
 	validatePrevote(t, cs1, round, vss[0], theBlockHash)
@@ -810,7 +806,7 @@ func TestStateLockPOLUnlock(t *testing.T) {
 
 	// timeout to new round
 	ensureNewTimeout(timeoutWaitCh, height, round, cs1.config.Precommit(round).Nanoseconds())
-	rs = cs1.GetRoundState()
+	rs := cs1.GetRoundState()
 	lockedBlockHash := rs.LockedBlock.Hash()
 
 	incrementRound(vs2, vs3, vs4)
@@ -877,10 +873,9 @@ func TestStateLockPOLUnlockOnUnknownBlock(t *testing.T) {
 	startTestRound(cs1, height, round)
 
 	ensureNewRound(newRoundCh, height, round)
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
-	firstBlockHash := rs.ProposalBlock.Hash()
-	firstBlockParts := rs.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	firstBlockHash := blockID.Hash
+	firstBlockParts := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round) // prevote
 
@@ -1456,11 +1451,10 @@ func TestProcessProposalAccept(t *testing.T) {
 			startTestRound(cs1, cs1.Height, round)
 			ensureNewRound(newRoundCh, height, round)
 
-			ensureNewProposal(proposalCh, height, round)
-			rs := cs1.GetRoundState()
+			blockID := ensureNewProposal(proposalCh, height, round)
 			var prevoteHash cmtbytes.HexBytes
 			if !testCase.expectedNilPrevote {
-				prevoteHash = rs.ProposalBlock.Hash()
+				prevoteHash = blockID.Hash
 			}
 			ensurePrevoteMatch(t, voteCh, height, round, prevoteHash)
 		})
@@ -1514,20 +1508,20 @@ func TestExtendVoteCalledWhenEnabled(t *testing.T) {
 
 			startTestRound(cs1, cs1.Height, round)
 			ensureNewRound(newRoundCh, height, round)
-			ensureNewProposal(proposalCh, height, round)
+			proposalBlockID := ensureNewProposal(proposalCh, height, round)
 
 			m.AssertNotCalled(t, "ExtendVote", mock.Anything, mock.Anything)
 
-			rs := cs1.GetRoundState()
-
 			blockID := types.BlockID{
-				Hash:          rs.ProposalBlock.Hash(),
-				PartSetHeader: rs.ProposalBlockParts.Header(),
+				Hash:          proposalBlockID.Hash,
+				PartSetHeader: proposalBlockID.PartSetHeader,
 			}
 			signAddVotes(cs1, cmtproto.PrevoteType, blockID.Hash, blockID.PartSetHeader, false, vss[1:]...)
 			ensurePrevoteMatch(t, voteCh, height, round, blockID.Hash)
 
 			ensurePrecommit(voteCh, height, round)
+
+			rs := cs1.GetRoundState()
 
 			if testCase.enabled {
 				m.AssertCalled(t, "ExtendVote", context.TODO(), &abci.RequestExtendVote{
@@ -1596,17 +1590,18 @@ func TestVerifyVoteExtensionNotCalledOnAbsentPrecommit(t *testing.T) {
 
 	startTestRound(cs1, cs1.Height, round)
 	ensureNewRound(newRoundCh, height, round)
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
+	proposalBlockID := ensureNewProposal(proposalCh, height, round)
 
 	blockID := types.BlockID{
-		Hash:          rs.ProposalBlock.Hash(),
-		PartSetHeader: rs.ProposalBlockParts.Header(),
+		Hash:          proposalBlockID.Hash,
+		PartSetHeader: proposalBlockID.PartSetHeader,
 	}
 	signAddVotes(cs1, cmtproto.PrevoteType, blockID.Hash, blockID.PartSetHeader, false, vss...)
 	ensurePrevoteMatch(t, voteCh, height, round, blockID.Hash)
 
 	ensurePrecommit(voteCh, height, round)
+
+	rs := cs1.GetRoundState()
 
 	m.AssertCalled(t, "ExtendVote", context.TODO(), &abci.RequestExtendVote{
 		Height:             height,
@@ -1681,12 +1676,10 @@ func TestPrepareProposalReceivesVoteExtensions(t *testing.T) {
 
 	startTestRound(cs1, height, round)
 	ensureNewRound(newRoundCh, height, round)
-	ensureNewProposal(proposalCh, height, round)
-
-	rs := cs1.GetRoundState()
+	proposalBlockID := ensureNewProposal(proposalCh, height, round)
 	blockID := types.BlockID{
-		Hash:          rs.ProposalBlock.Hash(),
-		PartSetHeader: rs.ProposalBlockParts.Header(),
+		Hash:          proposalBlockID.Hash,
+		PartSetHeader: proposalBlockID.PartSetHeader,
 	}
 	signAddVotes(cs1, cmtproto.PrevoteType, blockID.Hash, blockID.PartSetHeader, false, vss[1:]...)
 
@@ -1783,8 +1776,7 @@ func TestFinalizeBlockCalled(t *testing.T) {
 
 			startTestRound(cs1, cs1.Height, round)
 			ensureNewRound(newRoundCh, height, round)
-			ensureNewProposal(proposalCh, height, round)
-			rs := cs1.GetRoundState()
+			proposalBlockID := ensureNewProposal(proposalCh, height, round)
 
 			blockID := types.BlockID{}
 			nextRound := round + 1
@@ -1793,13 +1785,13 @@ func TestFinalizeBlockCalled(t *testing.T) {
 				nextRound = 0
 				nextHeight = height + 1
 				blockID = types.BlockID{
-					Hash:          rs.ProposalBlock.Hash(),
-					PartSetHeader: rs.ProposalBlockParts.Header(),
+					Hash:          proposalBlockID.Hash,
+					PartSetHeader: proposalBlockID.PartSetHeader,
 				}
 			}
 
 			signAddVotes(cs1, cmtproto.PrevoteType, blockID.Hash, blockID.PartSetHeader, false, vss[1:]...)
-			ensurePrevoteMatch(t, voteCh, height, round, rs.ProposalBlock.Hash())
+			ensurePrevoteMatch(t, voteCh, height, round, proposalBlockID.Hash)
 
 			signAddVotes(cs1, cmtproto.PrecommitType, blockID.Hash, blockID.PartSetHeader, true, vss[1:]...)
 			ensurePrecommit(voteCh, height, round)
@@ -1900,12 +1892,11 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 
 			startTestRound(cs1, cs1.Height, round)
 			ensureNewRound(newRoundCh, height, round)
-			ensureNewProposal(proposalCh, height, round)
-			rs := cs1.GetRoundState()
+			proposalBlockID := ensureNewProposal(proposalCh, height, round)
 
 			// sign all of the votes
-			signAddVotes(cs1, cmtproto.PrevoteType, rs.ProposalBlock.Hash(), rs.ProposalBlockParts.Header(), false, vss[1:]...)
-			ensurePrevoteMatch(t, voteCh, height, round, rs.ProposalBlock.Hash())
+			signAddVotes(cs1, cmtproto.PrevoteType, proposalBlockID.Hash, proposalBlockID.PartSetHeader, false, vss[1:]...)
+			ensurePrevoteMatch(t, voteCh, height, round, proposalBlockID.Hash)
 
 			var ext []byte
 			if testCase.hasExtension {
@@ -1913,7 +1904,7 @@ func TestVoteExtensionEnableHeight(t *testing.T) {
 			}
 
 			for _, vs := range vss[1:] {
-				vote, err := vs.signVote(cmtproto.PrecommitType, rs.ProposalBlock.Hash(), rs.ProposalBlockParts.Header(), ext, testCase.hasExtension)
+				vote, err := vs.signVote(cmtproto.PrecommitType, proposalBlockID.Hash, proposalBlockID.PartSetHeader, ext, testCase.hasExtension)
 				require.NoError(t, err)
 				addVotes(cs1, vote)
 			}
@@ -2200,10 +2191,9 @@ func TestStartNextHeightCorrectlyAfterTimeout(t *testing.T) {
 	startTestRound(cs1, height, round)
 	ensureNewRound(newRoundCh, height, round)
 
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
-	theBlockHash := rs.ProposalBlock.Hash()
-	theBlockParts := rs.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	theBlockHash := blockID.Hash
+	theBlockParts := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round)
 	validatePrevote(t, cs1, round, vss[0], theBlockHash)
@@ -2231,7 +2221,7 @@ func TestStartNextHeightCorrectlyAfterTimeout(t *testing.T) {
 	cs1.txNotifier.(*fakeTxNotifier).Notify()
 
 	ensureNewTimeout(timeoutProposeCh, height+1, round, cs1.config.Propose(round).Nanoseconds())
-	rs = cs1.GetRoundState()
+	rs := cs1.GetRoundState()
 	assert.False(
 		t,
 		rs.TriggeredTimeoutPrecommit,
@@ -2262,10 +2252,9 @@ func TestResetTimeoutPrecommitUponNewHeight(t *testing.T) {
 	startTestRound(cs1, height, round)
 	ensureNewRound(newRoundCh, height, round)
 
-	ensureNewProposal(proposalCh, height, round)
-	rs := cs1.GetRoundState()
-	theBlockHash := rs.ProposalBlock.Hash()
-	theBlockParts := rs.ProposalBlockParts.Header()
+	blockID := ensureNewProposal(proposalCh, height, round)
+	theBlockHash := blockID.Hash
+	theBlockParts := blockID.PartSetHeader
 
 	ensurePrevote(voteCh, height, round)
 	validatePrevote(t, cs1, round, vss[0], theBlockHash)
@@ -2291,7 +2280,7 @@ func TestResetTimeoutPrecommitUponNewHeight(t *testing.T) {
 	}
 	ensureNewProposal(proposalCh, height+1, 0)
 
-	rs = cs1.GetRoundState()
+	rs := cs1.GetRoundState()
 	assert.False(
 		t,
 		rs.TriggeredTimeoutPrecommit,
@@ -2559,6 +2548,31 @@ func TestStateOutputVoteStats(t *testing.T) {
 	}
 }
 
+func TestHandleMsgReleasesLockBeforeStatsMsgQueueSend(t *testing.T) {
+	cs, vss := randState(2)
+	peer := p2pmock.NewPeer(nil)
+
+	randBytes := cmtrand.Bytes(tmhash.Size)
+	vote := signVote(vss[1], cmtproto.PrecommitType, randBytes, types.PartSetHeader{}, true)
+
+	// Unbuffered channel with no consumer simulates a saturated queue.
+	cs.statsMsgQueue = make(chan msgInfo)
+
+	go cs.handleMsg(msgInfo{&VoteMessage{vote}, peer.ID()})
+	time.Sleep(20 * time.Millisecond)
+
+	rsResult := make(chan *cstypes.RoundState, 1)
+	go func() { rsResult <- cs.GetRoundState() }()
+
+	select {
+	case <-rsResult:
+	case <-time.After(2 * time.Second):
+		t.Fatal("GetRoundState timed out: cs.mtx held during statsMsgQueue send")
+	}
+
+	<-cs.statsMsgQueue
+}
+
 func TestSignSameVoteTwice(t *testing.T) {
 	_, vss := randState(2)
 
@@ -2695,4 +2709,164 @@ func TestWALSelectiveFsyncUnexpectedTypePanics(t *testing.T) {
 	require.Panics(t, func() {
 		cs.writeInternalMsgToWAL(unknown)
 	})
+}
+
+// newStateForDoubleSignTest builds the minimal State needed by checkDoubleSigningRisk.
+func newStateForDoubleSignTest(t *testing.T, doubleSignCheckHeight int64) (*State, *smmocks.BlockStore) {
+	t.Helper()
+
+	consConfig := *config.Consensus
+	consConfig.DoubleSignCheckHeight = doubleSignCheckHeight
+
+	mockBS := &smmocks.BlockStore{}
+
+	cs := &State{
+		config:     &consConfig,
+		blockStore: mockBS,
+	}
+	// Set logger directly on the embedded BaseService to avoid nil-dereference
+	// on timeoutTicker which is not needed for this unit test.
+	cs.Logger = log.TestingLogger()
+
+	// Wire a real private validator so privValidatorPubKey can be set.
+	pv := types.NewMockPV()
+	pubKey, err := pv.GetPubKey()
+	require.NoError(t, err)
+
+	cs.privValidator = pv
+	cs.privValidatorPubKey = pubKey
+
+	return cs, mockBS
+}
+
+// makeCommitWithValidator builds a commit with a single commit signature.
+func makeCommitWithValidator(height int64, validatorAddr types.Address) *types.Commit {
+	return &types.Commit{
+		Height: height,
+		Signatures: []types.CommitSig{
+			{
+				BlockIDFlag:      types.BlockIDFlagCommit,
+				ValidatorAddress: validatorAddr,
+				Timestamp:        time.Now(),
+			},
+		},
+	}
+}
+
+// TestDoubleSigning tests the checkDoubleSigningRisk method across a range of
+// double_sign_check_height configurations.
+func TestDoubleSigning(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		doubleSignCheckHeight int64
+		height                int64
+		seenCommits           []struct {
+			height                 int64
+			signedByLocalValidator bool
+			missing                bool
+		}
+		wantErr                error
+		assertNoLoadSeenCommit bool
+		assertNotPanics        bool
+	}{
+		{
+			name:                  "height-one-checks-one-previous-block",
+			doubleSignCheckHeight: 1,
+			height:                10,
+			seenCommits: []struct {
+				height                 int64
+				signedByLocalValidator bool
+				missing                bool
+			}{
+				{height: 9, signedByLocalValidator: true},
+			},
+			wantErr: ErrSignatureFoundInPastBlocks,
+		},
+		{
+			name:                   "height-zero-disabled",
+			doubleSignCheckHeight:  0,
+			height:                 10,
+			assertNoLoadSeenCommit: true,
+		},
+		{
+			name:                  "height-two-checks-two-blocks",
+			doubleSignCheckHeight: 2,
+			height:                10,
+			seenCommits: []struct {
+				height                 int64
+				signedByLocalValidator bool
+				missing                bool
+			}{
+				{height: 9},
+				{height: 8, signedByLocalValidator: true},
+			},
+			wantErr: ErrSignatureFoundInPastBlocks,
+		},
+		{
+			name:                  "height-two-no-signature-found",
+			doubleSignCheckHeight: 2,
+			height:                10,
+			seenCommits: []struct {
+				height                 int64
+				signedByLocalValidator bool
+				missing                bool
+			}{
+				{height: 9},
+				{height: 8},
+			},
+		},
+		{
+			name:                   "small-chain-height",
+			doubleSignCheckHeight:  10,
+			height:                 1,
+			assertNoLoadSeenCommit: true,
+			assertNotPanics:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cs, mockBS := newStateForDoubleSignTest(t, tc.doubleSignCheckHeight)
+			localAddr := cs.privValidatorPubKey.Address()
+			otherAddr := append(types.Address(nil), localAddr...)
+			require.NotEmpty(t, otherAddr)
+			otherAddr[len(otherAddr)-1] ^= 0x01
+
+			for _, seenCommit := range tc.seenCommits {
+				var commit *types.Commit
+				switch {
+				case seenCommit.missing:
+					commit = nil
+				case seenCommit.signedByLocalValidator:
+					commit = makeCommitWithValidator(seenCommit.height, localAddr)
+				default:
+					commit = makeCommitWithValidator(seenCommit.height, otherAddr)
+				}
+
+				mockBS.On("LoadSeenCommit", seenCommit.height).Return(commit)
+			}
+
+			var err error
+			if tc.assertNotPanics {
+				require.NotPanics(t, func() {
+					err = cs.checkDoubleSigningRisk(tc.height)
+				})
+			} else {
+				err = cs.checkDoubleSigningRisk(tc.height)
+			}
+
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.assertNoLoadSeenCommit {
+				mockBS.AssertNotCalled(t, "LoadSeenCommit")
+				return
+			}
+
+			mockBS.AssertExpectations(t)
+		})
+	}
 }
