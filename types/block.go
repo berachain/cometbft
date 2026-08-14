@@ -1063,6 +1063,16 @@ func (commit *Commit) WrappedExtendedCommit() *ExtendedCommit {
 	}
 }
 
+// String returns a string representation of the commit.
+//
+// Commit must not be rendered through fmt's default struct formatting (it
+// reflects over the lazily-initialized hash, bitArray, and mtx fields, which
+// races with concurrent Hash/BitArray callers), so all printing goes through
+// here.
+func (commit *Commit) String() string {
+	return commit.StringIndented("")
+}
+
 // StringIndented returns a string representation of the commit.
 func (commit *Commit) StringIndented(indent string) string {
 	if commit == nil {
