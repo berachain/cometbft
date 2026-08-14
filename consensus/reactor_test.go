@@ -1175,6 +1175,27 @@ func TestMarshalJSONPeerState(t *testing.T) {
 		}`, string(data))
 }
 
+// TestPickVoteToSendWholeCommit checks that vote gossip never tries to pick
+// individual votes out of a whole *types.Commit (its GetByIndex returns nil);
+// whole commits are gossiped via sendCommit instead. Regression test for the
+// post-restart LastCommit gossip path, where LastCommit holds a whole commit.
+func TestPickVoteToSendWholeCommit(t *testing.T) {
+	ps := NewPeerState(nil).SetLogger(log.TestingLogger())
+
+	commit := &types.Commit{
+		Height:  1078,
+		Round:   0,
+		BlockID: types.BlockID{Hash: cmtrand.Bytes(tmhash.Size), PartSetHeader: types.PartSetHeader{Total: 1, Hash: cmtrand.Bytes(tmhash.Size)}},
+		Signatures: []types.CommitSig{
+			{BlockIDFlag: types.BlockIDFlagCommit, ValidatorAddress: cmtrand.Bytes(20), Signature: cmtrand.Bytes(64)},
+			{BlockIDFlag: types.BlockIDFlagAbsent},
+			{BlockIDFlag: types.BlockIDFlagCommit, ValidatorAddress: cmtrand.Bytes(20), Signature: cmtrand.Bytes(64)},
+		},
+	}
+
+	require.Nil(t, ps.PickVoteToSend(commit))
+}
+
 func TestVoteMessageValidateBasic(t *testing.T) {
 	_, vss := randState(2)
 

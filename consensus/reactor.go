@@ -1462,6 +1462,13 @@ func (ps *PeerState) PickVoteToSend(votes types.VoteSetReader) *types.Vote {
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 
+	// Individual votes cannot be extracted from a whole *types.Commit
+	// (GetByIndex returns nil), so there is never a vote to pick. Whole
+	// commits are gossiped via sendCommit instead.
+	if _, isWholeCommit := votes.(*types.Commit); isWholeCommit {
+		return nil
+	}
+
 	if votes.Size() == 0 {
 		return nil
 	}
