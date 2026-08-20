@@ -1,0 +1,103 @@
+# Runs test/compat/rolling_upgrade.sh: a live bera-v1.x <-> bera-v0.40.x
+# data-dir reuse and 4-validator rolling-upgrade test (built-in kvstore app,
+# no beacon-kit). See test/compat/README.md.
+#
+# Runs on every pull request that touches Go code (like tests.yml and e2e.yml)
+# and on pushes to the release branches. The bera-v1.x side is the commit
+# pinned in test/compat/gen-v1x/go.mod; the bera-v0.40.x side is this checkout.
+
+name: compat-rolling-upgrade
+on:
+  workflow_dispatch:
+    inputs:
+      soak_blocks:
+        description: "Blocks to soak at each stage (SOAK_BLOCKS)"
+        required: false
+        default: "25"
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+      - bera-v[0-9]*.x
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  rolling-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      WORKDIR: ${{ github.workspace }}/build/compat
+    steps:
+      # Check out the PR/branch head, which is the bera-v0.40.x side of the test.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Skip the whole job unless Go code, the compat suite, or this file changed.
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            code:
+              - '**/*.go'
+              - 'Makefile'
+              - 'go.*'
+              - 'test/compat/**'
+              - '.github/workflows/compat-rolling-upgrade.yml'
+
+      # Read the Go version from the shared env file used by the other workflows.
+      - run: echo "GO_VERSION=$(cat .github/workflows/go-version.env | grep GO_VERSION | cut -d '=' -f2)" >> $GITHUB_ENV
+        if: steps.filter.outputs.code == 'true'
+
+      # Install Go and cache modules for both this checkout and the bera-v1.x pin.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.filter.outputs.code == 'true'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            go.sum
+            test/compat/gen-v1x/go.sum
+
+      # Reverse direction: write this fork's outputs, check they match the committed file, verify them with the bera-v1.x code.
+      - name: Verify bera-v1.x reads bera-v0.40.x outputs
+        if: steps.filter.outputs.code == 'true'
+        run: |
+          mkdir -p "$WORKDIR"
+          BERA_COMPAT_WRITE_OUTPUTS="$WORKDIR/bera_v040_outputs.json" go test -tags bls12381 -count=1 -run TestWriteV040Outputs ./test/compat/
+          cmp "$WORKDIR/bera_v040_outputs.json" test/compat/vectors/bera_v040_outputs.json \
+            || { echo "::error::test/compat/vectors/bera_v040_outputs.json is stale, regenerate it (see test/compat/README.md)"; exit 1; }
+          cd test/compat/gen-v1x
+          go vet .
+          go run . -verify ../vectors/bera_v040_outputs.json
+
+      # Build both binaries and run Phase A (data-dir reuse) and Phase B (rolling upgrade).
+      - name: Run rolling upgrade
+        if: steps.filter.outputs.code == 'true'
+        env:
+          SOAK_BLOCKS: ${{ github.event.inputs.soak_blocks || '25' }}
+        run: test/compat/rolling_upgrade.sh "$WORKDIR"
+
+      # Always keep the per-stage report, pass or fail.
+      - name: Archive report
+        if: ${{ always() && steps.filter.outputs.code == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compat-report
+          path: ${{ env.WORKDIR }}/report.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # On failure also keep node logs and configs (binaries and data dirs excluded).
+      - name: Archive node logs and configs
+        if: ${{ failure() && steps.filter.outputs.code == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compat-workdir
+          path: |
+            ${{ env.WORKDIR }}/**/*.log
+            ${{ env.WORKDIR }}/**/config/*.toml
+            ${{ env.WORKDIR }}/**/config/genesis.json
+          if-no-files-found: ignore
+          retention-days: 7

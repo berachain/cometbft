@@ -11,11 +11,15 @@
 #
 # Phase B (mixed-validator rolling upgrade): a 4-validator all-BLS network
 #   (aggregated commits, PBTS) is started on bera-v1.x, then validators are
-#   moved one by one to bera-v0.40.x (1+3, 2+2, 4+0), soaking at each stage,
-#   and finally one validator is rolled back to bera-v1.x and forward again.
+#   moved one by one to bera-v0.40.x (1+3, 2+2, 3+1, 4+0), soaking at each
+#   stage. In between, an already-upgraded node is restarted on its own data
+#   dir mid-soak, a node of each version is stopped for a soak and must
+#   block-sync the missed blocks from the mixed-version peers, and a tx is
+#   sent through the fully upgraded network. Finally one validator is rolled
+#   back to bera-v1.x and forward again.
 #   At every stage all validators must keep signing, both versions must
-#   propose blocks the other accepts, rounds must stay at 0, and block hashes
-#   must agree across nodes.
+#   propose blocks the other accepts, rounds must stay at 0, block hashes
+#   must agree across nodes, and the moved node must still serve early blocks.
 #
 # Requirements: go, python3, curl. The two binaries are built on the fly:
 #   bera-v0.40.x from this checkout (tags: bls12381,pebbledb), bera-v1.x from
