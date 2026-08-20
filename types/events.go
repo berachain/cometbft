@@ -31,6 +31,7 @@ const (
 	EventNewRound           = "NewRound"
 	EventNewRoundStep       = "NewRoundStep"
 	EventPolka              = "Polka"
+	EventProposalBlockPart  = "ProposalBlockPart"
 	EventRelock             = "Relock"
 	EventTimeoutPropose     = "TimeoutPropose"
 	EventTimeoutWait        = "TimeoutWait"

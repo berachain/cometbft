@@ -3,6 +3,7 @@ package tendermint.types;
 
 import "gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/cometbft/cometbft/proto/tendermint/types";
 option (gogoproto.equal_all) = true;
@@ -15,7 +16,12 @@ message ConsensusParams {
   ValidatorParams validator = 3;
   VersionParams version = 4;
   ABCIParams abci = 5;
-  AuthorityParams authority = 6;
+  // NOTE(berachain): synchrony=6 and feature=7 carry the field numbers used
+  // by bera-v1.x so that state persisted by existing networks decodes
+  // unchanged. Upstream v0.39 assigns authority=6; it is moved to 8 here.
+  SynchronyParams synchrony = 6;
+  FeatureParams feature = 7;
+  AuthorityParams authority = 8;
 }
 
 // BlockParams contains limits on the block size.
@@ -77,6 +83,43 @@ message VersionParams {
 message HashedParams {
   int64 block_max_bytes = 1;
   int64 block_max_gas = 2;
+}
+
+// SynchronyParams determine the validity of block timestamps.
+//
+// These parameters are part of the Proposer-Based Timestamps (PBTS) algorithm.
+// For more information on the relationship of the synchrony parameters to
+// block timestamps validity, refer to the PBTS specification:
+// https://github.com/tendermint/spec/blob/master/spec/consensus/proposer-based-timestamp/README.md
+message SynchronyParams {
+  // Bound for how skewed a proposer's clock may be from any validator on the
+  // network while still producing valid proposals.
+  google.protobuf.Duration precision = 1 [(gogoproto.stdduration) = true];
+  // Bound for how long a proposal message may take to reach all validators on
+  // a network and still be considered valid.
+  google.protobuf.Duration message_delay = 2 [(gogoproto.stdduration) = true];
+}
+
+// FeatureParams configure the height from which features of CometBFT are enabled.
+message FeatureParams {
+  // Height during which vote extensions will be enabled.
+  //
+  // A value of 0 means vote extensions are disabled. A value > 0 denotes
+  // the height at which vote extensions will be (or have been) enabled.
+  //
+  // Cannot be set to heights lower or equal to the current blockchain height.
+  google.protobuf.Int64Value vote_extensions_enable_height = 1 [(gogoproto.nullable) = true];
+
+  // Height at which Proposer-Based Timestamps (PBTS) will be enabled.
+  //
+  // A value of 0 means PBTS is disabled. A value > 0 denotes the height at
+  // which PBTS will be (or has been) enabled.
+  //
+  // Cannot be set to heights lower or equal to the current blockchain height.
+  google.protobuf.Int64Value pbts_enable_height = 2 [(gogoproto.nullable) = true];
+
+  // Height at which Stable Block Time (SBT) will be enabled.
+  google.protobuf.Int64Value sbt_enable_height = 3 [(gogoproto.nullable) = true];
 }
 
 // ABCIParams configure functionality specific to the Application Blockchain Interface.

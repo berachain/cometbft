@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"time"
 
 	cmterrors "github.com/cometbft/cometbft/types/errors"
 	"github.com/cosmos/gogoproto/proto"
@@ -76,11 +77,24 @@ func MsgToProto(msg Message) (proto.Message, error) {
 			Vote: vote,
 		}
 
+	case *CommitMessage:
+		commit := msg.Commit.ToProto()
+		pb = &cmtcons.Commit{
+			Commit: commit,
+		}
+
 	case *HasVoteMessage:
 		pb = &cmtcons.HasVote{
 			Height: msg.Height,
 			Round:  msg.Round,
 			Type:   msg.Type,
+			Index:  msg.Index,
+		}
+
+	case *HasProposalBlockPartMessage:
+		pb = &cmtcons.HasProposalBlockPart{
+			Height: msg.Height,
+			Round:  msg.Round,
 			Index:  msg.Index,
 		}
 
@@ -181,6 +195,15 @@ func MsgFromProto(p proto.Message) (Message, error) {
 			Round:  msg.Round,
 			Part:   parts,
 		}
+	case *cmtcons.Commit:
+		commit, err := types.CommitFromProto(msg.Commit)
+		if err != nil {
+			return nil, cmterrors.ErrMsgToProto{MessageName: "Commit", Err: err}
+		}
+
+		pb = &CommitMessage{
+			Commit: commit,
+		}
 	case *cmtcons.Vote:
 		// Vote validation will be handled in the vote message ValidateBasic
 		// call below.
@@ -197,6 +220,12 @@ func MsgFromProto(p proto.Message) (Message, error) {
 			Height: msg.Height,
 			Round:  msg.Round,
 			Type:   msg.Type,
+			Index:  msg.Index,
+		}
+	case *cmtcons.HasProposalBlockPart:
+		pb = &HasProposalBlockPartMessage{
+			Height: msg.Height,
+			Round:  msg.Round,
 			Index:  msg.Index,
 		}
 	case *cmtcons.VoteSetMaj23:
@@ -260,11 +289,19 @@ func WALToProto(msg WALMessage) (*cmtcons.WALMessage, error) {
 			consMsg = w.Wrap()
 		}
 		cm := consMsg.(*cmtcons.Message)
+		// Persist the receive time (as bera-v1.x does) so that a proposal
+		// replayed from the WAL keeps its PBTS timeliness verdict.
+		var rtp *time.Time
+		if !msg.ReceiveTime.IsZero() {
+			rt := msg.ReceiveTime
+			rtp = &rt
+		}
 		pb = cmtcons.WALMessage{
 			Sum: &cmtcons.WALMessage_MsgInfo{
 				MsgInfo: &cmtcons.MsgInfo{
-					Msg:    *cm,
-					PeerID: string(msg.PeerID),
+					Msg:         *cm,
+					PeerID:      string(msg.PeerID),
+					ReceiveTime: rtp,
 				},
 			},
 		}
@@ -317,10 +354,14 @@ func WALFromProto(msg *cmtcons.WALMessage) (WALMessage, error) {
 		if err != nil {
 			return nil, cmterrors.ErrMsgFromProto{MessageName: "MsgInfo", Err: err}
 		}
-		pb = msgInfo{
+		mi := msgInfo{
 			Msg:    walMsg,
 			PeerID: p2p.ID(msg.MsgInfo.PeerID),
 		}
+		if msg.MsgInfo.ReceiveTime != nil {
+			mi.ReceiveTime = *msg.MsgInfo.ReceiveTime
+		}
+		pb = mi
 
 	case *cmtcons.WALMessage_TimeoutInfo:
 		tis, err := cmtmath.SafeConvertUint8(int64(msg.TimeoutInfo.Step))

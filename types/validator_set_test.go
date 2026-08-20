@@ -523,18 +523,16 @@ func TestValidatorSetTotalVotingPowerPanicsOnOverflow(t *testing.T) {
 func TestValidatorSetFromProtoReturnsErrorOnOverflow(t *testing.T) {
 	// ValidatorSetFromProto should return an error instead of panicking when total voting power exceeds MaxTotalVotingPower.
 	pubKey := ed25519.GenPrivKey().PubKey()
-	pkProto, err := cryptoenc.PubKeyToProto(pubKey)
-	require.NoError(t, err)
 
 	protoVals := &cmtproto.ValidatorSet{
 		Validators: []*cmtproto.Validator{
-			{Address: pubKey.Address(), PubKey: pkProto, VotingPower: math.MaxInt64, ProposerPriority: 0},
-			{Address: pubKey.Address(), PubKey: pkProto, VotingPower: math.MaxInt64, ProposerPriority: 0},
+			{Address: pubKey.Address(), PubKeyBytes: pubKey.Bytes(), PubKeyType: pubKey.Type(), VotingPower: math.MaxInt64, ProposerPriority: 0},
+			{Address: pubKey.Address(), PubKeyBytes: pubKey.Bytes(), PubKeyType: pubKey.Type(), VotingPower: math.MaxInt64, ProposerPriority: 0},
 		},
-		Proposer: &cmtproto.Validator{Address: pubKey.Address(), PubKey: pkProto, VotingPower: math.MaxInt64, ProposerPriority: 0},
+		Proposer: &cmtproto.Validator{Address: pubKey.Address(), PubKeyBytes: pubKey.Bytes(), PubKeyType: pubKey.Type(), VotingPower: math.MaxInt64, ProposerPriority: 0},
 	}
 
-	_, err = ValidatorSetFromProto(protoVals)
+	_, err := ValidatorSetFromProto(protoVals)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds maximum")
 }
@@ -1754,7 +1752,6 @@ func TestVerifyCommitExtended(t *testing.T) {
 				Round:            round,
 				Type:             cmtproto.PrecommitType,
 				BlockID:          blockID,
-				Timestamp:        now,
 			}
 
 			added, err := signAddVote(vals[i], vote, voteSet)
@@ -1768,7 +1765,7 @@ func TestVerifyCommitExtended(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, added)
 
-		extCommit := voteSet.MakeExtendedCommit(ABCIParams{VoteExtensionsEnableHeight: height})
+		extCommit := voteSet.MakeExtendedCommit(FeatureParams{VoteExtensionsEnableHeight: height})
 		require.Equal(t, BlockIDFlagNil, extCommit.ExtendedSignatures[5].BlockIDFlag)
 		require.Equal(t, BlockIDFlagAbsent, extCommit.ExtendedSignatures[6].BlockIDFlag)
 		require.Empty(t, extCommit.ExtendedSignatures[5].Extension)

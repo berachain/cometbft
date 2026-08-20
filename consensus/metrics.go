@@ -152,6 +152,25 @@ type Metrics struct {
 	// RoundIncrementTotal is the number of times that the consensus reactor
 	// has incremented above the initial round in a step.
 	RoundIncrementTotal metrics.Counter `metrics_labels:"step"`
+
+	// NextBlockDelay is the time to wait before proposing the next block,
+	// as instructed by the application via FinalizeBlockResponse (ADR-115).
+	NextBlockDelay metrics.Histogram
+
+	// ProposalTimestampDifference is the difference between the local time
+	// of the validator at the time it receives a proposal message, and the
+	// timestamp of the received proposal message.
+	//
+	// The value of this metric is not expected to be negative, as it would
+	// mean that the proposal's timestamp is in the future. This indicates
+	// that the proposer's and this node's clocks are desynchronized.
+	//
+	// A positive value of this metric reflects the message delay from the
+	// proposer to this node, for the delivery of a proposal message. This
+	// metric thus should drive the definition of values for the consensus
+	// parameter SynchronyParams.MessageDelay, used by the PBTS algorithm.
+	//metrics:Difference in seconds between the local time when a proposal message is received and the timestamp in the proposal message.
+	ProposalTimestampDifference metrics.Histogram `metrics_bucketsizes:"-1.5, -1.0, -0.5, -0.2, 0, 0.2, 0.5, 1.0, 1.5, 2.0, 2.5, 4.0, 8.0" metrics_labels:"is_timely"`
 }
 
 func (m *Metrics) MarkRoundIncremented(step cstypes.RoundStepType) {

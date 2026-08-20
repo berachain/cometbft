@@ -13,6 +13,13 @@ option go_package = "github.com/cometbft/cometbft/proto/tendermint/consensus";
 message MsgInfo {
   Message msg = 1 [(gogoproto.nullable) = false];
   string peer_id = 2 [(gogoproto.customname) = "PeerID"];
+  // Berachain: local receive time of the message, persisted so that a
+  // WAL-replayed proposal keeps its PBTS timeliness verdict (same field as the
+  // bera-v1.x line). Only set for messages that have one.
+  google.protobuf.Timestamp receive_time = 3 [
+    (gogoproto.stdtime) = true,
+    (gogoproto.nullable) = true
+  ];
 }
 
 // TimeoutInfo internally generated messages which may update the state

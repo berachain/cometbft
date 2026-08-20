@@ -62,10 +62,15 @@ var testGenesisFmt = `{
 				"ed25519"
 			]
 		},
-		"abci": {
-			"vote_extensions_enable_height": "0"
+		"synchrony": {
+			"message_delay": "500000000",
+			"precision": "10000000"
 		},
-		"version": {}
+		"version": {},
+		"feature": {
+			"vote_extensions_enable_height": "0",
+			"pbts_enable_height": "1"
+		}
 	},
   "validators": [
     {

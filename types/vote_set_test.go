@@ -10,7 +10,6 @@ import (
 	"github.com/cometbft/cometbft/crypto"
 	cmtrand "github.com/cometbft/cometbft/libs/rand"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestVoteSet_AddVote_Good(t *testing.T) {
@@ -33,7 +32,6 @@ func TestVoteSet_AddVote_Good(t *testing.T) {
 		Height:           height,
 		Round:            round,
 		Type:             cmtproto.PrevoteType,
-		Timestamp:        cmttime.Now(),
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
 	_, err = signAddVote(val0, vote, voteSet)
@@ -54,7 +52,6 @@ func TestVoteSet_AddVote_Bad(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             cmtproto.PrevoteType,
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
@@ -129,7 +126,6 @@ func Benchmark_2_3_Maj(b *testing.B) {
 		Height:           height,
 		Round:            round,
 		Type:             cmtproto.PrevoteType,
-		Timestamp:        cmttime.Now(),
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
 	blockPartsTotal := uint32(123)
@@ -180,7 +176,6 @@ func TestVoteSet_2_3Majority(t *testing.T) {
 		Height:           height,
 		Round:            round,
 		Type:             cmtproto.PrevoteType,
-		Timestamp:        cmttime.Now(),
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
 	// 6 out of 10 voted for nil.
@@ -233,7 +228,6 @@ func TestVoteSet_2_3MajorityRedux(t *testing.T) {
 		ValidatorIndex:   -1,  // NOTE: must fill in
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             cmtproto.PrevoteType,
 		BlockID:          BlockID{blockHash, blockPartSetHeader},
 	}
@@ -330,7 +324,6 @@ func TestVoteSet_Conflicts(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             cmtproto.PrevoteType,
 		BlockID:          BlockID{nil, PartSetHeader{}},
 	}
@@ -458,7 +451,6 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 		ValidatorIndex:   -1,
 		Height:           height,
 		Round:            round,
-		Timestamp:        cmttime.Now(),
 		Type:             cmtproto.PrecommitType,
 		BlockID:          BlockID{blockHash, blockPartSetHeader},
 	}
@@ -476,7 +468,7 @@ func TestVoteSet_MakeCommit(t *testing.T) {
 	}
 
 	// MakeCommit should fail.
-	veHeightParam := ABCIParams{VoteExtensionsEnableHeight: height}
+	veHeightParam := FeatureParams{VoteExtensionsEnableHeight: height}
 	assert.Panics(t, func() { voteSet.MakeExtendedCommit(veHeightParam) }, "Doesn't have +2/3 majority")
 
 	// 7th voted for some other block.
@@ -584,7 +576,6 @@ func TestVoteSet_VoteExtensionsEnabled(t *testing.T) {
 				Height:           height,
 				Round:            round,
 				Type:             cmtproto.PrecommitType,
-				Timestamp:        cmttime.Now(),
 				BlockID:          BlockID{blockHash, blockPartSetHeader},
 			}
 			v := vote.ToProto()

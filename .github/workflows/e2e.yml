@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         group: ['networks/ci', 'networks/libp2p-ci', 'networks_regressions/*']
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7

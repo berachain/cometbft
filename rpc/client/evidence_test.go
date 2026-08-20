@@ -22,15 +22,9 @@ import (
 	"github.com/cometbft/cometbft/types"
 )
 
-// For some reason the empty node used in tests has a time of
-// 2018-10-10 08:20:13.695936996 +0000 UTC
-// this is because the test genesis time is set here
-// so in order to validate evidence we need evidence to be the same time
-var defaultTestTime = time.Date(2018, 10, 10, 8, 20, 13, 695936996, time.UTC)
-
 func newEvidence(t *testing.T, val *privval.FilePV,
 	vote *types.Vote, vote2 *types.Vote,
-	chainID string,
+	chainID string, evTime time.Time,
 ) *types.DuplicateVoteEvidence {
 	var err error
 
@@ -46,7 +40,7 @@ func newEvidence(t *testing.T, val *privval.FilePV,
 	validator := types.NewValidator(val.Key.PubKey, 10)
 	valSet := types.NewValidatorSet([]*types.Validator{validator})
 
-	ev, err := types.NewDuplicateVoteEvidence(vote, vote2, defaultTestTime, valSet)
+	ev, err := types.NewDuplicateVoteEvidence(vote, vote2, evTime, valSet)
 	require.NoError(t, err)
 	return ev
 }
@@ -55,6 +49,7 @@ func makeEvidences(
 	t *testing.T,
 	val *privval.FilePV,
 	chainID string,
+	evTime time.Time,
 ) (correct *types.DuplicateVoteEvidence, fakes []*types.DuplicateVoteEvidence) {
 	vote := types.Vote{
 		ValidatorAddress: val.Key.Address,
@@ -62,7 +57,6 @@ func makeEvidences(
 		Height:           1,
 		Round:            0,
 		Type:             cmtproto.PrevoteType,
-		Timestamp:        defaultTestTime,
 		BlockID: types.BlockID{
 			Hash: tmhash.Sum(cmtrand.Bytes(tmhash.Size)),
 			PartSetHeader: types.PartSetHeader{
@@ -74,7 +68,7 @@ func makeEvidences(
 
 	vote2 := vote
 	vote2.BlockID.Hash = tmhash.Sum([]byte("blockhash2"))
-	correct = newEvidence(t, val, &vote, &vote2, chainID)
+	correct = newEvidence(t, val, &vote, &vote2, chainID, evTime)
 
 	fakes = make([]*types.DuplicateVoteEvidence, 0)
 
@@ -82,34 +76,34 @@ func makeEvidences(
 	{
 		v := vote2
 		v.ValidatorAddress = []byte("some_address")
-		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID))
+		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID, evTime))
 	}
 
 	// different height
 	{
 		v := vote2
 		v.Height = vote.Height + 1
-		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID))
+		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID, evTime))
 	}
 
 	// different round
 	{
 		v := vote2
 		v.Round = vote.Round + 1
-		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID))
+		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID, evTime))
 	}
 
 	// different type
 	{
 		v := vote2
 		v.Type = cmtproto.PrecommitType
-		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID))
+		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID, evTime))
 	}
 
 	// exactly same vote
 	{
 		v := vote
-		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID))
+		fakes = append(fakes, newEvidence(t, val, &vote, &v, chainID, evTime))
 	}
 
 	return correct, fakes
@@ -123,8 +117,17 @@ func TestBroadcastEvidence_DuplicateVoteEvidence(t *testing.T) {
 	)
 
 	for i, c := range GetClients() {
-		correct, fakes := makeEvidences(t, pv, chainID)
 		t.Logf("client %d", i)
+
+		// The evidence is for height 1; make sure the node has committed the
+		// block at that height before broadcasting. Under PBTS the block time
+		// is the proposer's wall clock, so the evidence must be stamped with
+		// the actual block time.
+		require.NoError(t, client.WaitForHeight(c, 1, nil))
+		h := int64(1)
+		blk, err := c.Block(context.Background(), &h)
+		require.NoError(t, err)
+		correct, fakes := makeEvidences(t, pv, chainID, blk.Block.Time)
 
 		result, err := c.BroadcastEvidence(context.Background(), correct)
 		require.NoError(t, err, "BroadcastEvidence(%s) failed", correct)

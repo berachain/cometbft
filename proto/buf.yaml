@@ -5,6 +5,12 @@ deps:
 breaking:
   use:
     - FILE
+  ignore:
+    # Intentional wire-format changes from the bera re-fork (PR #51):
+    # CanonicalVote drops the timestamp field and ConsensusParams replaces
+    # authority with synchrony to align with bera-v1.x.
+    - tendermint/types/canonical.proto
+    - tendermint/types/params.proto
 lint:
   use:
     - BASIC

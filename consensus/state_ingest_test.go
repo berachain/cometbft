@@ -34,7 +34,7 @@ func TestStateIngestVerifiedBlock(t *testing.T) {
 	t.Run("ingestedBlockWithVoteExtensions", func(t *testing.T) {
 		// ARRANGE
 		ts := newIngestTestSuite(t)
-		ts.cs.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = 1
+		ts.cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = 1
 
 		// Given a verified block with extended commit
 		ic := ts.MakeIngestCandidate()
@@ -237,7 +237,7 @@ func TestIngestCandidate(t *testing.T) {
 				name:           "extensions invariant mismatch",
 				voteExtensions: true,
 				mutate: func(t *testing.T, ic *IngestCandidate, st *sm.State) {
-					st.ConsensusParams.ABCI.VoteExtensionsEnableHeight = 0
+					st.ConsensusParams.Feature.VoteExtensionsEnableHeight = 0
 				},
 				errContains: "invalid ext commit state",
 			},
@@ -337,9 +337,9 @@ func TestIngestCandidate(t *testing.T) {
 				ts := newIngestTestSuite(t)
 
 				if tt.voteExtensions {
-					ts.cs.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = 1
+					ts.cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = 1
 				} else {
-					ts.cs.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = 0
+					ts.cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = 0
 				}
 
 				if tt.arrange != nil {
@@ -429,7 +429,7 @@ func (ts *ingestTestSuite) MakeIngestCandidateUnverified() IngestCandidate {
 	}
 
 	var (
-		extensionsEnabled = ts.cs.state.ConsensusParams.ABCI.VoteExtensionsEnabled(block.Height)
+		extensionsEnabled = ts.cs.state.ConsensusParams.Feature.VoteExtensionsEnabled(block.Height)
 		chainID           = ts.cs.state.ChainID
 		blockHeight       = block.Height
 		blockID           = types.BlockID{
@@ -454,7 +454,7 @@ func (ts *ingestTestSuite) MakeIngestCandidateUnverified() IngestCandidate {
 		require.True(ts.t, added)
 	}
 
-	extCommit := voteSet.MakeExtendedCommit(ts.cs.state.ConsensusParams.ABCI)
+	extCommit := voteSet.MakeExtendedCommit(ts.cs.state.ConsensusParams.Feature)
 	commit := extCommit.ToCommit()
 	if !extensionsEnabled {
 		extCommit = nil
