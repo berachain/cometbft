@@ -184,7 +184,6 @@ func TestFinalizeBlockValidators(t *testing.T) {
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: state.Validators.Validators[0].Address,
-				Timestamp:        now,
 				Signature:        []byte("Signature1"),
 			},
 			Extension:          []byte("extension1"),
@@ -195,7 +194,6 @@ func TestFinalizeBlockValidators(t *testing.T) {
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: state.Validators.Validators[1].Address,
-				Timestamp:        now,
 				Signature:        []byte("Signature2"),
 			},
 			Extension:          []byte("extension2"),
@@ -297,7 +295,6 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 					Signatures: []types.CommitSig{{
 						BlockIDFlag:      types.BlockIDFlagNil,
 						ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
-						Timestamp:        defaultEvidenceTime,
 						Signature:        crypto.CRandBytes(types.MaxSignatureSize),
 					}},
 				},
@@ -440,8 +437,9 @@ func TestProcessProposal(t *testing.T) {
 			Round: 0,
 			Votes: voteInfos,
 		},
-		NextValidatorsHash: block1.NextValidatorsHash,
-		ProposerAddress:    block1.ProposerAddress,
+		NextValidatorsHash:  block1.NextValidatorsHash,
+		ProposerAddress:     block1.ProposerAddress,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
 	}
 
 	acceptBlock, err := blockExec.ProcessProposal(block1, state)
@@ -1073,7 +1071,7 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 			stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 				DiscardABCIResponses: false,
 			})
-			state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
+			state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
 			mp := &mpmocks.Mempool{}
 			mp.On("Lock").Return()
 			mp.On("Unlock").Return()

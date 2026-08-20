@@ -103,11 +103,51 @@ type pb2tm struct{}
 func (pb2tm) ValidatorUpdates(vals []abci.ValidatorUpdate) ([]*Validator, error) {
 	cmtVals := make([]*Validator, len(vals))
 	for i, v := range vals {
-		pub, err := cryptoenc.PubKeyFromProto(v.PubKey)
+		pub, err := PubKeyFromValidatorUpdate(v)
 		if err != nil {
 			return nil, err
 		}
 		cmtVals[i] = NewValidator(pub, v.Power)
 	}
 	return cmtVals, nil
+}
+
+// PubKeyFromValidatorUpdate extracts the public key from an ABCI validator
+// update. It accepts both encodings: the proto PublicKey in pub_key (upstream
+// and this fork) and the raw pub_key_bytes + pub_key_type pair written by the
+// bera-v1.x line. pub_key takes precedence when both are set.
+func PubKeyFromValidatorUpdate(v abci.ValidatorUpdate) (crypto.PubKey, error) {
+	if v.PubKey.Sum == nil && v.PubKeyType != "" {
+		return cryptoenc.PubKeyFromTypeAndBytes(v.PubKeyType, v.PubKeyBytes)
+	}
+	return cryptoenc.PubKeyFromProto(v.PubKey)
+}
+
+// NormalizeValidatorUpdates returns a copy of the validator updates in which
+// every entry carries both public key encodings (pub_key, and
+// pub_key_bytes + pub_key_type) so that the persisted form can be read by both
+// this fork and the bera-v1.x line. Entries whose key cannot be decoded are
+// left untouched.
+func NormalizeValidatorUpdates(vals []abci.ValidatorUpdate) []abci.ValidatorUpdate {
+	if len(vals) == 0 {
+		return vals
+	}
+	out := make([]abci.ValidatorUpdate, len(vals))
+	copy(out, vals)
+	for i := range out {
+		pub, err := PubKeyFromValidatorUpdate(out[i])
+		if err != nil {
+			continue
+		}
+		if out[i].PubKey.Sum == nil {
+			if pk, err := cryptoenc.PubKeyToProto(pub); err == nil {
+				out[i].PubKey = pk
+			}
+		}
+		if out[i].PubKeyType == "" {
+			out[i].PubKeyType = pub.Type()
+			out[i].PubKeyBytes = pub.Bytes()
+		}
+	}
+	return out
 }

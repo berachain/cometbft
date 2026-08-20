@@ -46,6 +46,7 @@ type HeightVoteSet struct {
 	round             int32                  // max tracked round
 	roundVoteSets     map[int32]RoundVoteSet // keys: [0...round]
 	peerCatchupRounds map[p2p.ID][]int32     // keys: peer.ID; values: at most 2 rounds
+	commit            *types.Commit          // a whole aggregated commit received via gossip (catch-up)
 }
 
 func NewHeightVoteSet(chainID string, height int64, valSet *types.ValidatorSet) *HeightVoteSet {
@@ -163,6 +164,25 @@ func (hvs *HeightVoteSet) Precommits(round int32) *types.VoteSet {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
 	return hvs.getVoteSet(round, cmtproto.PrecommitType)
+}
+
+// GetCommit returns the whole aggregated commit for the given round, if one
+// was received via gossip (catch-up path).
+func (hvs *HeightVoteSet) GetCommit(round int32) *types.Commit {
+	hvs.mtx.Lock()
+	defer hvs.mtx.Unlock()
+	if hvs.commit == nil || hvs.commit.Round != round {
+		return nil
+	}
+
+	return hvs.commit
+}
+
+// SetCommit stores a whole aggregated commit received via gossip.
+func (hvs *HeightVoteSet) SetCommit(commit *types.Commit) {
+	hvs.mtx.Lock()
+	defer hvs.mtx.Unlock()
+	hvs.commit = commit
 }
 
 // Last round and blockID that has +2/3 prevotes for a particular block or nil.

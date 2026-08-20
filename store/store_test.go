@@ -43,7 +43,6 @@ func makeTestExtCommitWithNumSigs(height int64, timestamp time.Time, numSigs int
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: cmtrand.Bytes(crypto.AddressSize),
-				Timestamp:        timestamp,
 				Signature:        cmtrand.Bytes(64),
 			},
 			ExtensionSignature: []byte("ExtensionSignature"),
@@ -584,6 +583,10 @@ func TestPruneBlocks(t *testing.T) {
 	})
 	state, err := stateStore.LoadFromDBOrGenesisFile(config.GenesisFile())
 	require.NoError(t, err)
+	// Use BFT Time for this test: with PBTS the proposer stamps blocks with
+	// the current time, which would keep every block inside the evidence
+	// max-age duration and defeat the height-based retain assertions below.
+	state.ConsensusParams.Feature.PbtsEnableHeight = 0
 	db := dbm.NewMemDB()
 	bs := NewBlockStore(db)
 	assert.EqualValues(t, 0, bs.Base())

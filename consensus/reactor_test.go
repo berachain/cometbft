@@ -360,7 +360,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 
 			cs.state.LastBlockHeight = testCase.storedHeight
 			cs.state.LastValidators = cs.state.Validators.Copy()
-			cs.state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
+			cs.state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.initialRequiredHeight
 
 			propBlock, err := cs.createProposalBlock(ctx)
 			require.NoError(t, err)
@@ -392,7 +392,7 @@ func TestSwitchToConsensusVoteExtensions(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, added)
 
-			veHeightParam := types.ABCIParams{VoteExtensionsEnableHeight: veHeight}
+			veHeightParam := types.FeatureParams{VoteExtensionsEnableHeight: veHeight}
 			if testCase.includeExtensions {
 				cs.blockStore.SaveBlockWithExtendedCommit(propBlock, blockParts, voteSet.MakeExtendedCommit(veHeightParam))
 			} else {
@@ -986,6 +986,36 @@ func TestBlockPartMessageValidateBasic(t *testing.T) {
 	assert.Equal(t, true, message.ValidateBasic() != nil, "Validate Basic had an unexpected result")
 }
 
+func TestCommitMessageValidateBasic(t *testing.T) {
+	// A height-zero commit bypasses Commit.ValidateBasic's per-signature checks,
+	// so the signature-count guard in CommitMessage.ValidateBasic is what bounds
+	// an otherwise arbitrarily large gossiped commit.
+	commitWithSigs := func(n int) *types.Commit {
+		return &types.Commit{Height: 0, Round: 0, Signatures: make([]types.CommitSig, n)}
+	}
+
+	testCases := []struct {
+		testName  string
+		numSigs   int
+		expectErr bool
+	}{
+		{"at cap", types.MaxVotesCount, false},
+		{"above cap", types.MaxVotesCount + 1, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			message := CommitMessage{Commit: commitWithSigs(tc.numSigs)}
+			err := message.ValidateBasic()
+			if tc.expectErr {
+				require.ErrorContains(t, err, "too many commit signatures")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestHasVoteMessageValidateBasic(t *testing.T) {
 	const (
 		validSignedMsgType   cmtproto.SignedMsgType = 0x01
@@ -1136,12 +1166,34 @@ func TestMarshalJSONPeerState(t *testing.T) {
 			"last_commit_round": -1,
 			"last_commit": null,
 			"catchup_commit_round": -1,
-			"catchup_commit": null
+			"catchup_commit": null,
+			"has_catchup_commit": false
 		},
 		"stats":{
 			"votes":"0",
 			"block_parts":"0"}
 		}`, string(data))
+}
+
+// TestPickVoteToSendWholeCommit checks that vote gossip never tries to pick
+// individual votes out of a whole *types.Commit (its GetByIndex returns nil);
+// whole commits are gossiped via sendCommit instead. Regression test for the
+// post-restart LastCommit gossip path, where LastCommit holds a whole commit.
+func TestPickVoteToSendWholeCommit(t *testing.T) {
+	ps := NewPeerState(nil).SetLogger(log.TestingLogger())
+
+	commit := &types.Commit{
+		Height:  1078,
+		Round:   0,
+		BlockID: types.BlockID{Hash: cmtrand.Bytes(tmhash.Size), PartSetHeader: types.PartSetHeader{Total: 1, Hash: cmtrand.Bytes(tmhash.Size)}},
+		Signatures: []types.CommitSig{
+			{BlockIDFlag: types.BlockIDFlagCommit, ValidatorAddress: cmtrand.Bytes(20), Signature: cmtrand.Bytes(64)},
+			{BlockIDFlag: types.BlockIDFlagAbsent},
+			{BlockIDFlag: types.BlockIDFlagCommit, ValidatorAddress: cmtrand.Bytes(20), Signature: cmtrand.Bytes(64)},
+		},
+	}
+
+	require.Nil(t, ps.PickVoteToSend(commit))
 }
 
 func TestVoteMessageValidateBasic(t *testing.T) {

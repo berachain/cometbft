@@ -17,6 +17,7 @@ import (
 	cmtcons "github.com/cometbft/cometbft/proto/tendermint/consensus"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestMsgToProto(t *testing.T) {
@@ -49,10 +50,10 @@ func TestMsgToProto(t *testing.T) {
 	proposal := types.Proposal{
 		Type:      cmtproto.ProposalType,
 		Height:    1,
-		Round:     1,
+		Round:     2,
 		POLRound:  1,
 		BlockID:   bi,
-		Timestamp: time.Now(),
+		Timestamp: cmttime.Now(),
 		Signature: cmtrand.Bytes(20),
 	}
 	pbProposal := proposal.ToProto()
@@ -223,6 +224,7 @@ func TestWALMsgProto(t *testing.T) {
 	}
 	pbParts, err := parts.ToProto()
 	require.NoError(t, err)
+	receiveTime := time.Date(2026, 1, 2, 3, 4, 5, 600000000, time.UTC)
 
 	testsCases := []struct {
 		testName string
@@ -263,6 +265,31 @@ func TestWALMsgProto(t *testing.T) {
 						},
 					},
 					PeerID: "string",
+				},
+			},
+		}, false},
+		{"successful msgInfo with receive time", msgInfo{
+			Msg: &BlockPartMessage{
+				Height: 100,
+				Round:  1,
+				Part:   &parts,
+			},
+			PeerID:      p2p.ID("string"),
+			ReceiveTime: receiveTime,
+		}, &cmtcons.WALMessage{
+			Sum: &cmtcons.WALMessage_MsgInfo{
+				MsgInfo: &cmtcons.MsgInfo{
+					Msg: cmtcons.Message{
+						Sum: &cmtcons.Message_BlockPart{
+							BlockPart: &cmtcons.BlockPart{
+								Height: 100,
+								Round:  1,
+								Part:   *pbParts,
+							},
+						},
+					},
+					PeerID:      "string",
+					ReceiveTime: &receiveTime,
 				},
 			},
 		}, false},
@@ -438,6 +465,12 @@ func TestConsMsgsVectors(t *testing.T) {
 			"3a1808ffffffffffffffff7f10ffffffff07180120ffffffff07",
 		},
 		{
+			"HasProposalBlockPart", &cmtcons.Message{Sum: &cmtcons.Message_HasProposalBlockPart{
+				HasProposalBlockPart: &cmtcons.HasProposalBlockPart{Height: 1, Round: 1, Index: 1},
+			}},
+			"5206080110011801",
+		},
+		{
 			"VoteSetMaj23", &cmtcons.Message{Sum: &cmtcons.Message_VoteSetMaj23{
 				VoteSetMaj23: &cmtcons.VoteSetMaj23{Height: 1, Round: 1, Type: cmtproto.PrevoteType, BlockID: pbBi},
 			}},
@@ -459,4 +492,29 @@ func TestConsMsgsVectors(t *testing.T) {
 			require.Equal(t, tc.expBytes, hex.EncodeToString(bz))
 		})
 	}
+}
+
+// TestHasProposalBlockPartWireCompat pins the decode path for the
+// has_proposal_block_part gossip hint (oneof field 10) exactly as the
+// bera-v1.x line encodes it. Mixed-version gossip during a rolling upgrade
+// depends on these bytes unwrapping instead of failing as an unknown sum.
+func TestHasProposalBlockPartWireCompat(t *testing.T) {
+	oldLineBytes, err := hex.DecodeString("5206080510011802")
+	require.NoError(t, err)
+
+	var m cmtcons.Message
+	require.NoError(t, proto.Unmarshal(oldLineBytes, &m))
+
+	unwrapped, err := m.Unwrap()
+	require.NoError(t, err)
+
+	msg, err := MsgFromProto(unwrapped)
+	require.NoError(t, err)
+	require.NoError(t, msg.ValidateBasic())
+
+	hpbp, ok := msg.(*HasProposalBlockPartMessage)
+	require.True(t, ok)
+	require.Equal(t, int64(5), hpbp.Height)
+	require.Equal(t, int32(1), hpbp.Round)
+	require.Equal(t, int32(2), hpbp.Index)
 }

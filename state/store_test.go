@@ -423,6 +423,52 @@ func TestLastFinalizeBlockResponses(t *testing.T) {
 	})
 }
 
+// Persisted validator updates carry both public key encodings (pub_key and
+// pub_key_bytes + pub_key_type) so that bera-v1.x and this fork can read each
+// other's state store, and updates written by bera-v1.x (pub_key_bytes only)
+// decode into validators.
+func TestSaveFinalizeBlockResponseValidatorUpdatesCarryBothPubKeyEncodings(t *testing.T) {
+	pubkey := ed25519.GenPrivKey().PubKey()
+	stateStore := sm.NewStore(dbm.NewMemDB(), sm.StoreOptions{DiscardABCIResponses: false})
+
+	// As returned by an application built against this fork (pub_key only).
+	resp := &abci.ResponseFinalizeBlock{
+		ValidatorUpdates: []abci.ValidatorUpdate{types.TM2PB.NewValidatorUpdate(pubkey, 7)},
+		AppHash:          []byte{1},
+	}
+	require.NoError(t, stateStore.SaveFinalizeBlockResponse(5, resp))
+
+	for _, loaded := range []func() (*abci.ResponseFinalizeBlock, error){
+		func() (*abci.ResponseFinalizeBlock, error) { return stateStore.LoadFinalizeBlockResponse(5) },
+		func() (*abci.ResponseFinalizeBlock, error) { return stateStore.LoadLastFinalizeBlockResponse(5) },
+	} {
+		got, err := loaded()
+		require.NoError(t, err)
+		require.Len(t, got.ValidatorUpdates, 1)
+		vu := got.ValidatorUpdates[0]
+		assert.NotNil(t, vu.PubKey.Sum)
+		assert.Equal(t, pubkey.Bytes(), vu.PubKeyBytes)
+		assert.Equal(t, pubkey.Type(), vu.PubKeyType)
+		assert.EqualValues(t, 7, vu.Power)
+		vals, err := types.PB2TM.ValidatorUpdates(got.ValidatorUpdates)
+		require.NoError(t, err)
+		assert.True(t, pubkey.Equals(vals[0].PubKey))
+	}
+
+	// As written by the bera-v1.x line (pub_key_bytes + pub_key_type only).
+	v1xResp := &abci.ResponseFinalizeBlock{
+		ValidatorUpdates: []abci.ValidatorUpdate{{PubKeyBytes: pubkey.Bytes(), PubKeyType: pubkey.Type(), Power: 9}},
+	}
+	bz, err := v1xResp.Marshal()
+	require.NoError(t, err)
+	got := new(abci.ResponseFinalizeBlock)
+	require.NoError(t, got.Unmarshal(bz))
+	vals, err := types.PB2TM.ValidatorUpdates(got.ValidatorUpdates)
+	require.NoError(t, err)
+	assert.True(t, pubkey.Equals(vals[0].PubKey))
+	assert.EqualValues(t, 9, vals[0].VotingPower)
+}
+
 func TestFinalizeBlockRecoveryUsingLegacyABCIResponses(t *testing.T) {
 	var (
 		height              int64 = 10

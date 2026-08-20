@@ -60,3 +60,4 @@ proto/spec/**/*.pb.go
 # Python virtual environments
 .venv
 go.work.sum
+test/compat/gen-v1x/gen-v1x

@@ -127,7 +127,7 @@ func (ic *IngestCandidate) Verify(state state.State) error {
 		height            = ic.Height()
 		blockID           = ic.BlockID()
 		chainID           = state.ChainID
-		extensionsPresent = state.ConsensusParams.ABCI.VoteExtensionsEnabled(height)
+		extensionsPresent = state.ConsensusParams.Feature.VoteExtensionsEnabled(height)
 	)
 
 	// ensure invariant
