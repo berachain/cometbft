@@ -282,7 +282,7 @@ func (cs *State) ingestBlock(ic IngestCandidate) error {
 	}
 
 	// the following flow is similar to finalizeCommit(height)
-	stateCopy, err := cs.blockExec.ApplyVerifiedBlock(stateCopy, ic.BlockID(), block)
+	stateCopy, err := cs.blockExec.ApplyVerifiedBlock(stateCopy, ic.BlockID(), block, block.Height)
 	if err != nil {
 		// we can't recover from this error
 		panic(errors.Wrapf(err, "failed to apply verified block (height: %d, hash: %x)", block.Height, block.Hash()))
