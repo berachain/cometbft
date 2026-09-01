@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ['bera-v1.x', 'bera-v0.39.x']
+        branch: ['bera-v1.x', 'bera-v0.40.x']
         part: ['00', '01', '02', '03', '04', '05']
     runs-on: ubuntu-latest
     timeout-minutes: 30
