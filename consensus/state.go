@@ -2059,6 +2059,7 @@ func (cs *State) finalizeCommit(height int64) {
 			PartSetHeader: blockParts.Header(),
 		},
 		block,
+		block.Height,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to apply block; error %v", err))

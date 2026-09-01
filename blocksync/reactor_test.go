@@ -212,7 +212,7 @@ func newReactor(
 			ExtendedSignatures: extCommit,
 		}
 
-		state, err = blockExec.ApplyBlock(state, blockID, thisBlock)
+		state, err = blockExec.ApplyBlock(state, blockID, thisBlock, maxBlockHeight)
 		if err != nil {
 			panic(fmt.Errorf("error apply block: %w", err))
 		}

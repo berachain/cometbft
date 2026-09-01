@@ -685,7 +685,7 @@ FOR_LOOP:
 
 			// TODO: same thing for app - but we would need a way to
 			// get the hash without persisting the state
-			state, err = r.blockExec.ApplyVerifiedBlock(state, firstID, first)
+			state, err = r.blockExec.ApplyVerifiedBlock(state, firstID, first, r.pool.MaxPeerHeight())
 			if err != nil {
 				// TODO This is bad, are we zombie?
 				panic(fmt.Sprintf("Failed to process committed block (%d:%X): %v", first.Height, first.Hash(), err))

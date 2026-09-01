@@ -325,6 +325,7 @@ title: Methods
     | time                 | [google.protobuf.Timestamp][protobuf-timestamp] | Timestamp of the block that will be proposed.                                            | 6            |
     | next_validators_hash | bytes                                           | Merkle root of the next validator set.                                                        | 7            |
     | proposer_address     | bytes                                           | [Address](../core/data_structures.md#address) of the validator that is creating the proposal. | 8            |
+    | syncing_to_height    | int64                                           | If the node is syncing/replaying blocks - target height. If not, syncing_to == height.        | 9            |
 
 * **Response**:
 
