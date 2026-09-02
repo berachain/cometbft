@@ -27,9 +27,22 @@ var (
 	ErrVoteInvalidBlockHash          = errors.New("invalid block hash")
 	ErrVoteNonDeterministicSignature = errors.New("non-deterministic signature")
 	ErrVoteNil                       = errors.New("nil vote")
+	ErrVoteNoSignature               = errors.New("no signature")
 	ErrVoteExtensionAbsent           = errors.New("vote extension absent")
 	ErrInvalidVoteExtension          = errors.New("invalid vote extension")
 )
+
+// ErrVoteTimestampNotZero is returned when a vote carries a non-zero
+// timestamp. Vote timestamps are pinned to zero on this fork because they are
+// excluded from the signed bytes (BLS aggregation requires all validators to
+// sign identical bytes).
+type ErrVoteTimestampNotZero struct {
+	Timestamp time.Time
+}
+
+func (err *ErrVoteTimestampNotZero) Error() string {
+	return fmt.Sprintf("Vote time stamp should be 0 and not set: %s", err.Timestamp)
+}
 
 type ErrVoteConflictingVotes struct {
 	VoteA *Vote
@@ -50,10 +63,11 @@ func NewConflictingVoteError(vote1, vote2 *Vote) *ErrVoteConflictingVotes {
 // The vote extension is only valid for non-nil precommits.
 type ErrVoteExtensionInvalid struct {
 	ExtSignature []byte
+	Reason       string
 }
 
 func (err *ErrVoteExtensionInvalid) Error() string {
-	return fmt.Sprintf("extensions must be present IFF vote is a non-nil Precommit; extension signature: %X", err.ExtSignature)
+	return fmt.Sprintf("invalid vote extension: %s; extension signature: %X", err.Reason, err.ExtSignature)
 }
 
 // Address is hex bytes.
@@ -93,12 +107,15 @@ func VoteFromProto(pv *cmtproto.Vote) (*Vote, error) {
 		Height:             pv.Height,
 		Round:              pv.Round,
 		BlockID:            *blockID,
-		Timestamp:          pv.Timestamp,
 		ValidatorAddress:   pv.ValidatorAddress,
 		ValidatorIndex:     pv.ValidatorIndex,
 		Signature:          pv.Signature,
 		Extension:          pv.Extension,
 		ExtensionSignature: pv.ExtensionSignature,
+		// The vote timestamp is not part of the signed (canonical) bytes and
+		// is pinned to zero on this fork (BLS aggregation requires identical
+		// sign bytes across validators).
+		Timestamp: time.Time{},
 	}, nil
 }
 
@@ -121,7 +138,6 @@ func (vote *Vote) CommitSig() CommitSig {
 	return CommitSig{
 		BlockIDFlag:      blockIDFlag,
 		ValidatorAddress: vote.ValidatorAddress,
-		Timestamp:        vote.Timestamp,
 		Signature:        vote.Signature,
 	}
 }
@@ -206,7 +222,7 @@ func (vote *Vote) String() string {
 		panic("Unknown vote type")
 	}
 
-	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X %X @ %s}",
+	return fmt.Sprintf("Vote{%v:%X %v/%02d/%v(%v) %X %X %X @}",
 		vote.ValidatorIndex,
 		cmtbytes.Fingerprint(vote.ValidatorAddress),
 		vote.Height,
@@ -216,7 +232,6 @@ func (vote *Vote) String() string {
 		cmtbytes.Fingerprint(vote.BlockID.Hash),
 		cmtbytes.Fingerprint(vote.Signature),
 		cmtbytes.Fingerprint(vote.Extension),
-		CanonicalTime(vote.Timestamp),
 	)
 }
 
@@ -429,7 +444,10 @@ func SignAndCheckVote(
 	isPrecommit := vote.Type == cmtproto.PrecommitType
 	if !isPrecommit && extensionsEnabled {
 		// Non-recoverable because the caller passed parameters that don't make sense
-		return false, &ErrVoteExtensionInvalid{ExtSignature: v.ExtensionSignature}
+		return false, &ErrVoteExtensionInvalid{
+			Reason:       "inconsistent values of `isPrecommit` and `extensionsEnabled`",
+			ExtSignature: v.ExtensionSignature,
+		}
 	}
 
 	isNil := vote.BlockID.IsZero()
@@ -438,7 +456,10 @@ func SignAndCheckVote(
 	// Error if prevote contains an extension signature
 	if extSignature && (!isPrecommit || isNil) {
 		// Non-recoverable because the vote is malformed
-		return false, &ErrVoteExtensionInvalid{ExtSignature: v.ExtensionSignature}
+		return false, &ErrVoteExtensionInvalid{
+			Reason:       "vote extension signature must not be present in prevotes or nil-precommits",
+			ExtSignature: v.ExtensionSignature,
+		}
 	}
 
 	vote.ExtensionSignature = nil
@@ -446,13 +467,18 @@ func SignAndCheckVote(
 		// Error if missing extension signature for non-nil Precommit
 		if !extSignature && isPrecommit && !isNil {
 			// Non-recoverable because the vote is malformed
-			return false, &ErrVoteExtensionInvalid{ExtSignature: v.ExtensionSignature}
+			return false, &ErrVoteExtensionInvalid{
+				Reason:       "vote extension signature must be present if extensions are enabled",
+				ExtSignature: v.ExtensionSignature,
+			}
 		}
 
 		vote.ExtensionSignature = v.ExtensionSignature
 	}
 
-	vote.Timestamp = v.Timestamp
+	if !v.Timestamp.Equal(time.Time{}) {
+		return false, &ErrVoteTimestampNotZero{Timestamp: v.Timestamp}
+	}
 
 	return true, nil
 }

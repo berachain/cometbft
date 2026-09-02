@@ -138,20 +138,22 @@ func (v *Validator) Bytes() []byte {
 	return bz
 }
 
-// ToProto converts Validator to protobuf
+// ToProto converts Validator to protobuf.
+// The key is serialized via pub_key_bytes/pub_key_type (the bera-v1.x
+// layout); the deprecated pub_key field is left unset.
 func (v *Validator) ToProto() (*cmtproto.Validator, error) {
 	if v == nil {
 		return nil, errors.New("nil validator")
 	}
 
-	pk, err := ce.PubKeyToProto(v.PubKey)
-	if err != nil {
-		return nil, err
+	if v.PubKey == nil {
+		return nil, errors.New("nil pubkey")
 	}
 
 	vp := cmtproto.Validator{
 		Address:          v.Address,
-		PubKey:           pk,
+		PubKeyType:       v.PubKey.Type(),
+		PubKeyBytes:      v.PubKey.Bytes(),
 		VotingPower:      v.VotingPower,
 		ProposerPriority: v.ProposerPriority,
 	}
@@ -166,9 +168,15 @@ func ValidatorFromProto(vp *cmtproto.Validator) (*Validator, error) {
 		return nil, errors.New("nil validator")
 	}
 
-	pk, err := ce.PubKeyFromProto(vp.PubKey)
+	pk, err := ce.PubKeyFromTypeAndBytes(vp.PubKeyType, vp.PubKeyBytes)
 	if err != nil {
-		return nil, err
+		if vp.PubKey == nil {
+			return nil, fmt.Errorf("validator pubkey decode failed and legacy pub_key is nil: %w", err)
+		}
+		pk, err = ce.PubKeyFromProto(*vp.PubKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 	v := new(Validator)
 	v.Address = vp.GetAddress()

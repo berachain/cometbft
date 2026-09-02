@@ -24,7 +24,6 @@ import (
 	cmtrand "github.com/cometbft/cometbft/libs/rand"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cmtversion "github.com/cometbft/cometbft/proto/tendermint/version"
-	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/cometbft/cometbft/version"
 )
 
@@ -548,7 +547,6 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 					Round:            1,
 					Type:             cmtproto.PrecommitType,
 					BlockID:          blockID,
-					Timestamp:        time.Now(),
 				}
 				v := vote.ToProto()
 				err = vals[i].SignVote(voteSet.ChainID(), v)
@@ -565,7 +563,7 @@ func TestVoteSetToExtendedCommit(t *testing.T) {
 			if testCase.includeExtension {
 				veHeight = 1
 			}
-			ec := voteSet.MakeExtendedCommit(ABCIParams{VoteExtensionsEnableHeight: veHeight})
+			ec := voteSet.MakeExtendedCommit(FeatureParams{VoteExtensionsEnableHeight: veHeight})
 
 			for i := int32(0); int(i) < len(vals); i++ {
 				vote1 := voteSet.GetByIndex(i)
@@ -686,7 +684,6 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 					Round:            round,
 					Type:             cmtproto.PrecommitType,
 					BlockID:          tc.blockIDs[n],
-					Timestamp:        cmttime.Now(),
 				}
 
 				added, err := signAddVote(vals[vi], vote, voteSet)
@@ -697,7 +694,7 @@ func TestCommitToVoteSetWithVotesForNilBlock(t *testing.T) {
 			}
 		}
 
-		veHeightParam := ABCIParams{VoteExtensionsEnableHeight: 0}
+		veHeightParam := FeatureParams{VoteExtensionsEnableHeight: 0}
 		if tc.valid {
 			extCommit := voteSet.MakeExtendedCommit(veHeightParam) // panics without > 2/3 valid votes
 			assert.NotNil(t, extCommit)
@@ -789,7 +786,7 @@ func TestBlockProtoBuf(t *testing.T) {
 			require.EqualValues(t, tc.b1.Header, block.Header, tc.msg)
 			require.EqualValues(t, tc.b1.Data, block.Data, tc.msg)
 			require.EqualValues(t, tc.b1.Evidence.Evidence, block.Evidence.Evidence, tc.msg)
-			require.EqualValues(t, *tc.b1.LastCommit, *block.LastCommit, tc.msg)
+			require.EqualValues(t, tc.b1.LastCommit, block.LastCommit, tc.msg)
 		} else {
 			require.Error(t, err, tc.msg)
 		}

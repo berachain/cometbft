@@ -2,6 +2,7 @@ syntax = "proto3";
 package tendermint.abci;
 
 import "gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "tendermint/crypto/keys.proto";
 // For more information on gogo.proto, see:
@@ -171,6 +172,10 @@ message RequestProcessProposal {
   bytes next_validators_hash = 7;
   // address of the public key of the original proposer of the block.
   bytes proposer_address = 8;
+  // address of the public key of the validator that will propose the block at the
+  // next height (also the proposer at round 1 of the current height if consensus
+  // goes into multiple rounds).
+  bytes next_proposer_address = 9;
 }
 
 // Extends a vote with application-injected data
@@ -216,6 +221,8 @@ message RequestFinalizeBlock {
   bytes next_validators_hash = 7;
   // proposer_address is the address of the public key of the original proposer of the block.
   bytes proposer_address = 8;
+  // If the node is syncing/replaying blocks - target height. If not, syncing_to == height.
+  int64 syncing_to_height = 9;
 }
 
 //----------------------------------------
@@ -402,6 +409,12 @@ message ResponseFinalizeBlock {
   tendermint.types.ConsensusParams consensus_param_updates = 4;
   // app_hash is the hash of the applications' state which is used to confirm that execution of the transactions was deterministic. It is up to the application to decide which algorithm to use.
   bytes app_hash = 5;
+  // delay between the time when this block is committed and the next height is started.
+  // previously `timeout_commit` in config.toml
+  google.protobuf.Duration next_block_delay = 6 [
+    (gogoproto.nullable) = false,
+    (gogoproto.stdduration) = true
+  ];
 }
 
 //----------------------------------------
@@ -480,6 +493,14 @@ message Validator {
 message ValidatorUpdate {
   tendermint.crypto.PublicKey pub_key = 1 [(gogoproto.nullable) = false];
   int64 power = 2;
+  // Berachain: the bera-v1.x line encodes the public key as raw bytes plus a
+  // key type (pub_key instead being reserved there). Both forms are accepted
+  // when decoding, and both are written to the state store, so that
+  // FinalizeBlock responses persisted by either line can be read by the other
+  // (e.g. a rolling upgrade or rollback while the last block's response is
+  // needed for crash recovery, or /block_results for historical heights).
+  bytes pub_key_bytes = 3;
+  string pub_key_type = 4;
 }
 
 message VoteInfo {

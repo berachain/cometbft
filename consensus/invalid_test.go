@@ -85,7 +85,6 @@ func invalidDoPrevoteFunc(t *testing.T, cs *State, sw p2p.Switcher, pv types.Pri
 			ValidatorIndex:   valIndex,
 			Height:           cs.Height,
 			Round:            cs.Round,
-			Timestamp:        cs.voteTime(),
 			Type:             cmtproto.PrecommitType,
 			BlockID: types.BlockID{
 				Hash:          blockHash,

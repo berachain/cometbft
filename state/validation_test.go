@@ -197,9 +197,15 @@ func TestValidateBlockCommit(t *testing.T) {
 			/*
 				#2589: test len(block.LastCommit.Signatures) == state.LastValidators.Size()
 			*/
-			_, err = makeBlock(state, height, wrongSigsCommit)
-			require.Error(t, err)
-			require.ErrorContains(t, err, "error making block")
+			block, err = makeBlock(state, height, wrongSigsCommit)
+			require.NoError(t, err)
+			err = blockExec.ValidateBlock(state, block)
+			_, isErrInvalidCommitSignatures := err.(errors.ErrInvalidCommitSignatures)
+			require.True(t, isErrInvalidCommitSignatures,
+				"expected ErrInvalidCommitSignatures at height %d, but got: %v",
+				height,
+				err,
+			)
 		}
 
 		/*
@@ -392,14 +398,18 @@ func TestValidateBlockTime(t *testing.T) {
 
 	blockStore := store.NewBlockStore(dbm.NewMemDB())
 
-	blockExec := sm.NewBlockExecutor(
-		stateStore,
-		log.TestingLogger(),
-		proxyApp.Consensus(),
-		mp,
-		sm.EmptyEvidencePool{},
-		blockStore,
-	)
+	newBlockExec := func(opts ...sm.BlockExecutorOption) *sm.BlockExecutor {
+		return sm.NewBlockExecutor(
+			stateStore,
+			log.TestingLogger(),
+			proxyApp.Consensus(),
+			mp,
+			sm.EmptyEvidencePool{},
+			blockStore,
+			opts...,
+		)
+	}
+	blockExec := newBlockExec()
 	lastCommit := &types.Commit{}
 	var lastExtCommit *types.ExtendedCommit
 
@@ -412,69 +422,65 @@ func TestValidateBlockTime(t *testing.T) {
 		lastCommit = lastExtCommit.ToCommit()
 	}
 
+	// PBTS is always on in this fork, so the block time is the proposer's
+	// local time and only its monotonicity is validated here. The upstream
+	// BFT Time subtests (block time must equal the median of the last
+	// commit's vote timestamps) do not apply.
+
 	t.Run("block time before last block time", func(t *testing.T) {
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
 
-		// Set time to before last block time
-		block.Time = block.Time.Add(-time.Millisecond * 10)
+		block.Time = state.LastBlockTime.Add(-time.Millisecond * 10)
 		err = blockExec.ValidateBlock(state, block)
 
 		require.ErrorContains(t, err, "not greater than last block time")
 	})
 
-	t.Run("block time after last block time, different than median time", func(t *testing.T) {
+	t.Run("block time equal to last block time", func(t *testing.T) {
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
-		// Set time to after the median time
-		block.Time = block.Time.Add(time.Second)
+
+		block.Time = state.LastBlockTime
 		err = blockExec.ValidateBlock(state, block)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid block time")
+
+		require.ErrorContains(t, err, "not greater than last block time")
 	})
 
-	t.Run("block time after last block time, same as median time", func(t *testing.T) {
+	t.Run("block time after last block time", func(t *testing.T) {
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
+
+		block.Time = state.LastBlockTime.Add(time.Second)
 		err = blockExec.ValidateBlock(state, block)
+
 		require.NoError(t, err)
 	})
 
 	t.Run("block time exceeds wall clock tolerance", func(t *testing.T) {
-		blockExecWithTol := sm.NewBlockExecutor(
-			stateStore,
-			log.TestingLogger(),
-			proxyApp.Consensus(),
-			mp,
-			sm.EmptyEvidencePool{},
-			blockStore,
-			sm.BlockExecutorWithBlockTimeTolerance(30*time.Second),
-		)
+		blockExecWithTol := newBlockExec(sm.BlockExecutorWithBlockTimeTolerance(30 * time.Second))
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
+
 		block.Time = time.Now().Add(1000 * time.Hour)
 		err = blockExecWithTol.ValidateBlock(state, block)
+
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "too far in the future")
 	})
 
 	t.Run("tolerance not set still allows valid blocks", func(t *testing.T) {
-		blockExecNoTol := sm.NewBlockExecutor(
-			stateStore,
-			log.TestingLogger(),
-			proxyApp.Consensus(),
-			mp,
-			sm.EmptyEvidencePool{},
-			blockStore,
-		)
+		blockExecNoTol := newBlockExec()
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
+
 		err = blockExecNoTol.ValidateBlock(state, block)
+
 		require.NoError(t, err)
 	})
 }
@@ -543,8 +549,9 @@ func TestValidateBlockInvalidCommit(t *testing.T) {
 			},
 		}
 
-		_, err := makeBlock(state, height, invalidCommit)
+		block, err := makeBlock(state, height, invalidCommit)
+		require.NoError(t, err)
+		err = blockExec.ValidateBlock(state, block)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "commit validator not found in validator set")
 	})
 }

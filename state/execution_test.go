@@ -73,7 +73,7 @@ func TestApplyBlock(t *testing.T) {
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	state, err = blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
 	require.Nil(t, err)
 
 	// TODO check state and mempool
@@ -147,7 +147,7 @@ func TestFinalizeBlockDecidedLastCommit(t *testing.T) {
 			bps, err := block.MakePartSet(testPartSize)
 			require.NoError(t, err)
 			blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
-			_, err = blockExec.ApplyBlock(state, blockID, block)
+			_, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
 			require.NoError(t, err)
 			require.True(t, app.LastTime.After(baseTime))
 
@@ -184,7 +184,6 @@ func TestFinalizeBlockValidators(t *testing.T) {
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: state.Validators.Validators[0].Address,
-				Timestamp:        now,
 				Signature:        []byte("Signature1"),
 			},
 			Extension:          []byte("extension1"),
@@ -195,7 +194,6 @@ func TestFinalizeBlockValidators(t *testing.T) {
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: state.Validators.Validators[1].Address,
-				Timestamp:        now,
 				Signature:        []byte("Signature2"),
 			},
 			Extension:          []byte("extension2"),
@@ -226,7 +224,7 @@ func TestFinalizeBlockValidators(t *testing.T) {
 		block, err := makeBlock(state, 2, lastCommit.ToCommit())
 		require.NoError(t, err)
 
-		_, err = sm.ExecCommitBlock(proxyApp.Consensus(), block, log.TestingLogger(), stateStore, 1)
+		_, err = sm.ExecCommitBlock(proxyApp.Consensus(), block, log.TestingLogger(), stateStore, 1, block.Height)
 		require.NoError(t, err, tc.desc)
 		require.True(t,
 			!tc.shouldHaveTime ||
@@ -297,7 +295,6 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 					Signatures: []types.CommitSig{{
 						BlockIDFlag:      types.BlockIDFlagNil,
 						ValidatorAddress: crypto.AddressHash([]byte("validator_address")),
-						Timestamp:        defaultEvidenceTime,
 						Signature:        crypto.CRandBytes(types.MaxSignatureSize),
 					}},
 				},
@@ -359,7 +356,7 @@ func TestFinalizeBlockMisbehavior(t *testing.T) {
 
 	blockID = types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	_, err = blockExec.ApplyBlock(state, blockID, block)
+	_, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
 	require.NoError(t, err)
 
 	// TODO check state and mempool
@@ -440,8 +437,9 @@ func TestProcessProposal(t *testing.T) {
 			Round: 0,
 			Votes: voteInfos,
 		},
-		NextValidatorsHash: block1.NextValidatorsHash,
-		ProposerAddress:    block1.ProposerAddress,
+		NextValidatorsHash:  block1.NextValidatorsHash,
+		ProposerAddress:     block1.ProposerAddress,
+		NextProposerAddress: state.NextValidators.GetProposer().Address,
 	}
 
 	acceptBlock, err := blockExec.ProcessProposal(block1, state)
@@ -492,6 +490,12 @@ func TestValidateValidatorUpdates(t *testing.T) {
 			[]abci.ValidatorUpdate{{PubKey: pk2, Power: -100}},
 			defaultValidatorParams,
 			true,
+		},
+		{
+			"adding a validator in bera-v1.x form (pub_key_bytes + pub_key_type) is OK",
+			[]abci.ValidatorUpdate{{PubKeyType: pubkey2.Type(), PubKeyBytes: pubkey2.Bytes(), Power: 20}},
+			defaultValidatorParams,
+			false,
 		},
 	}
 
@@ -644,7 +648,7 @@ func TestFinalizeBlockValidatorUpdates(t *testing.T) {
 		{PubKey: pk, Power: 10},
 	}
 
-	state, err = blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
 	require.NoError(t, err)
 	// test new validator was added to NextValidators
 	if assert.Equal(t, state.Validators.Size()+1, state.NextValidators.Size()) {
@@ -707,7 +711,7 @@ func TestFinalizeBlockValidatorUpdatesResultingInEmptySet(t *testing.T) {
 		{PubKey: vp, Power: 0},
 	}
 
-	assert.NotPanics(t, func() { state, err = blockExec.ApplyBlock(state, blockID, block) })
+	assert.NotPanics(t, func() { state, err = blockExec.ApplyBlock(state, blockID, block, block.Height) })
 	assert.Error(t, err)
 	assert.NotEmpty(t, state.NextValidators.Validators)
 }
@@ -1073,7 +1077,7 @@ func TestCreateProposalAbsentVoteExtensions(t *testing.T) {
 			stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 				DiscardABCIResponses: false,
 			})
-			state.ConsensusParams.ABCI.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
+			state.ConsensusParams.Feature.VoteExtensionsEnableHeight = testCase.extensionEnableHeight
 			mp := &mpmocks.Mempool{}
 			mp.On("Lock").Return()
 			mp.On("Unlock").Return()

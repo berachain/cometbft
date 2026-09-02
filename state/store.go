@@ -517,6 +517,10 @@ func (store dbStore) SaveFinalizeBlockResponse(height int64, resp *abci.Response
 	}
 	resp.TxResults = dtxs
 
+	// Carry both public key encodings in persisted validator updates, so the
+	// response can be read by both this fork and the bera-v1.x line.
+	resp.ValidatorUpdates = types.NormalizeValidatorUpdates(resp.ValidatorUpdates)
+
 	// If the flag is false then we save the ABCIResponse. This can be used for the /BlockResults
 	// query or to reindex an event using the command line.
 	if !store.DiscardABCIResponses {

@@ -228,6 +228,20 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "round_increment_total",
 			Help:      "RoundIncrementTotal is the number of times that the consensus reactor has incremented above the initial round in a step.",
 		}, append(labels, "step")).With(labelsAndValues...),
+		NextBlockDelay: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "next_block_delay",
+			Help:      "NextBlockDelay is the time to wait before proposing the next block, as instructed by the application via FinalizeBlockResponse (ADR-115).",
+		}, labels).With(labelsAndValues...),
+		ProposalTimestampDifference: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "proposal_timestamp_difference",
+			Help:      "Difference in seconds between the local time when a proposal message is received and the timestamp in the proposal message.",
+
+			Buckets: []float64{-1.5, -1.0, -0.5, -0.2, 0, 0.2, 0.5, 1.0, 1.5, 2.0, 2.5, 4.0, 8.0},
+		}, append(labels, "is_timely")).With(labelsAndValues...),
 	}
 }
 
@@ -268,5 +282,7 @@ func NopMetrics() *Metrics {
 		LateVotes:                   discard.NewCounter(),
 		PeerHeight:                  discard.NewGauge(),
 		RoundIncrementTotal:         discard.NewCounter(),
+		NextBlockDelay:              discard.NewHistogram(),
+		ProposalTimestampDifference: discard.NewHistogram(),
 	}
 }

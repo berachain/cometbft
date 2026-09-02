@@ -539,11 +539,11 @@ func createPEXReactorAndAddToSwitch(
 		Seeds:    splitAndTrimEmpty(config.P2P.Seeds, ",", " "),
 		SeedMode: config.P2P.SeedMode,
 		// See consensus/reactor.go: blocksToContributeToBecomeGoodPeer 10000
-		// blocks assuming 10s blocks ~ 28 hours.
+		// blocks assuming 2s blocks ~ 6 hours.
 		// TODO (melekes): make it dynamic based on the actual block latencies
 		// from the live network.
 		// https://github.com/tendermint/tendermint/issues/3523
-		SeedDisconnectWaitPeriod:     28 * time.Hour,
+		SeedDisconnectWaitPeriod:     6 * time.Hour,
 		PersistentPeersMaxDialPeriod: config.P2P.PersistentPeersMaxDialPeriod,
 	}
 

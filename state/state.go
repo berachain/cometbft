@@ -77,6 +77,10 @@ type State struct {
 
 	// the latest AppHash we've received from calling abci.Commit()
 	AppHash []byte
+
+	// delay between the time when this block is committed and the next height is started.
+	// previously `timeout_commit` in config.toml
+	NextBlockDelay time.Duration
 }
 
 // Copy makes a copy of the State for mutating.
@@ -101,6 +105,8 @@ func (state State) Copy() State {
 		AppHash: state.AppHash,
 
 		LastResultsHash: state.LastResultsHash,
+
+		NextBlockDelay: state.NextBlockDelay,
 	}
 }
 
@@ -169,6 +175,7 @@ func (state *State) ToProto() (*cmtstate.State, error) {
 	sm.LastHeightConsensusParamsChanged = state.LastHeightConsensusParamsChanged
 	sm.LastResultsHash = state.LastResultsHash
 	sm.AppHash = state.AppHash
+	sm.NextBlockDelay = state.NextBlockDelay
 
 	return sm, nil
 }
@@ -220,6 +227,7 @@ func FromProto(pb *cmtstate.State) (*State, error) { //nolint:golint
 	state.LastHeightConsensusParamsChanged = pb.LastHeightConsensusParamsChanged
 	state.LastResultsHash = pb.LastResultsHash
 	state.AppHash = pb.AppHash
+	state.NextBlockDelay = pb.NextBlockDelay
 
 	return state, nil
 }
@@ -243,9 +251,16 @@ func (state State) MakeBlock(
 
 	// Set time.
 	var timestamp time.Time
-	if height == state.InitialHeight {
+	switch {
+	case state.ConsensusParams.Feature.PbtsEnabled(height):
+		// Under Proposer-Based Timestamps the proposer stamps the block with
+		// its local time. With BLS signature aggregation the per-vote
+		// timestamps that BFT Time medians over are not signed, so PBTS is
+		// the only viable block-time source for aggregating networks.
+		timestamp = cmttime.Now()
+	case height == state.InitialHeight:
 		timestamp = state.LastBlockTime // genesis time
-	} else {
+	default:
 		ts, err := MedianTime(lastCommit, state.LastValidators)
 		if err != nil {
 			return nil, fmt.Errorf("error making block while calculating median time: %w", err)
