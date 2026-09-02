@@ -491,6 +491,12 @@ func TestValidateValidatorUpdates(t *testing.T) {
 			defaultValidatorParams,
 			true,
 		},
+		{
+			"adding a validator in bera-v1.x form (pub_key_bytes + pub_key_type) is OK",
+			[]abci.ValidatorUpdate{{PubKeyType: pubkey2.Type(), PubKeyBytes: pubkey2.Bytes(), Power: 20}},
+			defaultValidatorParams,
+			false,
+		},
 	}
 
 	for _, tc := range testCases {
