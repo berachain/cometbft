@@ -9,7 +9,6 @@ import (
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	cryptoenc "github.com/cometbft/cometbft/crypto/encoding"
 	"github.com/cometbft/cometbft/libs/fail"
 	"github.com/cometbft/cometbft/libs/log"
 	"github.com/cometbft/cometbft/mempool"
@@ -725,8 +724,10 @@ func validateValidatorUpdates(abciUpdates []abci.ValidatorUpdate,
 			continue
 		}
 
-		// Check if validator's pubkey matches an ABCI type in the consensus params
-		pk, err := cryptoenc.PubKeyFromProto(valUpdate.PubKey)
+		// Check if validator's pubkey matches an ABCI type in the consensus params.
+		// Accept both the proto pub_key and the bera-v1.x pub_key_bytes +
+		// pub_key_type encoding, same as PB2TM.ValidatorUpdates below.
+		pk, err := types.PubKeyFromValidatorUpdate(valUpdate)
 		if err != nil {
 			return err
 		}
