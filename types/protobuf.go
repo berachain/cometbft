@@ -125,9 +125,12 @@ func PubKeyFromValidatorUpdate(v abci.ValidatorUpdate) (crypto.PubKey, error) {
 
 // NormalizeValidatorUpdates returns a copy of the validator updates in which
 // every entry carries both public key encodings (pub_key, and
-// pub_key_bytes + pub_key_type) so that the persisted form can be read by both
-// this fork and the bera-v1.x line. Entries whose key cannot be decoded are
-// left untouched.
+// pub_key_bytes + pub_key_type) for the same key, so that the persisted form
+// is read the same way by this fork and by the bera-v1.x line. The key is the
+// one PubKeyFromValidatorUpdate picks. When pub_key is set, the raw fields are
+// rewritten from it, even if they held a different key. A raw-only
+// (bera-v1.x) entry keeps its raw bytes as given (e.g. a compressed BLS key).
+// Entries whose key cannot be decoded are left untouched.
 func NormalizeValidatorUpdates(vals []abci.ValidatorUpdate) []abci.ValidatorUpdate {
 	if len(vals) == 0 {
 		return vals
@@ -143,11 +146,10 @@ func NormalizeValidatorUpdates(vals []abci.ValidatorUpdate) []abci.ValidatorUpda
 			if pk, err := cryptoenc.PubKeyToProto(pub); err == nil {
 				out[i].PubKey = pk
 			}
+			continue
 		}
-		if out[i].PubKeyType == "" {
-			out[i].PubKeyType = pub.Type()
-			out[i].PubKeyBytes = pub.Bytes()
-		}
+		out[i].PubKeyType = pub.Type()
+		out[i].PubKeyBytes = pub.Bytes()
 	}
 	return out
 }

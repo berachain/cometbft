@@ -130,19 +130,29 @@ func TestNormalizeValidatorUpdates(t *testing.T) {
 	pkProto, err := cryptoenc.PubKeyToProto(pubkey)
 	require.NoError(t, err)
 
+	other := ed25519.GenPrivKey().PubKey()
+
 	in := []abci.ValidatorUpdate{
 		{PubKey: pkProto, Power: 1},
 		{PubKeyBytes: pubkey.Bytes(), PubKeyType: pubkey.Type(), Power: 2},
+		// pub_key and raw fields disagree: pub_key is the key that is
+		// applied, so the raw fields are rewritten from it
+		{PubKey: pkProto, PubKeyBytes: other.Bytes(), PubKeyType: other.Type(), Power: 4},
 		{Power: 3}, // undecodable, left untouched
 	}
 	out := NormalizeValidatorUpdates(in)
-	require.Len(t, out, 3)
-	for _, v := range out[:2] {
+	require.Len(t, out, 4)
+	for _, v := range out[:3] {
 		assert.Equal(t, pkProto, v.PubKey)
 		assert.Equal(t, pubkey.Bytes(), v.PubKeyBytes)
 		assert.Equal(t, pubkey.Type(), v.PubKeyType)
+		// both encodings decode to the same key
+		raw, err := cryptoenc.PubKeyFromTypeAndBytes(v.PubKeyType, v.PubKeyBytes)
+		require.NoError(t, err)
+		assert.True(t, pubkey.Equals(raw))
 	}
-	assert.Equal(t, in[2], out[2])
+	assert.Equal(t, in[3], out[3])
+	assert.Equal(t, other.Bytes(), in[2].PubKeyBytes)
 	// input is not mutated
 	assert.Nil(t, in[0].PubKeyBytes)
 	assert.Nil(t, in[1].PubKey.Sum)

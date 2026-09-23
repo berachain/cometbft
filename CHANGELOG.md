@@ -47,7 +47,9 @@ section becomes `## v0.40.0-bera.N`._
   on restart.
 - `[abci,state,types]` `ValidatorUpdate` accepts and persists both public key encodings: `pub_key`
   (upstream) and `pub_key_bytes` + `pub_key_type` (bera-v1.x). FinalizeBlock responses persisted
-  by either line are readable by the other (crash recovery, `/block_results`).
+  by either line are readable by the other (crash recovery, `/block_results`). When an update sets
+  both and they disagree, `pub_key` is the key applied and the persisted raw fields are rewritten
+  from it.
 - `[abci,state]` Add `syncing_to_height` (field 9) to `RequestFinalizeBlock`, the upstream v1 /
   bera-v1.x field the application uses to tell block sync and replay from live consensus
   (cometbft [\#3134](https://github.com/cometbft/cometbft/pull/3134)). Block sync passes the
