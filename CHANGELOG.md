@@ -27,6 +27,8 @@ section becomes `## v0.40.0-bera.N`._
 - `[consensus,types,state]` Port Proposer-Based Timestamps (PBTS) from the bera-v1.x line.
   Block timestamps are set by the proposer and validated against synchrony parameters instead of
   the BFT-median of vote times; per-vote timestamps are removed. PBTS is always enabled on this fork.
+  Without vote timestamps the `quorum_prevote_delay`, `quorum_precommit_delay` and
+  `full_prevote_delay` metrics are no longer reported.
   ([\#51](https://github.com/berachain/cometbft/pull/51))
 - `[consensus,crypto,types]` Port BLS12-381 signature aggregation. For all-BLS validator sets,
   precommit signatures are aggregated into a single commit that is gossiped whole and used for

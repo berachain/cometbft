@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
-	"sort"
 	"strconv"
 	"time"
 
@@ -1966,8 +1965,6 @@ func (cs *State) finalizeCommit(height int64) {
 	if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
 		blockID = commit.BlockID
 	} else {
-		cs.calculatePrevoteMessageDelayMetrics()
-
 		var ok bool
 		blockID, ok = cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
 		if !ok {
@@ -1986,8 +1983,6 @@ func (cs *State) finalizeCommit(height int64) {
 	if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
 		panic(fmt.Errorf("+2/3 committed an invalid block: %w", err))
 	}
-
-	cs.calculatePrecommitMessageDelayMetrics()
 
 	logger.Info(
 		"finalizing commit of block",
@@ -2860,54 +2855,10 @@ func (cs *State) emitPrecommitTimeoutMetrics(round int32) {
 		"stake_percentage", stakePercentage)
 }
 
-func (cs *State) calculatePrecommitMessageDelayMetrics() {
-	if cs.Proposal == nil {
-		return
-	}
-
-	ps := cs.Votes.Precommits(cs.Round)
-	pl := ps.List()
-
-	sort.Slice(pl, func(i, j int) bool {
-		return pl[i].Timestamp.Before(pl[j].Timestamp)
-	})
-
-	var votingPowerSeen int64
-	for _, v := range pl {
-		_, val := cs.Validators.GetByAddress(v.ValidatorAddress)
-		votingPowerSeen += val.VotingPower
-		if votingPowerSeen >= cs.Validators.TotalVotingPower()*2/3+1 {
-			cs.metrics.QuorumPrecommitDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(v.Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
-			break
-		}
-	}
-}
-
-func (cs *State) calculatePrevoteMessageDelayMetrics() {
-	if cs.Proposal == nil {
-		return
-	}
-
-	ps := cs.Votes.Prevotes(cs.Round)
-	pl := ps.List()
-
-	sort.Slice(pl, func(i, j int) bool {
-		return pl[i].Timestamp.Before(pl[j].Timestamp)
-	})
-
-	var votingPowerSeen int64
-	for _, v := range pl {
-		_, val := cs.Validators.GetByAddressMut(v.ValidatorAddress)
-		votingPowerSeen += val.VotingPower
-		if votingPowerSeen >= cs.Validators.TotalVotingPower()*2/3+1 {
-			cs.metrics.QuorumPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(v.Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
-			break
-		}
-	}
-	if ps.HasAll() {
-		cs.metrics.FullPrevoteDelay.With("proposer_address", cs.Validators.GetProposer().Address.String()).Set(pl[len(pl)-1].Timestamp.Sub(cs.Proposal.Timestamp).Seconds())
-	}
-}
+// The QuorumPrevoteDelay, QuorumPrecommitDelay and FullPrevoteDelay metrics
+// are not computed. Vote timestamps are not signed in this fork (see
+// types.CanonicalizeVote) and are always zero, so there is no vote time to
+// measure against the proposal time.
 
 //---------------------------------------------------------
 
