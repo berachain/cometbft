@@ -1211,6 +1211,7 @@ func (cs *State) enterNewRound(height int64, round int32) {
 	if round != 0 {
 		logger.Info("resetting proposal info", "proposer", propAddress)
 		cs.Proposal = nil
+		cs.ProposalReceiveTime = time.Time{}
 		cs.ProposalBlock = nil
 		cs.ProposalBlockParts = nil
 	}
