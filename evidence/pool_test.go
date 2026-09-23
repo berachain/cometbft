@@ -379,6 +379,8 @@ func initializeStateFromValidatorSet(valSet *types.ValidatorSet, height int64) s
 				MaxAgeDuration:  20 * time.Minute,
 				MaxBytes:        1000,
 			},
+			// state.MakeBlock (initializeBlockStore) requires PBTS
+			Feature: types.FeatureParams{PbtsEnableHeight: 1},
 		},
 	}
 

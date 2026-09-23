@@ -483,6 +483,24 @@ func TestValidateBlockTime(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	// Vote timestamps are not signed, so there is no BFT Time fallback:
+	// making or validating a block without PBTS fails loudly.
+	t.Run("PBTS disabled", func(t *testing.T) {
+		height := int64(3)
+		block, err := makeBlock(state, height, lastCommit)
+		require.NoError(t, err)
+
+		noPBTS := state.Copy()
+		noPBTS.ConsensusParams.Feature.PbtsEnableHeight = 0
+
+		require.PanicsWithValue(t, "PBTS has to be enabled", func() {
+			_, _ = noPBTS.MakeBlock(height, nil, lastCommit, nil, state.Validators.GetProposer().Address)
+		})
+		require.PanicsWithValue(t, "PBTS has to be enabled", func() {
+			_ = blockExec.ValidateBlock(noPBTS, block)
+		})
+	})
 }
 
 func TestValidateBlockInvalidCommit(t *testing.T) {

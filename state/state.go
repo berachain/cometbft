@@ -250,23 +250,14 @@ func (state State) MakeBlock(
 	block := types.MakeBlock(height, txs, lastCommit, evidence)
 
 	// Set time.
-	var timestamp time.Time
-	switch {
-	case state.ConsensusParams.Feature.PbtsEnabled(height):
-		// Under Proposer-Based Timestamps the proposer stamps the block with
-		// its local time. With BLS signature aggregation the per-vote
-		// timestamps that BFT Time medians over are not signed, so PBTS is
-		// the only viable block-time source for aggregating networks.
-		timestamp = cmttime.Now()
-	case height == state.InitialHeight:
-		timestamp = state.LastBlockTime // genesis time
-	default:
-		ts, err := MedianTime(lastCommit, state.LastValidators)
-		if err != nil {
-			return nil, fmt.Errorf("error making block while calculating median time: %w", err)
-		}
-		timestamp = ts
+	// Under Proposer-Based Timestamps the proposer stamps the block with its
+	// local time. Vote timestamps are not signed in this fork, so there is no
+	// BFT Time median to fall back to and PBTS must be enabled (as in
+	// bera-v1.x).
+	if !state.ConsensusParams.Feature.PbtsEnabled(height) {
+		panic("PBTS has to be enabled")
 	}
+	timestamp := cmttime.Now()
 
 	// Fill rest of header with state data.
 	block.Populate(

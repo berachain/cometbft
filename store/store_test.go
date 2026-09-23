@@ -583,10 +583,6 @@ func TestPruneBlocks(t *testing.T) {
 	})
 	state, err := stateStore.LoadFromDBOrGenesisFile(config.GenesisFile())
 	require.NoError(t, err)
-	// Use BFT Time for this test: with PBTS the proposer stamps blocks with
-	// the current time, which would keep every block inside the evidence
-	// max-age duration and defeat the height-based retain assertions below.
-	state.ConsensusParams.Feature.PbtsEnableHeight = 0
 	db := dbm.NewMemDB()
 	bs := NewBlockStore(db)
 	assert.EqualValues(t, 0, bs.Base())
@@ -614,11 +610,15 @@ func TestPruneBlocks(t *testing.T) {
 	assert.EqualValues(t, 1500, bs.Height())
 	assert.EqualValues(t, 1500, bs.Size())
 
-	state.LastBlockTime = time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+	// Under PBTS the blocks above are stamped with the current time. Put the
+	// last block time far enough ahead that all of them are past the evidence
+	// max-age duration, so only the height-based limit decides (as in
+	// bera-v1.x).
+	state.LastBlockTime = cmttime.Now().Add(24 * time.Hour)
 	state.LastBlockHeight = 1500
 
 	state.ConsensusParams.Evidence.MaxAgeNumBlocks = 400
-	state.ConsensusParams.Evidence.MaxAgeDuration = 1 * time.Second
+	state.ConsensusParams.Evidence.MaxAgeDuration = 1 * time.Minute
 
 	// Check that basic pruning works
 	pruned, evidenceRetainHeight, err := bs.PruneBlocks(1200, state)
