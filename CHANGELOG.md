@@ -36,7 +36,10 @@ section becomes `## v0.40.0-bera.N`._
   ([\#51](https://github.com/berachain/cometbft/pull/51))
 - `[state,abci]` Add `NextBlockDelay` (ADR-115): the application controls the delay before the next
   height starts, replacing the static `timeout_commit`. Also adds `next_proposer_address` to
-  `ProcessProposal`.
+  `ProcessProposal`. As on bera-v1.x, `timeout_commit` is only used when the application returns a
+  zero delay, and a node starts the next height as soon as it has all precommits only when both
+  are zero. `skip_timeout_commit` is deprecated and ignored (a warning is printed at startup), so
+  it cannot cut short the application's delay.
   ([\#51](https://github.com/berachain/cometbft/pull/51))
 - `[consensus]` The WAL persists `MsgInfo.receive_time` (same field as the bera-v1.x line), so a
   proposal replayed from the WAL keeps its PBTS timeliness verdict instead of being prevoted nil

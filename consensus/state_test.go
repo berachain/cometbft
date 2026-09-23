@@ -2244,12 +2244,36 @@ func (n *fakeTxNotifier) Notify() {
 	n.ch <- struct{}{}
 }
 
+// skip_timeout_commit is ignored: the commit timeout is skipped only when
+// neither the app (NextBlockDelay) nor the config (timeout_commit) asks for a
+// delay, as in bera-v1.x.
+func TestSkipTimeoutCommit(t *testing.T) {
+	cs, _ := randState(1)
+	for _, tc := range []struct {
+		nextBlockDelay time.Duration
+		timeoutCommit  time.Duration
+		skipConfig     bool
+		want           bool
+	}{
+		{0, 0, false, true},
+		{0, 0, true, true},
+		{time.Second, 0, true, false},
+		{0, time.Second, true, false},
+		{time.Second, time.Second, false, false},
+	} {
+		cs.state.NextBlockDelay = tc.nextBlockDelay
+		cs.config.TimeoutCommit = tc.timeoutCommit
+		cs.config.SkipTimeoutCommit = tc.skipConfig
+		assert.Equal(t, tc.want, cs.skipTimeoutCommit(), "%+v", tc)
+	}
+}
+
 // 2 vals precommit votes for a block but node times out waiting for the third. Move to next round
 // and third precommit arrives which leads to the commit of that header and the correct
 // start of the next round
 func TestStartNextHeightCorrectlyAfterTimeout(t *testing.T) {
-	config.Consensus.SkipTimeoutCommit = false
 	cs1, vss := randState(4)
+	cs1.state.NextBlockDelay = 10 * time.Millisecond
 	cs1.txNotifier = &fakeTxNotifier{ch: make(chan struct{})}
 
 	vs2, vs3, vs4 := vss[1], vss[2], vss[3]
@@ -2310,8 +2334,8 @@ func TestStartNextHeightCorrectlyAfterTimeout(t *testing.T) {
 func TestResetTimeoutPrecommitUponNewHeight(t *testing.T) {
 	ctx := t.Context()
 
-	config.Consensus.SkipTimeoutCommit = false
 	cs1, vss := randState(4)
+	cs1.state.NextBlockDelay = 10 * time.Millisecond
 
 	vs2, vs3, vs4 := vss[1], vss[2], vss[3]
 	height, round := cs1.Height, cs1.Round

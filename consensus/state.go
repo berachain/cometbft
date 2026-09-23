@@ -1159,9 +1159,18 @@ func (cs *State) handleTxsAvailable() {
 // State functions
 // Used internally by handleTimeout and handleMsg to make state transitions
 
+// skipTimeoutCommit reports whether the node may start the next height as
+// soon as it has all the precommits. As in bera-v1.x this is only the case
+// when neither the application (NextBlockDelay) nor the config
+// (timeout_commit) asks for a delay. skip_timeout_commit is ignored, so it
+// cannot cut short the delay set by the application.
+func (cs *State) skipTimeoutCommit() bool {
+	return cs.state.NextBlockDelay == 0 && cs.config.TimeoutCommit == 0
+}
+
 // Enter: `timeoutNewHeight` by startTime (commitTime+timeoutCommit),
 //
-//	or, if SkipTimeoutCommit==true, after receiving all precommits from (height,round-1)
+//	or, if NextBlockDelay==0 and TimeoutCommit==0, after receiving all precommits from (height,round-1)
 //
 // Enter: `timeoutPrecommits` after any +2/3 precommits from (height,round-1)
 // Enter: +2/3 precommits for nil at (height,round-1)
@@ -2462,7 +2471,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 		cs.evsw.FireEvent(types.EventVote, vote)
 
 		// if we can skip timeoutCommit and have all the votes now,
-		if cs.config.SkipTimeoutCommit && lastCommitAsVs.HasAll() {
+		if cs.skipTimeoutCommit() && lastCommitAsVs.HasAll() {
 			// go straight to new round (skip timeout commit)
 			// cs.scheduleTimeout(time.Duration(0), cs.Height, 0, cstypes.RoundStepNewHeight)
 			cs.enterNewRound(cs.Height, 0)
@@ -2648,7 +2657,7 @@ func (cs *State) addVote(vote *types.Vote, peerID p2p.ID) (added bool, err error
 
 			if len(blockID.Hash) != 0 {
 				cs.enterCommit(height, vote.Round)
-				if cs.config.SkipTimeoutCommit && precommits.HasAll() {
+				if cs.skipTimeoutCommit() && precommits.HasAll() {
 					cs.enterNewRound(cs.Height, 0)
 				}
 			} else {

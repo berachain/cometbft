@@ -591,7 +591,8 @@ timeout_commit = "{{ .Consensus.TimeoutCommit }}"
 # So, validators should stop the state machine, wait for some blocks, and then restart the state machine to avoid panic.
 double_sign_check_height = {{ .Consensus.DoubleSignCheckHeight }}
 
-# Make progress as soon as we have all the precommits (as if TimeoutCommit = 0)
+# Deprecated and ignored. The node makes progress as soon as it has all the
+# precommits only when timeout_commit = 0 and the app sets no next_block_delay.
 skip_timeout_commit = {{ .Consensus.SkipTimeoutCommit }}
 
 # EmptyBlocks mode and possible interval between empty blocks
