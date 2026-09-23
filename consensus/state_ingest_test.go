@@ -384,6 +384,9 @@ type ingestTestSuite struct {
 	t          *testing.T
 	cs         *State
 	validators []*validatorStub
+
+	// aggregate makes the candidates carry an aggregated (BLS) commit.
+	aggregate bool
 }
 
 func newIngestTestSuite(t *testing.T) *ingestTestSuite {
@@ -454,7 +457,12 @@ func (ts *ingestTestSuite) MakeIngestCandidateUnverified() IngestCandidate {
 		require.True(ts.t, added)
 	}
 
-	extCommit := voteSet.MakeExtendedCommit(ts.cs.state.ConsensusParams.Feature)
+	var extCommit *types.ExtendedCommit
+	if ts.aggregate {
+		extCommit = voteSet.MakeBLSCommit()
+	} else {
+		extCommit = voteSet.MakeExtendedCommit(ts.cs.state.ConsensusParams.Feature)
+	}
 	commit := extCommit.ToCommit()
 	if !extensionsEnabled {
 		extCommit = nil
