@@ -1,4 +1,9 @@
 version: "2"
+# Lint the real BLS code (crypto/bls12381, aggregation) and the tag-gated
+# tests, not the !bls12381 stubs.
+run:
+  build-tags:
+    - bls12381
 linters:
   enable:
     - asciicheck

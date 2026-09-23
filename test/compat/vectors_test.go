@@ -419,19 +419,19 @@ func (f *fixture) block(t *testing.T, agg *types.Commit) (*types.Block, *types.P
 	lastBlockID := types.BlockID{Hash: h32("last-block"), PartSetHeader: types.PartSetHeader{Total: 1, Hash: h32("last-parts")}}
 	txs := []types.Tx{types.Tx("tx-one"), types.Tx("tx-two")}
 	block := types.MakeBlock(height+1, txs, agg, nil)
-	block.Header.Version = cmtversion.Consensus{Block: 11, App: 1}
-	block.Header.ChainID = chainID
-	block.Header.Time = fixedTimeNext
-	block.Header.LastBlockID = lastBlockID
-	block.Header.ValidatorsHash = f.blsValSet.Hash()
-	block.Header.NextValidatorsHash = f.blsValSet.Hash()
-	block.Header.ConsensusHash = f.params.Hash()
-	block.Header.AppHash = h32("app")
-	block.Header.LastResultsHash = h32("results")
-	block.Header.ProposerAddress = f.blsVals[1].Address
-	block.Header.EvidenceHash = block.Evidence.Hash()
-	block.Header.DataHash = block.Data.Hash()
-	block.Header.LastCommitHash = agg.Hash()
+	block.Version = cmtversion.Consensus{Block: 11, App: 1}
+	block.ChainID = chainID
+	block.Time = fixedTimeNext
+	block.LastBlockID = lastBlockID
+	block.ValidatorsHash = f.blsValSet.Hash()
+	block.NextValidatorsHash = f.blsValSet.Hash()
+	block.ConsensusHash = f.params.Hash()
+	block.AppHash = h32("app")
+	block.LastResultsHash = h32("results")
+	block.ProposerAddress = f.blsVals[1].Address
+	block.EvidenceHash = block.Evidence.Hash()
+	block.DataHash = block.Data.Hash()
+	block.LastCommitHash = agg.Hash()
 	ps, err := block.MakePartSet(types.BlockPartSizeBytes)
 	require.NoError(t, err)
 	return block, ps
