@@ -32,8 +32,7 @@ import (
 func blsConsensusParams() *types.ConsensusParams {
 	c := types.DefaultConsensusParams()
 	c.Feature.VoteExtensionsEnableHeight = 0 // disabled
-	c.Feature.VoteExtensionsEnableHeight = 0
-	c.Feature.PbtsEnableHeight = 1 // PBTS on from genesis
+	c.Feature.PbtsEnableHeight = 1           // PBTS on from genesis
 	return c
 }
 
