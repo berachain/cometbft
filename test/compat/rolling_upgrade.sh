@@ -120,13 +120,14 @@ wait_all_height() { local k; for k in $(seq 0 $((NUM_VALS - 1))); do wait_height
 max_height() { local m=0 k h; for k in "$@"; do h=$(height_of "$k"); [ "$h" -gt "$m" ] && m=$h; done; echo "$m"; }
 
 check_no_errors() { # idx label
-  local f="$WORK/node$1/$2.log"
-  # panics and consensus/p2p codec errors that would indicate an interop problem
-  if grep -E "panic|CONSENSUS FAILURE|wrong Block.Header|invalid commit|failed to verify|unknown message|failed to decode|ErrMsgFromProto|conflicting votes|Vote extension|signature is too big" "$f" | grep -v "use of closed network" | head -3 | grep -q .; then
-    log "WARN: suspicious log lines in $f:"; grep -E "panic|CONSENSUS FAILURE|wrong Block.Header|invalid commit|failed to verify|unknown message|failed to decode|ErrMsgFromProto|conflicting votes|Vote extension|signature is too big" "$f" | head -5 | cut -c1-200 | tee -a "$REPORT"
-    return 1
-  fi
-  return 0
+  local f="$WORK/node$1/$2.log" hits
+  # panics and consensus/p2p codec errors that would indicate an interop problem.
+  # Collect all matches first: under pipefail an early-exiting reader (head,
+  # grep -q) can SIGPIPE the writer and turn a match into a pass.
+  hits=$(grep -E "panic|CONSENSUS FAILURE|wrong Block.Header|invalid commit|failed to verify|unknown message|failed to decode|ErrMsgFromProto|conflicting votes|Vote extension|signature is too big" "$f" | grep -v "use of closed network" || true)
+  [ -z "$hits" ] && return 0
+  log "WARN: suspicious log lines in $f:"; head -5 <<< "$hits" | cut -c1-200 | tee -a "$REPORT"
+  return 1
 }
 
 # analyze heights [from,to] as seen by node $1: per-validator signing/proposing,
