@@ -218,13 +218,16 @@ a_wait() { for _ in $(seq 1 240); do h=$(a_height); [ "${h:-0}" -ge "$1" ] && re
 a_tx() { curl -s --max-time 10 "127.0.0.1:$ARPC/broadcast_tx_commit?tx=\"$1\"" | jget "['result']['height']"; }
 a_query() { curl -s --max-time 5 "127.0.0.1:$ARPC/abci_query?path=\"/key\"&data=\"$1\"" | jget "['result']['response']['log']"; }
 
-H=0
+H=0; KEYS=""
 for step in "v1x:$V1X_BIN:10" "v040:$V040_BIN:10" "v1x:$V1X_BIN:10" "v040:$V040_BIN:10"; do
   IFS=: read -r label bin blocks <<< "$step"
   a_start "$bin" "$label"
   a_wait $((H + 1))
   ver=$(curl -s "127.0.0.1:$ARPC/status" | jget "['result']['node_info']['version']")
+  # txs written by earlier runs (either version) must survive this restart
+  for k in $KEYS; do [ "$(a_query "$k")" = "exists" ] || die "tx $k lost after restarting on $label"; done
   txh=$(a_tx "k-$label-$H=v")
+  KEYS="$KEYS k-$label-$H"
   a_wait $((txh + blocks))
   # every height written so far (by either version) must be queryable,
   # historical commits must be aggregated, and old txs must be in the app state
