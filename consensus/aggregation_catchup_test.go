@@ -19,7 +19,9 @@ import (
 	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/internal/test"
 	"github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/proxy"
 	sm "github.com/cometbft/cometbft/state"
+	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	cmttime "github.com/cometbft/cometbft/types/time"
 )
@@ -325,4 +327,77 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 
 	t.Logf("late joiner finalized height %d via aggregated commit and advanced to height %d "+
 		"(LastCommit is the adopted aggregated *Commit)", catchUpHeight, nextHeight)
+}
+
+// TestAggregationCatchUpOneHeightBehind restarts two equal-power BLS
+// validators from stores one height apart: A holds blocks 1..3, so its
+// LastCommit is the whole aggregated commit for 3, and B holds blocks 1..2.
+// Neither can commit alone, so the chain only moves on if A sends B that
+// whole commit (there are no votes to pick from it).
+func TestAggregationCatchUpOneHeightBehind(t *testing.T) {
+	genDoc, privVals := blsGenesisDoc(2, 10, blsConsensusParams())
+
+	prod, cleanup := blsConsensusNetFromGenesis(t, genDoc, privVals, "agg_one_behind_prod")
+	defer cleanup()
+	reactors, subs, buses := startConsensusNet(t, prod, 2)
+	drain(subs)
+	require.Eventually(t, func() bool { return prod[0].blockStore.Height() >= 4 }, 60*time.Second, 50*time.Millisecond)
+	stopConsensusNet(log.TestingLogger(), reactors, buses)
+
+	a := restartedNode(t, genDoc, privVals[0], prod[0].blockStore, 3, "agg_one_behind_a")
+	b := restartedNode(t, genDoc, privVals[1], prod[0].blockStore, 2, "agg_one_behind_b")
+	_, whole := a.LastCommit.(*types.Commit)
+	require.True(t, whole, "A should restart with a whole LastCommit")
+
+	reactors, subs, buses = startConsensusNet(t, []*State{a, b}, 2)
+	defer stopConsensusNet(log.TestingLogger(), reactors, buses)
+	drain(subs)
+	for _, cs := range []*State{a, b} {
+		require.Eventually(t, func() bool { return cs.blockStore.Height() >= 4 }, 30*time.Second, 50*time.Millisecond)
+	}
+}
+
+func drain(subs []types.Subscription) {
+	for _, s := range subs {
+		go func() {
+			for range s.Out() {
+			}
+		}()
+	}
+}
+
+// restartedNode returns a validator whose stores hold blocks 1..n of src, as
+// if it had synced them and restarted: its LastCommit is rebuilt from the
+// aggregated seen commit of block n.
+func restartedNode(t *testing.T, genDoc *types.GenesisDoc, pv types.PrivValidator, src sm.BlockStore, n int64, name string) *State {
+	t.Helper()
+	db := dbm.NewMemDB()
+	stateStore := sm.NewStore(db, sm.StoreOptions{})
+	state, err := stateStore.LoadFromDBOrGenesisDoc(genDoc)
+	require.NoError(t, err)
+	require.NoError(t, stateStore.Save(state)) // stores the validators for height 1
+	app := newKVStore()
+	_, err = app.InitChain(context.Background(), &abci.RequestInitChain{Validators: types.TM2PB.ValidatorUpdates(state.Validators)})
+	require.NoError(t, err)
+	proxyApp := proxy.NewAppConns(proxy.NewLocalClientCreator(app), proxy.NopMetrics())
+	require.NoError(t, proxyApp.Start())
+	t.Cleanup(func() { _ = proxyApp.Stop() })
+
+	bs := store.NewBlockStore(db)
+	blockExec := sm.NewBlockExecutor(stateStore, log.NewNopLogger(), proxyApp.Consensus(), emptyMempool{}, sm.EmptyEvidencePool{}, bs)
+	for h := int64(1); h <= n; h++ {
+		block := src.LoadBlock(h)
+		parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+		require.NoError(t, err)
+		bs.SaveBlock(block, parts, src.LoadBlockCommit(h))
+		state, err = blockExec.ApplyBlock(state, types.BlockID{Hash: block.Hash(), PartSetHeader: parts.Header()}, block, h)
+		require.NoError(t, err)
+	}
+
+	config := ResetConfig(name)
+	t.Cleanup(func() { _ = os.RemoveAll(config.RootDir) })
+	ensureDir(filepath.Dir(config.Consensus.WalFile()), 0o700)
+	cs := newStateWithConfigAndBlockStore(config, state, pv, app, db)
+	cs.SetTimeoutTicker(newMockTickerFunc(false)())
+	return cs
 }
