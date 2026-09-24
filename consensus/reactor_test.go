@@ -1196,6 +1196,20 @@ func TestPickVoteToSendWholeCommit(t *testing.T) {
 	require.Nil(t, ps.PickVoteToSend(commit))
 }
 
+// A whole commit sent for the peer's old height must not mark its new height
+// as having the catch-up commit: the send happens outside the lock, so the peer
+// may move on (clearing the flag) before the flag is set.
+func TestPeerStateSetHasCatchupCommitIgnoresOldHeight(t *testing.T) {
+	ps := NewPeerState(nil).SetLogger(log.TestingLogger())
+	ps.ApplyNewRoundStepMessage(&NewRoundStepMessage{Height: 10, Step: cstypes.RoundStepNewHeight})
+	ps.ApplyNewRoundStepMessage(&NewRoundStepMessage{Height: 11, Step: cstypes.RoundStepNewHeight})
+
+	ps.SetHasCatchupCommit(&types.Commit{Height: 10})
+	require.False(t, ps.HasCatchupCommit())
+	ps.SetHasCatchupCommit(&types.Commit{Height: 11})
+	require.True(t, ps.HasCatchupCommit())
+}
+
 func TestVoteMessageValidateBasic(t *testing.T) {
 	_, vss := randState(2)
 

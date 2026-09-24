@@ -1430,6 +1430,12 @@ func (ps *PeerState) SetHasCatchupCommit(commit *types.Commit) {
 
 // CONTRACT: Caller must hold the mutex.
 func (ps *PeerState) setHasCatchupCommit(height int64, round int32) {
+	// The commit is sent outside the lock, so the peer may have moved to a new
+	// height (which clears the flag) in the meantime. Only mark the height the
+	// commit is for.
+	if height != ps.PRS.Height {
+		return
+	}
 	ps.logger.Debug("setHasCatchupCommit",
 		"peerH/R",
 		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
