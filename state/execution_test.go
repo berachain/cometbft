@@ -73,8 +73,10 @@ func TestApplyBlock(t *testing.T) {
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	state, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
+	// the app is told the height being synced to (e.g. block sync's target)
+	state, err = blockExec.ApplyBlock(state, blockID, block, block.Height+5)
 	require.Nil(t, err)
+	assert.Equal(t, block.Height+5, app.SyncingToHeight)
 
 	// TODO check state and mempool
 	assert.EqualValues(t, 1, state.Version.Consensus.App, "App version wasn't updated")

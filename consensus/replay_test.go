@@ -766,7 +766,8 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 		_ = kvstoreApp.Close()
 	})
 
-	clientCreator2 := proxy.NewLocalClientCreator(kvstoreApp)
+	syncApp := &syncingToHeightApp{Application: kvstoreApp}
+	clientCreator2 := proxy.NewLocalClientCreator(syncApp)
 	if nBlocks > 0 {
 		// run nBlocks against a new client to build up the app state.
 		// use a throwaway CometBFT state
@@ -805,6 +806,7 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 	})
 
 	// perform the replay protocol to sync Tendermint and the application
+	syncApp.seen = nil
 	err = handshaker.Handshake(proxyApp)
 	if expectError {
 		require.Error(t, err)
@@ -812,6 +814,11 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 		return
 	}
 	require.NoError(t, err)
+
+	// every replayed block is told the stored tip it is syncing to
+	for _, h := range syncApp.seen {
+		require.Equal(t, store.Height(), h)
+	}
 
 	// get the latest app hash from the app
 	res, err := proxyApp.Query().Info(context.Background(), proxy.RequestInfo)
@@ -844,6 +851,17 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 	if handshaker.NBlocks() != expectedBlocksToSync {
 		t.Fatalf("Expected handshake to sync %d blocks, got %d", expectedBlocksToSync, handshaker.NBlocks())
 	}
+}
+
+// syncingToHeightApp records the syncing_to_height of each FinalizeBlock.
+type syncingToHeightApp struct {
+	abci.Application
+	seen []int64
+}
+
+func (app *syncingToHeightApp) FinalizeBlock(ctx context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	app.seen = append(app.seen, req.SyncingToHeight)
+	return app.Application.FinalizeBlock(ctx, req)
 }
 
 func applyBlock(t *testing.T, stateStore sm.Store, mempool mempool.Mempool, evpool sm.EvidencePool, st sm.State, blk *types.Block, proxyApp proxy.AppConns, bs sm.BlockStore) sm.State {
