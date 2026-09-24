@@ -5,6 +5,8 @@ package consensus
 import (
 	"context"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,10 +16,10 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	cfg "github.com/cometbft/cometbft/config"
-	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/privval"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sm "github.com/cometbft/cometbft/state"
-	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 )
 
@@ -52,128 +54,110 @@ func buildBLSState(
 	return cs
 }
 
-// TestAggregationWALReplayRestart proves a BLS+PBTS node can be restarted and
-// replay its WAL cleanly, ending at the same height with the SAME aggregated
-// commits in its store, all of which still verify.
-//
-//  1. A single BLS validator commits several heights to a persistent block/state
-//     DB and a real on-disk WAL.
-//  2. The State is stopped.
-//  3. A brand-new State is constructed over the very same DB, app and WAL file,
-//     and started. On start it replays the WAL (catchupReplay).
-//  4. We assert the post-restart height matches and that every stored commit is
-//     aggregated (BlockIDFlagAgg*) and verifies via VerifyCommit.
+// TestAggregationWALReplayRestart crashes a BLS+PBTS validator right after it
+// signed its prevote at crashHeight but before the prevote reached the WAL,
+// then restarts it once the proposal's timeliness window has passed. Replaying
+// the proposal with its persisted receive time must reproduce the same prevote,
+// so the disk-backed FilePV returns the stored signature instead of refusing a
+// conflicting vote, and the node goes on to commit new aggregated blocks.
 func TestAggregationWALReplayRestart(t *testing.T) {
-	// Shared, restart-surviving resources.
+	const crashHeight = int64(3)
 	cp := blsConsensusParams()
+	cp.Synchrony.MessageDelay = 500 * time.Millisecond
+	cp.Synchrony.Precision = 10 * time.Millisecond
 	genDoc, privVals := blsGenesisDoc(1, 10, cp)
-	privVal := privVals[0]
-
-	pk, err := privVal.GetPubKey()
-	require.NoError(t, err)
-	require.Equal(t, bls12381.KeyType, pk.Type(), "validator must use a bls12381 key")
 
 	thisConfig := ResetConfig("aggregation_wal_replay")
-	t.Cleanup(func() { _ = thisConfig })
 	ensureDir(filepath.Dir(thisConfig.Consensus.WalFile()), 0o700)
+	blockDB := dbm.NewMemDB()
+	app := newPersistentKVStoreWithPath(filepath.Join(thisConfig.DBDir(), "agg_replay_app"))
+	keyFile, stateFile := filepath.Join(thisConfig.RootDir, "pv_key.json"), filepath.Join(thisConfig.RootDir, "pv_state.json")
+	privval.NewFilePV(privVals[0].(types.MockPV).PrivKey, keyFile, stateFile).Save()
 
-	blockDB := dbm.NewMemDB() // a single handle, shared across both State lifetimes
-	appPath := filepath.Join(thisConfig.DBDir(), "agg_replay_app")
-	app := newPersistentKVStoreWithPath(appPath)
-
-	const targetHeight = int64(4)
-
-	// ---- Phase 1: run to targetHeight, persisting to DB + WAL. ----
-	func() {
-		cs := buildBLSState(t, thisConfig, genDoc, privVal, app, blockDB)
-		cs.SetTimeoutTicker(newMockTickerFunc(true)())
-
-		newBlockCh := subscribe(cs.eventBus, types.EventQueryNewBlock)
-
-		require.NoError(t, cs.Start())
-		defer func() { _ = cs.Stop() }()
-
-		deadline := time.Now().Add(30 * time.Second)
-		for {
-			select {
-			case msg := <-newBlockCh:
-				nb := msg.Data().(types.EventDataNewBlock)
-				if nb.Block.Height >= targetHeight {
-					goto done
-				}
-			case <-time.After(time.Until(deadline)):
-				t.Fatalf("phase 1 liveness stall before height %d", targetHeight)
-			}
-		}
-	done:
-		// Let the commit for the final height settle into the store/WAL.
-		time.Sleep(300 * time.Millisecond)
-		require.GreaterOrEqual(t, cs.blockStore.Height(), targetHeight,
-			"phase 1 did not reach target height")
-	}()
-
-	// Capture what the store holds pre-restart for comparison.
-	preStore := store.NewBlockStore(blockDB)
-	preHeight := preStore.Height()
-	require.GreaterOrEqual(t, preHeight, targetHeight)
-
-	chainID := genDoc.ChainID
-	valSet := types.NewValidatorSet(nil)
-	{
-		// Reconstruct the genesis validator set for verification.
-		s, err := sm.MakeGenesisState(genDoc)
-		require.NoError(t, err)
-		valSet = s.Validators
+	// Phase 1: run until the prevote at crashHeight is signed, then crash.
+	cs1 := buildBLSState(t, thisConfig, genDoc, privval.LoadFilePV(keyFile, stateFile), app, blockDB)
+	cs1.SetTimeoutTicker(newMockTickerFunc(true)())
+	wal, err := cs1.OpenWAL(thisConfig.Consensus.WalFile())
+	require.NoError(t, err)
+	crashed := make(chan struct{})
+	cs1.wal = &crashOnPrevoteWAL{WAL: wal, height: crashHeight, crashed: crashed}
+	require.NoError(t, cs1.Start())
+	select {
+	case <-crashed:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("no prevote at height %d", crashHeight)
 	}
+	_ = cs1.Stop()
+	_ = wal.Stop()
 
-	assertAggregatedCommits := func(t *testing.T, bs sm.BlockStore, label string) {
-		t.Helper()
-		checked := 0
-		for h := int64(1); h <= bs.Height()-1; h++ {
-			commit := bs.LoadBlockCommit(h)
-			if commit == nil {
-				commit = bs.LoadSeenCommit(h)
-			}
-			require.NotNil(t, commit, "%s: missing commit for height %d", label, h)
-			require.True(t, commit.HasAggregatedSignature(),
-				"%s: commit at height %d is NOT aggregated: %v", label, h, commit)
-			require.NoError(t, valSet.VerifyCommit(chainID, commit.BlockID, h, commit),
-				"%s: aggregated commit at height %d failed VerifyCommit", label, h)
-			checked++
-		}
-		require.Positive(t, checked, "%s: no aggregated commits checked", label)
-		t.Logf("%s: verified %d aggregated commits up to height %d", label, checked, bs.Height())
-	}
+	// Restart only after the proposal would no longer be timely by wall clock.
+	time.Sleep(cp.Synchrony.MessageDelay + cp.Synchrony.Precision + 300*time.Millisecond)
 
-	// Pre-restart sanity: the persisted commits are aggregated and verify.
-	assertAggregatedCommits(t, preStore, "pre-restart")
-
-	// ---- Phase 2: restart over the SAME DB + WAL and replay. ----
-	cs2 := buildBLSState(t, thisConfig, genDoc, privVal, app, blockDB)
+	// Phase 2: restart over the same block store, app, WAL and FilePV state.
+	pv := &signErrPV{PrivValidator: privval.LoadFilePV(keyFile, stateFile)}
+	cs2 := buildBLSState(t, thisConfig, genDoc, pv, app, blockDB)
 	cs2.SetTimeoutTicker(newMockTickerFunc(true)())
-
-	// Starting the State triggers WAL load + catchupReplay over the persisted WAL.
+	newBlockCh := subscribe(cs2.eventBus, types.EventQueryNewBlock)
 	require.NoError(t, cs2.Start())
 	defer func() { _ = cs2.Stop() }()
+	for h := int64(0); h <= crashHeight; {
+		select {
+		case msg := <-newBlockCh:
+			h = msg.Data().(types.EventDataNewBlock).Block.Height
+		case <-time.After(10 * time.Second):
+			t.Fatalf("no new block after restart (vote signing errors: %v)", pv.errors())
+		}
+	}
+	require.Empty(t, pv.errors(), "restart signed a conflicting vote")
 
-	// Give replay a moment to run.
-	time.Sleep(500 * time.Millisecond)
+	valSet, err := sm.MakeGenesisState(genDoc)
+	require.NoError(t, err)
+	for h := int64(1); h <= crashHeight; h++ {
+		commit := cs2.blockStore.LoadBlockCommit(h)
+		require.True(t, commit.HasAggregatedSignature(), "height %d", h)
+		require.NoError(t, valSet.Validators.VerifyCommit(genDoc.ChainID, commit.BlockID, h, commit))
+	}
+}
 
-	// The restarted node must be at least at the pre-restart height (replay must
-	// not lose committed state) and its store must still hold the aggregated
-	// commits, all verifying.
-	require.GreaterOrEqual(t, cs2.blockStore.Height(), preHeight,
-		"restarted node regressed below pre-restart height %d (got %d)",
-		preHeight, cs2.blockStore.Height())
+// crashOnPrevoteWAL stops the consensus receive routine, like a crash, when the
+// node's own prevote at height is about to be written.
+type crashOnPrevoteWAL struct {
+	WAL
+	height  int64
+	crashed chan struct{}
+}
 
-	// cs2 is running, so read its height via GetRoundState, which takes the
-	// consensus mutex; a direct cs2.Height read races with the state machine.
-	csHeight := cs2.GetRoundState().Height
-	require.GreaterOrEqual(t, csHeight, preHeight,
-		"restarted consensus height %d below pre-restart height %d", csHeight, preHeight)
+func (w *crashOnPrevoteWAL) Write(m WALMessage) error {
+	if mi, ok := m.(msgInfo); ok && mi.PeerID == "" {
+		if vm, ok := mi.Msg.(*VoteMessage); ok && vm.Vote.Type == cmtproto.PrevoteType && vm.Vote.Height == w.height {
+			close(w.crashed)
+			runtime.Goexit()
+		}
+	}
+	return w.WAL.Write(m)
+}
 
-	assertAggregatedCommits(t, cs2.blockStore, "post-restart")
+func (w *crashOnPrevoteWAL) WriteSync(m WALMessage) error { return w.Write(m) }
 
-	t.Logf("restart replay OK: pre-restart height=%d, post-restart store height=%d, cs height=%d",
-		preHeight, cs2.blockStore.Height(), csHeight)
+// signErrPV records the errors returned when signing votes.
+type signErrPV struct {
+	types.PrivValidator
+	mtx  sync.Mutex
+	errs []error
+}
+
+func (pv *signErrPV) SignVote(chainID string, vote *cmtproto.Vote) error {
+	err := pv.PrivValidator.SignVote(chainID, vote)
+	if err != nil {
+		pv.mtx.Lock()
+		pv.errs = append(pv.errs, err)
+		pv.mtx.Unlock()
+	}
+	return err
+}
+
+func (pv *signErrPV) errors() []error {
+	pv.mtx.Lock()
+	defer pv.mtx.Unlock()
+	return pv.errs
 }
