@@ -188,6 +188,57 @@ func TestStateEnterProposeYesPrivValidator(t *testing.T) {
 	ensureNoNewTimeout(timeoutCh, cs.config.TimeoutPropose.Nanoseconds())
 }
 
+// Under PBTS a validator prevotes a proposal's block only if the proposal
+// timestamp equals the block time. Once +2/3 prevote the block it still locks
+// and precommits it.
+func TestStateTimestamp_ProposalMatch(t *testing.T) {
+	for name, offset := range map[string]time.Duration{"match": 0, "mismatch": time.Millisecond} {
+		t.Run(name, func(t *testing.T) {
+			cs1, vss := randState(4)
+			vs2, vs3, vs4 := vss[1], vss[2], vss[3]
+			height, round := cs1.Height, cs1.Round+1
+			proposalCh := subscribe(cs1.eventBus, types.EventQueryCompleteProposal)
+			pv1, err := cs1.privValidator.GetPubKey()
+			require.NoError(t, err)
+			voteCh := subscribeToVoter(cs1, pv1.Address())
+
+			block, parts, blockID := createProposalBlockWithTime(t, cs1, time.Time{})
+			incrementRound(vss[1:]...)
+			proposal := types.NewProposal(vs2.Height, round, -1, blockID, block.Time.Add(offset))
+			signProposal(t, proposal, cs1.state.ChainID, vs2)
+			require.NoError(t, cs1.SetProposalAndBlock(proposal, block, parts, "some peer"))
+
+			startTestRound(cs1, height, round)
+			ensureProposal(proposalCh, height, round, blockID)
+			ensurePrevote(voteCh, height, round)
+			if offset == 0 {
+				validatePrevote(t, cs1, round, vss[0], blockID.Hash)
+			} else {
+				validatePrevote(t, cs1, round, vss[0], nil)
+			}
+
+			signAddVotes(cs1, cmtproto.PrevoteType, blockID.Hash, blockID.PartSetHeader, false, vs2, vs3, vs4)
+			ensurePrecommit(voteCh, height, round)
+			validatePrecommit(t, cs1, round, round, vss[0], blockID.Hash, blockID.Hash)
+		})
+	}
+}
+
+// The round state (/dump_consensus_state) marshals to JSON whether LastCommit
+// is a vote set or a whole aggregated commit (after catch-up or restart).
+func TestStateJSONMarshalling(t *testing.T) {
+	cs1, _ := randState(4)
+	val, _ := types.RandValidator(true, 100)
+	for _, lastCommit := range []types.VoteSetReader{
+		types.NewVoteSet(cs1.state.ChainID, 10, 3, cmtproto.PrecommitType, types.NewValidatorSet([]*types.Validator{val})),
+		&types.Commit{Height: 5, Round: 6, Signatures: []types.CommitSig{{BlockIDFlag: types.BlockIDFlagAggCommit, ValidatorAddress: val.Address}}},
+	} {
+		cs1.LastCommit = lastCommit
+		_, err := cs1.GetRoundStateJSON()
+		require.NoError(t, err, "%T", lastCommit)
+	}
+}
+
 func TestStateBadProposal(t *testing.T) {
 	ctx := t.Context()
 
