@@ -1432,12 +1432,12 @@ func (cs *State) createProposalBlock(ctx context.Context) (*types.Block, error) 
 		lastExtCommit = &types.ExtendedCommit{}
 
 	case ok && lastCommitAsVs.HasTwoThirdsMajority():
-		// Make the commit from LastCommit.
+		// Make the commit from LastCommit. Its votes come from the previous
+		// height's set (LastValidators), so that set decides if they can be
+		// aggregated.
 		_, blsKey := cs.privValidatorPubKey.(*bls12381.PubKey)
 		_, blsKey2 := cs.privValidatorPubKey.(bls12381.PubKey)
-		canBeAggregated := (blsKey || blsKey2) &&
-			cs.state.Validators.AllKeysHaveSameType()
-		if canBeAggregated {
+		if (blsKey || blsKey2) && canAggregateCommits(cs.state.LastValidators) {
 			if !cs.isPBTSEnabled(cs.Height) {
 				panic("Wanted to aggregate LastCommit, but PBTS is not enabled for height " + strconv.FormatInt(cs.Height, 10))
 			}
@@ -1526,13 +1526,13 @@ func (cs *State) isVoteExtensionsEnabled(height int64) bool {
 }
 
 // canAggregateCommits returns true if the validator set uses BLS12-381 keys
-// exclusively, in which case precommit signatures are aggregated into a
+// exclusively, in which case its precommit signatures are aggregated into a
 // single commit signature (mirrors the routing in types.isAggregatedCommit).
-func (cs *State) canAggregateCommits() bool {
-	proposerKey := cs.Validators.GetProposer().PubKey
+func canAggregateCommits(vals *types.ValidatorSet) bool {
+	proposerKey := vals.GetProposer().PubKey
 	_, blsKey := proposerKey.(*bls12381.PubKey)
 	_, blsKey2 := proposerKey.(bls12381.PubKey)
-	return (blsKey || blsKey2) && cs.Validators.AllKeysHaveSameType()
+	return (blsKey || blsKey2) && vals.AllKeysHaveSameType()
 }
 
 // proposerWaitTime determines how long the proposer should wait to propose its next block.
@@ -2009,7 +2009,7 @@ func (cs *State) finalizeCommit(height int64) {
 		var seenExtendedCommit *types.ExtendedCommit
 		if commit := cs.Votes.GetCommit(cs.CommitRound); commit != nil {
 			seenExtendedCommit = commit.WrappedExtendedCommit()
-		} else if cs.canAggregateCommits() {
+		} else if canAggregateCommits(cs.Validators) {
 			// NOTE: the seenCommit is local justification to commit this block,
 			// but may differ from the LastCommit included in the next block
 			seenExtendedCommit = cs.Votes.Precommits(cs.CommitRound).MakeBLSCommit()
