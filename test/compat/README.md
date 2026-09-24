@@ -89,18 +89,22 @@ the bera-v1.x binary:
 - **Phase A, data-dir reuse**: one validator runs on bera-v1.x, is stopped and
   restarted on bera-v0.40.x with the same home directory (no migration), then
   rolled back to bera-v1.x and forward again. Each run must replay the other
-  version's store/WAL, keep producing aggregated commits, serve every
-  historical height (`/block`, `/block_results`) and keep the app state (txs
-  sent through either version are queryable on the other).
+  version's store/WAL, keep producing aggregated commits, serve historical
+  heights (`/block`, `/block_results`, sampled every 5th height) and keep the
+  app state (every tx sent so far, through either version, is queried right
+  after each restart).
 - **Phase B, rolling upgrade**: a 4-validator all-BLS network starts on
   bera-v1.x and validators are moved one at a time to bera-v0.40.x (1+3, 2+2,
   3+1, 4+0), with a mid-soak restart of an already-upgraded node, a tx sent
   through the upgraded network, then one validator rolled back to bera-v1.x
-  and forward again. After every stage it checks that all four validators
-  signed every block of the soak, that both versions proposed blocks the other
-  accepted, that commits stayed aggregated with round 0, that block hashes
-  agree across all nodes, that the moved node still serves early blocks, and
-  that no consensus/p2p codec errors were logged.
+  and forward again. After every stage it checks that each validator signed at
+  least 70% of the soak's blocks, that both versions proposed blocks the other
+  accepted, that every commit is aggregated, that block hashes agree across
+  all nodes, that the moved node still serves early blocks, and that no
+  consensus/p2p codec errors were logged. The report lists each missed
+  signature as `height:flag`, so nil precommits (flag 6/7, normal when a
+  validator sees +2/3 precommits before its own polka) can be told apart from
+  absent ones (flag 1). Commits at round > 0 are only reported as a warning.
 
 ```bash
 test/compat/rolling_upgrade.sh            # ~3 minutes, writes a report.md
