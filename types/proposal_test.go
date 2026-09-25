@@ -13,6 +13,7 @@ import (
 	"github.com/cometbft/cometbft/libs/protoio"
 	cmtrand "github.com/cometbft/cometbft/libs/rand"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 var (
@@ -62,8 +63,8 @@ func TestProposalVerifySignature(t *testing.T) {
 	require.NoError(t, err)
 
 	prop := NewProposal(
-		4, 2, 2,
-		BlockID{cmtrand.Bytes(tmhash.Size), PartSetHeader{777, cmtrand.Bytes(tmhash.Size)}})
+		4, 2, 1,
+		BlockID{cmtrand.Bytes(tmhash.Size), PartSetHeader{777, cmtrand.Bytes(tmhash.Size)}}, cmttime.Now())
 	p := prop.ToProto()
 	signBytes := ProposalSignBytes("test_chain_id", p)
 
@@ -151,8 +152,8 @@ func TestProposalValidateBasic(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
 			prop := NewProposal(
-				4, 2, 2,
-				blockID)
+				4, 2, 1,
+				blockID, cmttime.Now())
 			p := prop.ToProto()
 			err := privVal.SignProposal("test_chain_id", p)
 			prop.Signature = p.Signature
@@ -164,9 +165,9 @@ func TestProposalValidateBasic(t *testing.T) {
 }
 
 func TestProposalProtoBuf(t *testing.T) {
-	proposal := NewProposal(1, 2, 3, makeBlockID([]byte("hash"), 2, []byte("part_set_hash")))
+	proposal := NewProposal(1, 2, 1, makeBlockID([]byte("hash"), 2, []byte("part_set_hash")), cmttime.Now())
 	proposal.Signature = []byte("sig")
-	proposal2 := NewProposal(1, 2, 3, BlockID{})
+	proposal2 := NewProposal(1, 2, 3, BlockID{}, cmttime.Now())
 
 	testCases := []struct {
 		msg     string
@@ -198,12 +199,12 @@ func TestProposalValidateBlockSize(t *testing.T) {
 		proposal     *Proposal
 		expectPass   bool
 	}{
-		{"10 chunk max, 5 chunk proposal, success", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 5}}), true},
-		{"10 chunk max, 20 chunk proposal, fail", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 20}}), false},
-		{"10 chunk max, max uint32 chunk proposal, fail", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}), false},
-		{"-1 chunk max, max uint32 chunk proposal, fail", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}), false},
-		{"0 chunk max, max uint32 chunk proposal, fail", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}), false},
-		{"total parts equals chunk max, success", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 1600}}), true},
+		{"10 chunk max, 5 chunk proposal, success", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 5}}, cmttime.Now()), true},
+		{"10 chunk max, 20 chunk proposal, fail", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 20}}, cmttime.Now()), false},
+		{"10 chunk max, max uint32 chunk proposal, fail", int64(10 * BlockPartSizeBytes), NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}, cmttime.Now()), false},
+		{"-1 chunk max, max uint32 chunk proposal, fail", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}, cmttime.Now()), false},
+		{"0 chunk max, max uint32 chunk proposal, fail", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: math.MaxUint32}}, cmttime.Now()), false},
+		{"total parts equals chunk max, success", -1, NewProposal(0, 0, 0, BlockID{PartSetHeader: PartSetHeader{Total: 1600}}, cmttime.Now()), true},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {

@@ -34,6 +34,7 @@ import (
 	sm "github.com/cometbft/cometbft/state"
 	smmocks "github.com/cometbft/cometbft/state/mocks"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 func TestMain(m *testing.M) {
@@ -462,7 +463,7 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: propBlock.Hash(), PartSetHeader: propBlockParts.Header()}
 
-	proposal := types.NewProposal(vss[1].Height, round, -1, blockID)
+	proposal := types.NewProposal(vss[1].Height, round, -1, blockID, propBlock.Time)
 	p := proposal.ToProto()
 	if err := vss[1].SignProposal(test.DefaultTestChainID, p); err != nil {
 		t.Fatal("failed to sign bad proposal", err)
@@ -493,7 +494,7 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	require.NoError(t, err)
 	blockID = types.BlockID{Hash: propBlock.Hash(), PartSetHeader: propBlockParts.Header()}
 
-	proposal = types.NewProposal(vss[2].Height, round, -1, blockID)
+	proposal = types.NewProposal(vss[2].Height, round, -1, blockID, propBlock.Time)
 	p = proposal.ToProto()
 	if err := vss[2].SignProposal(test.DefaultTestChainID, p); err != nil {
 		t.Fatal("failed to sign bad proposal", err)
@@ -551,7 +552,7 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 
 	selfIndex := valIndexFn(0)
 
-	proposal = types.NewProposal(vss[3].Height, round, -1, blockID)
+	proposal = types.NewProposal(vss[3].Height, round, -1, blockID, cmttime.Now())
 	p = proposal.ToProto()
 	if err := vss[3].SignProposal(test.DefaultTestChainID, p); err != nil {
 		t.Fatal("failed to sign bad proposal", err)
@@ -610,7 +611,7 @@ func setupChainWithChangingValidators(t *testing.T, name string, nBlocks int) (*
 	sort.Sort(ValidatorStubsByPower(newVss))
 
 	selfIndex = valIndexFn(0)
-	proposal = types.NewProposal(vss[1].Height, round, -1, blockID)
+	proposal = types.NewProposal(vss[1].Height, round, -1, blockID, propBlock.Time)
 	p = proposal.ToProto()
 	if err := vss[1].SignProposal(test.DefaultTestChainID, p); err != nil {
 		t.Fatal("failed to sign bad proposal", err)
@@ -765,7 +766,8 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 		_ = kvstoreApp.Close()
 	})
 
-	clientCreator2 := proxy.NewLocalClientCreator(kvstoreApp)
+	syncApp := &syncingToHeightApp{Application: kvstoreApp}
+	clientCreator2 := proxy.NewLocalClientCreator(syncApp)
 	if nBlocks > 0 {
 		// run nBlocks against a new client to build up the app state.
 		// use a throwaway CometBFT state
@@ -804,6 +806,7 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 	})
 
 	// perform the replay protocol to sync Tendermint and the application
+	syncApp.seen = nil
 	err = handshaker.Handshake(proxyApp)
 	if expectError {
 		require.Error(t, err)
@@ -811,6 +814,11 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 		return
 	}
 	require.NoError(t, err)
+
+	// every replayed block is told the stored tip it is syncing to
+	for _, h := range syncApp.seen {
+		require.Equal(t, store.Height(), h)
+	}
 
 	// get the latest app hash from the app
 	res, err := proxyApp.Query().Info(context.Background(), proxy.RequestInfo)
@@ -845,6 +853,17 @@ func testHandshakeReplay(t *testing.T, config *cfg.Config, nBlocks int, mode uin
 	}
 }
 
+// syncingToHeightApp records the syncing_to_height of each FinalizeBlock.
+type syncingToHeightApp struct {
+	abci.Application
+	seen []int64
+}
+
+func (app *syncingToHeightApp) FinalizeBlock(ctx context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+	app.seen = append(app.seen, req.SyncingToHeight)
+	return app.Application.FinalizeBlock(ctx, req)
+}
+
 func applyBlock(t *testing.T, stateStore sm.Store, mempool mempool.Mempool, evpool sm.EvidencePool, st sm.State, blk *types.Block, proxyApp proxy.AppConns, bs sm.BlockStore) sm.State {
 	testPartSize := types.BlockPartSizeBytes
 	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool, bs)
@@ -852,7 +871,7 @@ func applyBlock(t *testing.T, stateStore sm.Store, mempool mempool.Mempool, evpo
 	bps, err := blk.MakePartSet(testPartSize)
 	require.NoError(t, err)
 	blkID := types.BlockID{Hash: blk.Hash(), PartSetHeader: bps.Header()}
-	newState, err := blockExec.ApplyBlock(st, blkID, blk)
+	newState, err := blockExec.ApplyBlock(st, blkID, blk, blk.Height)
 	require.NoError(t, err)
 	return newState
 }

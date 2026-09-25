@@ -71,7 +71,7 @@ var (
 		"upgrade": 0.3,
 	}
 	voteExtensionUpdateHeight = uniformChoice{int64(-1), int64(0), int64(1)} // -1: genesis, 0: InitChain, 1: (use offset)
-	voteExtensionEnabled      = weightedChoice{true: 3, false: 1}
+	voteExtensionEnabled      = weightedChoice{false: 1}                     // vote extensions are disabled on the Berachain fork
 	voteExtensionHeightOffset = uniformChoice{int64(0), int64(10), int64(100)}
 	voteExtensionSize         = uniformChoice{uint(128), uint(512), uint(2048), uint(8192)} //TODO: define the right values depending on experiment results.
 	keyType                   = uniformChoice{ed25519.KeyType, secp256k1.KeyType, bls12381.KeyType, mldsa65.KeyType, secp256k1eth.KeyType}

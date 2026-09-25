@@ -87,6 +87,14 @@ func newValidatorStub(privValidator types.PrivValidator, valIndex int32) *valida
 	}
 }
 
+func signProposal(t *testing.T, proposal *types.Proposal, chainID string, vss *validatorStub) {
+	t.Helper()
+	p := proposal.ToProto()
+	err := vss.SignProposal(chainID, p)
+	require.NoError(t, err)
+	proposal.Signature = p.Signature
+}
+
 func (vs *validatorStub) signVote(
 	voteType cmtproto.SignedMsgType,
 	hash []byte,
@@ -217,6 +225,19 @@ func startTestRound(cs *State, height int64, round int32) {
 	cs.startRoutines(0)
 }
 
+func createProposalBlockWithTime(t *testing.T, cs *State, time time.Time) (*types.Block, *types.PartSet, types.BlockID) {
+	t.Helper()
+	block, err := cs.createProposalBlock(context.Background())
+	if !time.IsZero() {
+		block.Time = cmttime.Canonical(time)
+	}
+	assert.NoError(t, err)
+	blockParts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	assert.NoError(t, err)
+	blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
+	return block, blockParts, blockID
+}
+
 // Create proposal block from cs1 but sign it with vs.
 func decideProposal(
 	ctx context.Context,
@@ -240,7 +261,7 @@ func decideProposal(
 
 	// Make proposal
 	polRound, propBlockID := validRound, types.BlockID{Hash: block.Hash(), PartSetHeader: blockParts.Header()}
-	proposal := types.NewProposal(height, round, polRound, propBlockID)
+	proposal := types.NewProposal(height, round, polRound, propBlockID, block.Time)
 	p := proposal.ToProto()
 	if err := vs.SignProposal(chainID, p); err != nil {
 		panic(err)
@@ -295,11 +316,13 @@ func validateLastPrecommit(t *testing.T, cs *State, privVal *validatorStub, bloc
 	require.NoError(t, err)
 	address := pv.Address()
 	var vote *types.Vote
-	if vote = votes.GetByAddress(address); vote == nil {
-		panic("Failed to find precommit from validator")
-	}
-	if !bytes.Equal(vote.BlockID.Hash, blockHash) {
-		panic(fmt.Sprintf("Expected precommit to be for %X, got %X", blockHash, vote.BlockID.Hash))
+	if vs, ok := votes.(*types.VoteSet); ok {
+		if vote = vs.GetByAddress(address); vote == nil {
+			panic("Failed to find precommit from validator")
+		}
+		if !bytes.Equal(vote.BlockID.Hash, blockHash) {
+			panic(fmt.Sprintf("Expected precommit to be for %X, got %X", blockHash, vote.BlockID.Hash))
+		}
 	}
 }
 
@@ -464,7 +487,7 @@ func randStateWithAppWithHeight(
 	height int64,
 ) (*State, []*validatorStub) {
 	c := test.ConsensusParams()
-	c.ABCI.VoteExtensionsEnableHeight = height
+	c.Feature.VoteExtensionsEnableHeight = height
 	return randStateWithAppImpl(nValidators, app, c)
 }
 
@@ -478,8 +501,17 @@ func randStateWithAppImpl(
 	app abci.Application,
 	consensusParams *types.ConsensusParams,
 ) (*State, []*validatorStub) {
+	return randStateWithAppImplGenesisTime(nValidators, app, consensusParams, cmttime.Now())
+}
+
+func randStateWithAppImplGenesisTime(
+	nValidators int,
+	app abci.Application,
+	consensusParams *types.ConsensusParams,
+	genesisTime time.Time,
+) (*State, []*validatorStub) {
 	// Get State
-	state, privVals := randGenesisState(nValidators, false, 10, consensusParams)
+	state, privVals := randGenesisStateWithTime(nValidators, consensusParams, genesisTime)
 
 	vss := make([]*validatorStub, nValidators)
 
@@ -912,6 +944,17 @@ func randGenesisState(
 	consensusParams *types.ConsensusParams,
 ) (sm.State, []types.PrivValidator) {
 	genDoc, privValidators := randGenesisDoc(numValidators, randPower, minPower, consensusParams)
+	s0, _ := sm.MakeGenesisState(genDoc)
+	return s0, privValidators
+}
+
+func randGenesisStateWithTime(
+	numValidators int,
+	consensusParams *types.ConsensusParams,
+	genesisTime time.Time,
+) (sm.State, []types.PrivValidator) {
+	genDoc, privValidators := randGenesisDoc(numValidators, false, 10, consensusParams)
+	genDoc.GenesisTime = genesisTime
 	s0, _ := sm.MakeGenesisState(genDoc)
 	return s0, privValidators
 }

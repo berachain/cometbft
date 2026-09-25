@@ -72,7 +72,7 @@ func makeAndApplyGoodBlock(state sm.State, height int64, lastCommit *types.Commi
 		Hash:          block.Hash(),
 		PartSetHeader: partSet.Header(),
 	}
-	state, err = blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block, block.Height)
 	if err != nil {
 		return state, types.BlockID{}, err
 	}
@@ -251,6 +251,7 @@ type testApp struct {
 	CommitVotes      []abci.VoteInfo
 	Misbehavior      []abci.Misbehavior
 	LastTime         time.Time
+	SyncingToHeight  int64
 	ValidatorUpdates []abci.ValidatorUpdate
 	AppHash          []byte
 }
@@ -261,6 +262,7 @@ func (app *testApp) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBl
 	app.CommitVotes = req.DecidedLastCommit.Votes
 	app.Misbehavior = req.Misbehavior
 	app.LastTime = req.Time
+	app.SyncingToHeight = req.SyncingToHeight
 	txResults := make([]*abci.ExecTxResult, len(req.Txs))
 	for idx := range req.Txs {
 		txResults[idx] = &abci.ExecTxResult{

@@ -54,14 +54,17 @@ func CanonicalizeProposal(chainID string, proposal *cmtproto.Proposal) cmtproto.
 // CanonicalizeVote transforms the given Vote to a CanonicalVote, which does
 // not contain ValidatorIndex and ValidatorAddress fields, or any fields
 // relating to vote extensions.
+//
+// The per-vote Timestamp is deliberately excluded from the canonical
+// (signed) representation: all validators must sign identical bytes for a
+// given block so that their BLS signatures can be aggregated.
 func CanonicalizeVote(chainID string, vote *cmtproto.Vote) cmtproto.CanonicalVote {
 	return cmtproto.CanonicalVote{
-		Type:      vote.Type,
-		Height:    vote.Height,       // encoded as sfixed64
-		Round:     int64(vote.Round), // encoded as sfixed64
-		BlockID:   CanonicalizeBlockID(vote.BlockID),
-		Timestamp: vote.Timestamp,
-		ChainID:   chainID,
+		Type:    vote.Type,
+		Height:  vote.Height,       // encoded as sfixed64
+		Round:   int64(vote.Round), // encoded as sfixed64
+		BlockID: CanonicalizeBlockID(vote.BlockID),
+		ChainID: chainID,
 	}
 }
 

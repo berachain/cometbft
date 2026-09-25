@@ -603,14 +603,14 @@ func NewMockDuplicateVoteEvidenceWithValidator(height int64, time time.Time,
 		return nil, err
 	}
 	val := NewValidator(pubKey, 10)
-	voteA := makeMockVote(height, 0, 0, pubKey.Address(), randBlockID(), time)
+	voteA := makeMockVote(height, 0, 0, pubKey.Address(), randBlockID())
 	vA := voteA.ToProto()
 	err = pv.SignVote(chainID, vA)
 	if err != nil {
 		return nil, err
 	}
 	voteA.Signature = vA.Signature
-	voteB := makeMockVote(height, 0, 0, pubKey.Address(), randBlockID(), time)
+	voteB := makeMockVote(height, 0, 0, pubKey.Address(), randBlockID())
 	vB := voteB.ToProto()
 	err = pv.SignVote(chainID, vB)
 	if err != nil {
@@ -621,14 +621,13 @@ func NewMockDuplicateVoteEvidenceWithValidator(height int64, time time.Time,
 }
 
 func makeMockVote(height int64, round, index int32, addr Address,
-	blockID BlockID, time time.Time,
+	blockID BlockID,
 ) *Vote {
 	return &Vote{
 		Type:             cmtproto.SignedMsgType(2),
 		Height:           height,
 		Round:            round,
 		BlockID:          blockID,
-		Timestamp:        time,
 		ValidatorAddress: addr,
 		ValidatorIndex:   index,
 	}

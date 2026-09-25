@@ -173,6 +173,9 @@ func (cfg *Config) ValidateBasic() error {
 // CheckDeprecated returns any deprecation warnings. These are printed to the operator on startup
 func (cfg *Config) CheckDeprecated() []string {
 	var warnings []string
+	if cfg.Consensus.SkipTimeoutCommit {
+		warnings = append(warnings, "[consensus.skip_timeout_commit] is deprecated and ignored. Please remove it from the config.")
+	}
 	return warnings
 }
 
@@ -1257,7 +1260,9 @@ type ConsensusConfig struct {
 	// NOTE: when modifying, make sure to update time_iota_ms genesis parameter
 	TimeoutCommit time.Duration `mapstructure:"timeout_commit"`
 
-	// Make progress as soon as we have all the precommits (as if TimeoutCommit = 0)
+	// Ignored (deprecated). The node makes progress as soon as it has all the
+	// precommits only when TimeoutCommit == 0 and the app sets no
+	// NextBlockDelay (as in bera-v1.x).
 	SkipTimeoutCommit bool `mapstructure:"skip_timeout_commit"`
 
 	// EmptyBlocks mode and possible interval between empty blocks
@@ -1304,9 +1309,9 @@ func TestConsensusConfig() *ConsensusConfig {
 	cfg.TimeoutPrevoteDelta = 1 * time.Millisecond
 	cfg.TimeoutPrecommit = 10 * time.Millisecond
 	cfg.TimeoutPrecommitDelta = 1 * time.Millisecond
-	// NOTE: when modifying, make sure to update time_iota_ms (testGenesisFmt) in toml.go
-	cfg.TimeoutCommit = 10 * time.Millisecond
-	cfg.SkipTimeoutCommit = true
+	// With TimeoutCommit == 0 (and no NextBlockDelay from the app) a node
+	// starts the next height as soon as it has all the precommits.
+	cfg.TimeoutCommit = 0
 	cfg.PeerGossipSleepDuration = 5 * time.Millisecond
 	cfg.PeerQueryMaj23SleepDuration = 250 * time.Millisecond
 	cfg.DoubleSignCheckHeight = int64(0)

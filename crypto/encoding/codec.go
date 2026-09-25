@@ -45,23 +45,32 @@ func init() {
 	json.RegisterType((*pc.PublicKey_Secp256K1Eth)(nil), "tendermint.crypto.PublicKey_Secp256K1Eth")
 }
 
-// PubKeyToProto takes crypto.PubKey and transforms it to a protobuf Pubkey
+// PubKeyToProto takes crypto.PubKey and transforms it to a protobuf Pubkey.
+//
+// NOTE: it switches on the key type, not the concrete Go type, because BLS
+// public keys appear both as values and as pointers (PubKeyFromProto returns
+// a pointer), and both must serialize identically.
 func PubKeyToProto(k crypto.PubKey) (pc.PublicKey, error) {
 	var kp pc.PublicKey
-	switch k := k.(type) {
-	case ed25519.PubKey:
+
+	if k == nil {
+		return kp, fmt.Errorf("toproto: key type %v is not supported", k)
+	}
+
+	switch k.Type() {
+	case ed25519.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Ed25519{
-				Ed25519: k,
+				Ed25519: k.Bytes(),
 			},
 		}
-	case secp256k1.PubKey:
+	case secp256k1.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Secp256K1{
-				Secp256K1: k,
+				Secp256K1: k.Bytes(),
 			},
 		}
-	case bls12381.PubKey:
+	case bls12381.KeyType:
 		if !bls12381.Enabled {
 			return kp, ErrUnsupportedKey{Key: k}
 		}
@@ -71,13 +80,13 @@ func PubKeyToProto(k crypto.PubKey) (pc.PublicKey, error) {
 				Bls12381: k.Bytes(),
 			},
 		}
-	case mldsa65.PubKey:
+	case mldsa65.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Mldsa65{
 				Mldsa65: k.Bytes(),
 			},
 		}
-	case secp256k1eth.PubKey:
+	case secp256k1eth.KeyType:
 		kp = pc.PublicKey{
 			Sum: &pc.PublicKey_Secp256K1Eth{
 				Secp256K1Eth: k.Bytes(),
@@ -113,14 +122,18 @@ func PubKeyFromProto(k pc.PublicKey) (crypto.PubKey, error) {
 			return nil, ErrUnsupportedKey{Key: k}
 		}
 
-		if len(k.Bls12381) != bls12381.PubKeySize {
+		switch len(k.Bls12381) {
+		case bls12381.PubKeySize:
+			return bls12381.NewPublicKeyFromBytes(k.Bls12381)
+		case bls12381.PubKeyCompressedSize:
+			return bls12381.NewPublicKeyFromCompressedBytes(k.Bls12381)
+		default:
 			return nil, ErrInvalidKeyLen{
 				Key:  k,
 				Got:  len(k.Bls12381),
 				Want: bls12381.PubKeySize,
 			}
 		}
-		return bls12381.NewPublicKeyFromBytes(k.Bls12381)
 	case *pc.PublicKey_Mldsa65:
 		if len(k.Mldsa65) != mldsa65.PubKeySize {
 			return nil, ErrInvalidKeyLen{
@@ -179,15 +192,18 @@ func PubKeyFromTypeAndBytes(pkType string, bytes []byte) (crypto.PubKey, error) 
 			return nil, ErrUnsupportedKey{Key: pkType}
 		}
 
-		if len(bytes) != bls12381.PubKeySize {
+		switch len(bytes) {
+		case bls12381.PubKeySize:
+			return bls12381.NewPublicKeyFromBytes(bytes)
+		case bls12381.PubKeyCompressedSize:
+			return bls12381.NewPublicKeyFromCompressedBytes(bytes)
+		default:
 			return nil, ErrInvalidKeyLen{
 				Key:  pkType,
 				Got:  len(bytes),
 				Want: bls12381.PubKeySize,
 			}
 		}
-
-		return bls12381.NewPublicKeyFromBytes(bytes)
 	case mldsa65.KeyType:
 		if len(bytes) != mldsa65.PubKeySize {
 			return nil, ErrInvalidKeyLen{

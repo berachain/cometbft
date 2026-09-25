@@ -43,7 +43,6 @@ func makeTestExtCommitWithNumSigs(height int64, timestamp time.Time, numSigs int
 			CommitSig: types.CommitSig{
 				BlockIDFlag:      types.BlockIDFlagCommit,
 				ValidatorAddress: cmtrand.Bytes(crypto.AddressSize),
-				Timestamp:        timestamp,
 				Signature:        cmtrand.Bytes(64),
 			},
 			ExtensionSignature: []byte("ExtensionSignature"),
@@ -611,11 +610,15 @@ func TestPruneBlocks(t *testing.T) {
 	assert.EqualValues(t, 1500, bs.Height())
 	assert.EqualValues(t, 1500, bs.Size())
 
-	state.LastBlockTime = time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+	// Under PBTS the blocks above are stamped with the current time. Put the
+	// last block time far enough ahead that all of them are past the evidence
+	// max-age duration, so only the height-based limit decides (as in
+	// bera-v1.x).
+	state.LastBlockTime = cmttime.Now().Add(24 * time.Hour)
 	state.LastBlockHeight = 1500
 
 	state.ConsensusParams.Evidence.MaxAgeNumBlocks = 400
-	state.ConsensusParams.Evidence.MaxAgeDuration = 1 * time.Second
+	state.ConsensusParams.Evidence.MaxAgeDuration = 1 * time.Minute
 
 	// Check that basic pruning works
 	pruned, evidenceRetainHeight, err := bs.PruneBlocks(1200, state)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/types"
+	cmttime "github.com/cometbft/cometbft/types/time"
 )
 
 //-----------------------------------------------------
@@ -127,8 +128,21 @@ func validateBlock(state State, block *types.Block, opts ...func(*blockValidatio
 			block.Time, time.Now(), tol,
 		)
 	}
+	// Vote timestamps are not signed in this fork, so there is no BFT Time
+	// median to check against and PBTS must be enabled (as in bera-v1.x).
+	if !state.ConsensusParams.Feature.PbtsEnabled(block.Height) {
+		panic("PBTS has to be enabled")
+	}
+	// Times must be canonical
+	if cantime := cmttime.Canonical(block.Time); block.Time != cantime {
+		return fmt.Errorf("block time %v is not canonical", block.Time)
+	}
+
 	switch {
 	case block.Height > state.InitialHeight:
+		// Under PBTS the block time is the proposer's local time; its
+		// timeliness is enforced by the consensus prevote step, so only
+		// monotonicity is validated here.
 		if !block.Time.After(state.LastBlockTime) {
 			return fmt.Errorf("block time %v not greater than last block time %v",
 				block.Time,
@@ -136,21 +150,10 @@ func validateBlock(state State, block *types.Block, opts ...func(*blockValidatio
 			)
 		}
 
-		medianTime, err := MedianTime(block.LastCommit, state.LastValidators)
-		if err != nil {
-			return fmt.Errorf("error validating block while calculating median time: %w", err)
-		}
-		if !block.Time.Equal(medianTime) {
-			return fmt.Errorf("invalid block time. Expected %v, got %v",
-				medianTime,
-				block.Time,
-			)
-		}
-
 	case block.Height == state.InitialHeight:
 		genesisTime := state.LastBlockTime
-		if !block.Time.Equal(genesisTime) {
-			return fmt.Errorf("block time %v is not equal to genesis time %v",
+		if block.Time.Before(genesisTime) {
+			return fmt.Errorf("block time %v is before genesis time %v",
 				block.Time,
 				genesisTime,
 			)

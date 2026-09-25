@@ -21,9 +21,11 @@ type IngestCandidate struct {
 	blockValidator func(state.State, *types.Block) error
 
 	// fields that are set only after successful verification
-	verified      bool
-	commitRound   int32
-	commitVoteSet *types.VoteSet
+	verified    bool
+	commitRound int32
+	// commitVoteSet becomes cs.LastCommit. It is the commit itself when the
+	// commit is aggregated (see buildCommitVoteSet).
+	commitVoteSet types.VoteSetReader
 
 	// caches IngestCandidate.BlockID() to avoid recalculating it
 	cachedBlockID types.BlockID
@@ -127,7 +129,7 @@ func (ic *IngestCandidate) Verify(state state.State) error {
 		height            = ic.Height()
 		blockID           = ic.BlockID()
 		chainID           = state.ChainID
-		extensionsPresent = state.ConsensusParams.ABCI.VoteExtensionsEnabled(height)
+		extensionsPresent = state.ConsensusParams.Feature.VoteExtensionsEnabled(height)
 	)
 
 	// ensure invariant
@@ -282,7 +284,7 @@ func (cs *State) ingestBlock(ic IngestCandidate) error {
 	}
 
 	// the following flow is similar to finalizeCommit(height)
-	stateCopy, err := cs.blockExec.ApplyVerifiedBlock(stateCopy, ic.BlockID(), block)
+	stateCopy, err := cs.blockExec.ApplyVerifiedBlock(stateCopy, ic.BlockID(), block, block.Height)
 	if err != nil {
 		// we can't recover from this error
 		panic(errors.Wrapf(err, "failed to apply verified block (height: %d, hash: %x)", block.Height, block.Hash()))
@@ -310,7 +312,7 @@ func (cs *State) ingestBlock(ic IngestCandidate) error {
 }
 
 // buildCommitVoteSet returns the commit round and vote set for the verified block.
-func buildCommitVoteSet(state state.State, ic *IngestCandidate) (round int32, voteSet *types.VoteSet, err error) {
+func buildCommitVoteSet(state state.State, ic *IngestCandidate) (round int32, voteSet types.VoteSetReader, err error) {
 	var (
 		chainID = state.ChainID
 		vals    = state.Validators
@@ -325,6 +327,13 @@ func buildCommitVoteSet(state state.State, ic *IngestCandidate) (round int32, vo
 
 	if ic.extensionsEnabled() {
 		return ic.extCommit.Round, ic.extCommit.ToExtendedVoteSet(chainID, vals), nil
+	}
+
+	// With BLS aggregation the individual precommits cannot be rebuilt from
+	// an aggregated commit, so the whole *Commit stands in for the vote set
+	// (as in votesFromSeenCommit). It was verified by the caller.
+	if ic.commit.HasAggregatedSignature() {
+		return ic.commit.Round, ic.commit, nil
 	}
 
 	return ic.commit.Round, ic.commit.ToVoteSet(chainID, vals), nil
