@@ -951,8 +951,7 @@ func pickVoteToSend(
 	// If peer is lagging by height 1, send LastCommit.
 	if prs.Height != 0 && rs.Height == prs.Height+1 {
 		// Individual votes cannot be extracted from a whole (aggregated)
-		// *types.Commit; the peer will catch up via block sync or the next
-		// proposal instead.
+		// *types.Commit; it is sent whole by getEntireCommitToSend instead.
 		if _, isWholeCommit := rs.LastCommit.(*types.Commit); !isWholeCommit {
 			if vote := ps.PickVoteToSend(rs.LastCommit); vote != nil {
 				logger.Debug("Picked rs.LastCommit to send", "height", prs.Height)
@@ -1000,16 +999,24 @@ func pickVoteToSend(
 	return nil
 }
 
-// getEntireCommitToSend returns the whole stored commit for the peer's
-// height when the peer is lagging by more than one height. It is used when
-// commits are aggregated, since individual votes cannot be extracted from an
-// aggregated commit.
+// getEntireCommitToSend returns the whole commit for the peer's height when
+// the peer is lagging: our LastCommit if it is a whole commit and the peer is
+// one height behind, else the stored commit if the peer is further behind. It
+// is used when commits are aggregated, since individual votes cannot be
+// extracted from an aggregated commit.
 func getEntireCommitToSend(_ log.Logger,
 	conS *State,
 	rs *cstypes.RoundState,
 	_ *PeerState,
 	prs *cstypes.PeerRoundState,
 ) types.VoteSetReader {
+	// After a restart or a whole-commit catch-up our LastCommit is a whole
+	// commit, so a peer one height behind can only get it from here (peers only
+	// accept aggregated ones, see AddCommit).
+	if c, ok := rs.LastCommit.(*types.Commit); ok && c.HasAggregatedSignature() && prs.Height != 0 && rs.Height == prs.Height+1 {
+		return c
+	}
+
 	// Catchup logic
 	// If peer is lagging by more than 1, send Commit.
 	blockStoreBase := conS.blockStore.Base()
@@ -1423,6 +1430,12 @@ func (ps *PeerState) SetHasCatchupCommit(commit *types.Commit) {
 
 // CONTRACT: Caller must hold the mutex.
 func (ps *PeerState) setHasCatchupCommit(height int64, round int32) {
+	// The commit is sent outside the lock, so the peer may have moved to a new
+	// height (which clears the flag) in the meantime. Only mark the height the
+	// commit is for.
+	if height != ps.PRS.Height {
+		return
+	}
 	ps.logger.Debug("setHasCatchupCommit",
 		"peerH/R",
 		log.NewLazySprintf("%d/%d", ps.PRS.Height, ps.PRS.Round),
