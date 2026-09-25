@@ -336,25 +336,55 @@ func TestAggregationCatchUpViaAddCommit(t *testing.T) {
 // whole commit (there are no votes to pick from it).
 func TestAggregationCatchUpOneHeightBehind(t *testing.T) {
 	genDoc, privVals := blsGenesisDoc(2, 10, blsConsensusParams())
+	src := produceBLSBlocks(t, genDoc, privVals, 4, "agg_one_behind_prod")
 
-	prod, cleanup := blsConsensusNetFromGenesis(t, genDoc, privVals, "agg_one_behind_prod")
-	defer cleanup()
-	reactors, subs, buses := startConsensusNet(t, prod, 2)
-	drain(subs)
-	require.Eventually(t, func() bool { return prod[0].blockStore.Height() >= 4 }, 60*time.Second, 50*time.Millisecond)
-	stopConsensusNet(log.TestingLogger(), reactors, buses)
-
-	a := restartedNode(t, genDoc, privVals[0], prod[0].blockStore, 3, "agg_one_behind_a")
-	b := restartedNode(t, genDoc, privVals[1], prod[0].blockStore, 2, "agg_one_behind_b")
+	a := restartedNode(t, genDoc, privVals[0], src, 3, "agg_one_behind_a")
+	b := restartedNode(t, genDoc, privVals[1], src, 2, "agg_one_behind_b")
 	_, whole := a.LastCommit.(*types.Commit)
 	require.True(t, whole, "A should restart with a whole LastCommit")
 
-	reactors, subs, buses = startConsensusNet(t, []*State{a, b}, 2)
+	reactors, subs, buses := startConsensusNet(t, []*State{a, b}, 2)
 	defer stopConsensusNet(log.TestingLogger(), reactors, buses)
 	drain(subs)
 	for _, cs := range []*State{a, b} {
 		require.Eventually(t, func() bool { return cs.blockStore.Height() >= 4 }, 30*time.Second, 50*time.Millisecond)
 	}
+}
+
+// A whole commit that lets a node finalize the height at once (it already has
+// the block parts, as a peer one height behind often does) must not start the
+// next height early: round 0 is left to the NextBlockDelay timeout.
+func TestAggregationAddCommitKeepsNextBlockDelay(t *testing.T) {
+	genDoc, privVals := blsGenesisDoc(2, 10, blsConsensusParams())
+	src := produceBLSBlocks(t, genDoc, privVals, 3, "agg_add_commit_delay_prod")
+
+	// Not started, so no timeout fires and only AddCommit moves it forward.
+	cs := restartedNode(t, genDoc, privVals[1], src, 1, "agg_add_commit_delay")
+	block := src.LoadBlock(2)
+	parts, err := block.MakePartSet(types.BlockPartSizeBytes)
+	require.NoError(t, err)
+
+	cs.mtx.Lock()
+	defer cs.mtx.Unlock()
+	cs.ProposalBlock, cs.ProposalBlockParts = block, parts
+	added, err := cs.AddCommit(src.LoadBlockCommit(2), "peer")
+	require.NoError(t, err)
+	require.True(t, added)
+	require.EqualValues(t, 3, cs.Height)
+	require.Equal(t, cstypes.RoundStepNewHeight, cs.Step)
+}
+
+// produceBLSBlocks runs a network of privVals until it has n blocks and
+// returns the block store of its first node.
+func produceBLSBlocks(t *testing.T, genDoc *types.GenesisDoc, privVals []types.PrivValidator, n int64, name string) sm.BlockStore {
+	t.Helper()
+	css, cleanup := blsConsensusNetFromGenesis(t, genDoc, privVals, name)
+	t.Cleanup(cleanup)
+	reactors, subs, buses := startConsensusNet(t, css, len(css))
+	drain(subs)
+	require.Eventually(t, func() bool { return css[0].blockStore.Height() >= n }, 60*time.Second, 50*time.Millisecond)
+	stopConsensusNet(log.TestingLogger(), reactors, buses)
+	return css[0].blockStore
 }
 
 func drain(subs []types.Subscription) {

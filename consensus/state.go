@@ -538,9 +538,11 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (bool, error) {
 	cs.enterNewRound(height, commit.Round)
 	cs.enterPrecommit(height, commit.Round)
 
+	// If the block parts are already here this finalizes the height, and
+	// finalizeCommit schedules round 0 of the next height after NextBlockDelay.
+	// Don't start that round here: a peer only one height behind gets whole
+	// commits too, and would otherwise skip the delay.
 	cs.enterCommit(height, commit.Round)
-	// We skip timeoutCommit as this function is hit only when the node is late
-	cs.enterNewRound(cs.Height, 0)
 
 	return true, nil
 }
