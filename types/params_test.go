@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	gogo "github.com/cosmos/gogoproto/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -78,9 +80,11 @@ func makeParams(
 		Validator: ValidatorParams{
 			PubKeyTypes: pubkeyTypes,
 		},
-		ABCI: ABCIParams{
+		Feature: FeatureParams{
 			VoteExtensionsEnableHeight: abciExtensionHeight,
+			PbtsEnableHeight:           1,
 		},
+		Synchrony: DefaultSynchronyParams(),
 		Authority: auth,
 	}
 }
@@ -230,12 +234,12 @@ func TestConsensusParamsUpdate_VoteExtensionsEnableHeight(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(*testing.T) {
 			initialParams := makeParams(1, 0, 2, 0, valEd25519, tc.from, "")
-			update := &cmtproto.ConsensusParams{}
+			update := &cmtproto.ConsensusParams{Feature: &cmtproto.FeatureParams{}}
 			if tc.to == nilTest {
-				update.Abci = nil
+				update.Feature.VoteExtensionsEnableHeight = nil
 			} else {
-				update.Abci = &cmtproto.ABCIParams{
-					VoteExtensionsEnableHeight: tc.to,
+				update.Feature = &cmtproto.FeatureParams{
+					VoteExtensionsEnableHeight: &gogo.Int64Value{Value: tc.to},
 				}
 			}
 			if tc.expectedErr {

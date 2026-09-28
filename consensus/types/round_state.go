@@ -71,14 +71,15 @@ type RoundState struct {
 	StartTime time.Time     `json:"start_time"`
 
 	// Subjective time when +2/3 precommits for Block at Round were found
-	CommitTime         time.Time           `json:"commit_time"`
-	Validators         *types.ValidatorSet `json:"validators"`
-	Proposal           *types.Proposal     `json:"proposal"`
-	ProposalBlock      *types.Block        `json:"proposal_block"`
-	ProposalBlockParts *types.PartSet      `json:"proposal_block_parts"`
-	LockedRound        int32               `json:"locked_round"`
-	LockedBlock        *types.Block        `json:"locked_block"`
-	LockedBlockParts   *types.PartSet      `json:"locked_block_parts"`
+	CommitTime          time.Time           `json:"commit_time"`
+	Validators          *types.ValidatorSet `json:"validators"`
+	Proposal            *types.Proposal     `json:"proposal"`
+	ProposalReceiveTime time.Time           `json:"proposal_receive_time"`
+	ProposalBlock       *types.Block        `json:"proposal_block"`
+	ProposalBlockParts  *types.PartSet      `json:"proposal_block_parts"`
+	LockedRound         int32               `json:"locked_round"`
+	LockedBlock         *types.Block        `json:"locked_block"`
+	LockedBlockParts    *types.PartSet      `json:"locked_block_parts"`
 
 	// The variables below starting with "Valid..." derive their name from
 	// the algorithm presented in this paper:
@@ -97,7 +98,7 @@ type RoundState struct {
 	ValidBlockParts           *types.PartSet      `json:"valid_block_parts"`
 	Votes                     *HeightVoteSet      `json:"votes"`
 	CommitRound               int32               `json:"commit_round"` //
-	LastCommit                *types.VoteSet      `json:"last_commit"`  // Last precommits at Height-1
+	LastCommit                types.VoteSetReader `json:"last_commit"`  // Last precommits at Height-1
 	LastValidators            *types.ValidatorSet `json:"last_validators"`
 	TriggeredTimeoutPrecommit bool                `json:"triggered_timeout_precommit"`
 }
@@ -186,6 +187,16 @@ func (rs *RoundState) String() string {
 
 // StringIndented returns a string
 func (rs *RoundState) StringIndented(indent string) string {
+	var lcStr string
+	switch lc := rs.LastCommit.(type) {
+	case *types.VoteSet:
+		lcStr = lc.StringShort()
+	case *types.Commit:
+		lcStr = lc.StringIndented("  ")
+	default:
+		lcStr = fmt.Sprintf("<unknown last commit type %T>", lc)
+	}
+
 	return fmt.Sprintf(`RoundState{
 %s  H:%v R:%v S:%v
 %s  StartTime:     %v
@@ -212,7 +223,7 @@ func (rs *RoundState) StringIndented(indent string) string {
 		indent, rs.ValidRound,
 		indent, rs.ValidBlockParts.StringShort(), rs.ValidBlock.StringShort(),
 		indent, rs.Votes.StringIndented(indent+"  "),
-		indent, rs.LastCommit.StringShort(),
+		indent, lcStr,
 		indent, rs.LastValidators.StringIndented(indent+"  "),
 		indent)
 }

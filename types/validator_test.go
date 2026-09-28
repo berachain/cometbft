@@ -55,6 +55,21 @@ func TestValidatorBytesCommitPubKeyAndVotingPower(t *testing.T) {
 	require.Equal(t, wantBz, val.Bytes())
 }
 
+// Malformed validators from a peer return an error instead of panicking.
+func TestValidatorFromProtoNoPanicOnNilPubKey(t *testing.T) {
+	for _, vp := range []*cmtproto.Validator{
+		{},                      // no key at all
+		{PubKeyType: "unknown"}, // unknown key type
+		{PubKeyType: "bls12_381", PubKeyBytes: []byte{1, 2}}, // truncated key
+	} {
+		require.NotPanics(t, func() {
+			v, err := ValidatorFromProto(vp)
+			require.Error(t, err)
+			require.Nil(t, v)
+		})
+	}
+}
+
 func TestValidatorValidateBasic(t *testing.T) {
 	priv := NewMockPV()
 	pubKey, _ := priv.GetPubKey()

@@ -15,6 +15,16 @@ enum BlockIDFlag {
   BLOCK_ID_FLAG_ABSENT = 1 [(gogoproto.enumvalue_customname) = "BlockIDFlagAbsent"]; // the vote was not received
   BLOCK_ID_FLAG_COMMIT = 2 [(gogoproto.enumvalue_customname) = "BlockIDFlagCommit"]; // voted for the block that received the majority
   BLOCK_ID_FLAG_NIL = 3 [(gogoproto.enumvalue_customname) = "BlockIDFlagNil"]; // voted for nil
+
+  // Aggregated commit
+  // Voted for the block and contains aggregated signature.
+  BLOCK_ID_FLAG_AGG_COMMIT = 4 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggCommit"];
+  // Voted for the block.
+  BLOCK_ID_FLAG_AGG_COMMIT_ABSENT = 5 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggCommitAbsent"];
+  // Voted for nil and contains aggregated signature.
+  BLOCK_ID_FLAG_AGG_NIL = 6 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggNil"];
+  // Voted for nil.
+  BLOCK_ID_FLAG_AGG_NIL_ABSENT = 7 [(gogoproto.enumvalue_customname) = "BlockIDFlagAggNilAbsent"];
 }
 
 message ValidatorSet {
@@ -25,9 +35,13 @@ message ValidatorSet {
 
 message Validator {
   bytes address = 1;
-  tendermint.crypto.PublicKey pub_key = 2 [(gogoproto.nullable) = false];
+  // NOTE(berachain): bera-v1.x serializes keys via pub_key_bytes/pub_key_type
+  // (the v1.x layout); pub_key is kept as a decode fallback only.
+  tendermint.crypto.PublicKey pub_key = 2 [deprecated = true];
   int64 voting_power = 3;
   int64 proposer_priority = 4;
+  bytes pub_key_bytes = 5;
+  string pub_key_type = 6;
 }
 
 message SimpleValidator {

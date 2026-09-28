@@ -383,3 +383,14 @@ func TestInstrumentationConfigValidateBasic(t *testing.T) {
 	cfg.MaxOpenConnections = -1
 	assert.Error(t, cfg.ValidateBasic())
 }
+
+// skip_timeout_commit is ignored, so setting it prints a deprecation warning.
+func TestCheckDeprecatedSkipTimeoutCommit(t *testing.T) {
+	cfg := config.DefaultConfig()
+	assert.Empty(t, cfg.CheckDeprecated())
+
+	cfg.Consensus.SkipTimeoutCommit = true
+	warnings := cfg.CheckDeprecated()
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "skip_timeout_commit")
+}

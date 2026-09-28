@@ -34,14 +34,16 @@ type Proposal struct {
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Proposal {
+// Under PBTS the proposal timestamp must equal the proposed block's time, so
+// the caller provides it (it is canonicalized here).
+func NewProposal(height int64, round int32, polRound int32, blockID BlockID, ts time.Time) *Proposal {
 	return &Proposal{
 		Type:      cmtproto.ProposalType,
 		Height:    height,
 		Round:     round,
 		BlockID:   blockID,
 		POLRound:  polRound,
-		Timestamp: cmttime.Now(),
+		Timestamp: cmttime.Canonical(ts),
 	}
 }
 
@@ -50,14 +52,17 @@ func (p *Proposal) ValidateBasic() error {
 	if p.Type != cmtproto.ProposalType {
 		return errors.New("invalid Type")
 	}
-	if p.Height < 0 {
-		return errors.New("negative Height")
+	if p.Height <= 0 {
+		return errors.New("non positive Height")
 	}
 	if p.Round < 0 {
 		return errors.New("negative Round")
 	}
 	if p.POLRound < -1 {
 		return errors.New("negative POLRound (exception: -1)")
+	}
+	if p.POLRound >= p.Round {
+		return errors.New("POLRound >= Round")
 	}
 	if err := p.BlockID.ValidateBasic(); err != nil {
 		return fmt.Errorf("wrong BlockID: %v", err)
@@ -67,7 +72,10 @@ func (p *Proposal) ValidateBasic() error {
 		return fmt.Errorf("expected a complete, non-empty BlockID, got: %v", p.BlockID)
 	}
 
-	// NOTE: Timestamp validation is subtle and handled elsewhere.
+	// Times must be canonical
+	if cmttime.Canonical(p.Timestamp) != p.Timestamp {
+		return fmt.Errorf("expected a canonical timestamp, got: %v", p.Timestamp)
+	}
 
 	if len(p.Signature) == 0 {
 		return errors.New("signature is missing")
@@ -77,6 +85,30 @@ func (p *Proposal) ValidateBasic() error {
 		return fmt.Errorf("signature is too big (max: %d)", MaxSignatureSize)
 	}
 	return nil
+}
+
+// IsTimely validates that the proposal timestamp is 'timely' according to the
+// proposer-based timestamp algorithm. To evaluate if a proposal is timely, its
+// timestamp is compared to the local time of the validator when it receives
+// the proposal along with the configured Precision and MessageDelay
+// parameters. Specifically, a proposed proposal timestamp is considered timely
+// if it is satisfies the following inequalities:
+//
+// proposalReceiveTime >= proposalTimestamp - Precision
+// proposalReceiveTime <= proposalTimestamp + MessageDelay + Precision
+//
+// For more information on the meaning of 'timely', refer to the specification:
+// https://github.com/cometbft/cometbft/tree/main/spec/consensus/proposer-based-timestamp
+func (p *Proposal) IsTimely(recvTime time.Time, sp SynchronyParams) bool {
+	// lhs is `proposalTimestamp - Precision` in the first inequality
+	lhs := p.Timestamp.Add(-sp.Precision)
+	// rhs is `proposalTimestamp + MessageDelay + Precision` in the second inequality
+	rhs := p.Timestamp.Add(sp.MessageDelay).Add(sp.Precision)
+
+	if recvTime.Before(lhs) || recvTime.After(rhs) {
+		return false
+	}
+	return true
 }
 
 // ValidateBlockSize block size ensures that a proposal block is not larger

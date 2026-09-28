@@ -57,7 +57,7 @@ NUM_SPLIT ?= 4
 # Note we need to check for both in-package tests (.TestGoFiles) and
 # out-of-package tests (.XTestGoFiles).
 $(BUILDDIR)/packages.txt:$(GO_TEST_FILES) $(BUILDDIR)
-	go list -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | sort > $@
+	go list -tags 'bls12381,secp256k1eth' -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | sort > $@
 
 split-test-packages:$(BUILDDIR)/packages.txt
 	split -d -n l/$(NUM_SPLIT) $< $<.

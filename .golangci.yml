@@ -1,4 +1,9 @@
 version: "2"
+# Lint the real BLS code (crypto/bls12381, aggregation) and the tag-gated
+# tests, not the !bls12381 stubs.
+run:
+  build-tags:
+    - bls12381
 linters:
   enable:
     - asciicheck
@@ -51,6 +56,7 @@ linters:
             - github.com/stretchr/testify/require
             - github.com/syndtr/goleveldb
             - github.com/decred/dcrd/dcrec/secp256k1/v4
+            - github.com/supranational/blst/bindings/go
             - google.golang.org/grpc
             - google.golang.org/protobuf/proto
             - golang.org/x/sync
@@ -83,6 +89,7 @@ linters:
             - github.com/spf13
             - github.com/stretchr/testify
             - github.com/decred/dcrd/dcrec/secp256k1/v4
+            - github.com/supranational/blst/bindings/go
             - google.golang.org/grpc
             - google.golang.org/protobuf/proto
             - google.golang.org/protobuf/types/known/timestampp

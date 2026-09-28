@@ -83,7 +83,7 @@ func TestPrivKeyEquals(t *testing.T) {
 	privKey2, err := bls12381.GenPrivKey()
 	require.NoError(t, err)
 
-	assert.True(t, privKey.Equals(privKey))
+	assert.True(t, privKey.Equals(privKey)) //nolint:gocritic // equality with itself is the point
 	assert.False(t, privKey.Equals(privKey2))
 }
 
@@ -136,7 +136,7 @@ func TestPubKeyEquals(t *testing.T) {
 	pubKey := privKey.PubKey()
 	pubKey2 := privKey.PubKey()
 
-	assert.True(t, pubKey.Equals(pubKey))
+	assert.True(t, pubKey.Equals(pubKey)) //nolint:gocritic // equality with itself is the point
 	assert.True(t, pubKey.Equals(pubKey2))
 }
 

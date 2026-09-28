@@ -52,12 +52,25 @@ message Vote {
   tendermint.types.Vote vote = 1;
 }
 
+// An entire Commit is sent when signatures are aggregated and we cannot
+// extract a single signature.
+message Commit {
+  tendermint.types.Commit commit = 1;
+}
+
 // HasVote is sent to indicate that a particular vote has been received.
 message HasVote {
   int64 height = 1;
   int32 round = 2;
   tendermint.types.SignedMsgType type = 3;
   int32 index = 4;
+}
+
+// HasProposalBlockPart is sent to indicate that a particular block part has been received.
+message HasProposalBlockPart {
+  int64 height = 1;
+  int32 round = 2;
+  int32 index = 3;
 }
 
 // VoteSetMaj23 is sent to indicate that a given BlockID has seen +2/3 votes.
@@ -94,5 +107,9 @@ message Message {
     HasVote has_vote = 7;
     VoteSetMaj23 vote_set_maj23 = 8;
     VoteSetBits vote_set_bits = 9;
+    // Fields 10 and 11 are fork-pinned wire numbers (bera-v1.x compatibility, relied on by
+    // rolling upgrades). If an upstream rebase adds new entries here, renumber upstream's to 12+.
+    HasProposalBlockPart has_proposal_block_part = 10;
+    Commit commit = 11;
   }
 }

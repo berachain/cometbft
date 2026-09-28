@@ -12,6 +12,7 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/ed25519"
+	cryptoenc "github.com/cometbft/cometbft/crypto/encoding"
 	"github.com/cometbft/cometbft/internal/test"
 	cmtstate "github.com/cometbft/cometbft/proto/tendermint/state"
 	sm "github.com/cometbft/cometbft/state"
@@ -421,6 +422,70 @@ func TestLastFinalizeBlockResponses(t *testing.T) {
 		_, err = stateStore.LoadFinalizeBlockResponse(height + 1)
 		assert.Equal(t, sm.ErrFinalizeBlockResponsesNotPersisted, err)
 	})
+}
+
+// Persisted validator updates carry both public key encodings (pub_key and
+// pub_key_bytes + pub_key_type) so that bera-v1.x and this fork can read each
+// other's state store, and updates written by bera-v1.x (pub_key_bytes only)
+// decode into validators.
+func TestSaveFinalizeBlockResponseValidatorUpdatesCarryBothPubKeyEncodings(t *testing.T) {
+	pubkey := ed25519.GenPrivKey().PubKey()
+	stateStore := sm.NewStore(dbm.NewMemDB(), sm.StoreOptions{DiscardABCIResponses: false})
+
+	// As returned by an application built against this fork (pub_key only).
+	resp := &abci.ResponseFinalizeBlock{
+		ValidatorUpdates: []abci.ValidatorUpdate{types.TM2PB.NewValidatorUpdate(pubkey, 7)},
+		AppHash:          []byte{1},
+	}
+	require.NoError(t, stateStore.SaveFinalizeBlockResponse(5, resp))
+
+	for _, loaded := range []func() (*abci.ResponseFinalizeBlock, error){
+		func() (*abci.ResponseFinalizeBlock, error) { return stateStore.LoadFinalizeBlockResponse(5) },
+		func() (*abci.ResponseFinalizeBlock, error) { return stateStore.LoadLastFinalizeBlockResponse(5) },
+	} {
+		got, err := loaded()
+		require.NoError(t, err)
+		require.Len(t, got.ValidatorUpdates, 1)
+		vu := got.ValidatorUpdates[0]
+		assert.NotNil(t, vu.PubKey.Sum)
+		assert.Equal(t, pubkey.Bytes(), vu.PubKeyBytes)
+		assert.Equal(t, pubkey.Type(), vu.PubKeyType)
+		assert.EqualValues(t, 7, vu.Power)
+		vals, err := types.PB2TM.ValidatorUpdates(got.ValidatorUpdates)
+		require.NoError(t, err)
+		assert.True(t, pubkey.Equals(vals[0].PubKey))
+	}
+
+	// pub_key and raw fields that disagree are persisted as the key that is
+	// applied (pub_key), so a bera-v1.x binary reading the raw fields during
+	// recovery sees the same validator.
+	other := ed25519.GenPrivKey().PubKey()
+	conflicting := types.TM2PB.NewValidatorUpdate(pubkey, 8)
+	conflicting.PubKeyBytes = other.Bytes()
+	conflicting.PubKeyType = other.Type()
+	require.NoError(t, stateStore.SaveFinalizeBlockResponse(6, &abci.ResponseFinalizeBlock{
+		ValidatorUpdates: []abci.ValidatorUpdate{conflicting},
+		AppHash:          []byte{1},
+	}))
+	got6, err := stateStore.LoadFinalizeBlockResponse(6)
+	require.NoError(t, err)
+	require.Len(t, got6.ValidatorUpdates, 1)
+	raw, err := cryptoenc.PubKeyFromTypeAndBytes(got6.ValidatorUpdates[0].PubKeyType, got6.ValidatorUpdates[0].PubKeyBytes)
+	require.NoError(t, err)
+	assert.True(t, pubkey.Equals(raw))
+
+	// As written by the bera-v1.x line (pub_key_bytes + pub_key_type only).
+	v1xResp := &abci.ResponseFinalizeBlock{
+		ValidatorUpdates: []abci.ValidatorUpdate{{PubKeyBytes: pubkey.Bytes(), PubKeyType: pubkey.Type(), Power: 9}},
+	}
+	bz, err := v1xResp.Marshal()
+	require.NoError(t, err)
+	got := new(abci.ResponseFinalizeBlock)
+	require.NoError(t, got.Unmarshal(bz))
+	vals, err := types.PB2TM.ValidatorUpdates(got.ValidatorUpdates)
+	require.NoError(t, err)
+	assert.True(t, pubkey.Equals(vals[0].PubKey))
+	assert.EqualValues(t, 9, vals[0].VotingPower)
 }
 
 func TestFinalizeBlockRecoveryUsingLegacyABCIResponses(t *testing.T) {

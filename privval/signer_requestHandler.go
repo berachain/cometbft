@@ -88,6 +88,16 @@ func DefaultValidationRequestHandler(
 		} else {
 			res = mustWrapMsg(&privvalproto.SignedProposalResponse{Proposal: *proposal, Error: nil})
 		}
+	case *privvalproto.Message_SignBytesRequest:
+		var signature []byte
+		signature, err = privVal.SignBytes(r.SignBytesRequest.Value)
+		if err != nil {
+			res = mustWrapMsg(&privvalproto.SignBytesResponse{
+				Signature: nil, Error: &privvalproto.RemoteSignerError{Code: 0, Description: err.Error()},
+			})
+		} else {
+			res = mustWrapMsg(&privvalproto.SignBytesResponse{Signature: signature, Error: nil})
+		}
 	case *privvalproto.Message_PingRequest:
 		err, res = nil, mustWrapMsg(&privvalproto.PingResponse{})
 

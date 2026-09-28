@@ -82,7 +82,7 @@ func TestEvidencePoolBasic(t *testing.T) {
 	next := pool.EvidenceFront()
 	assert.Equal(t, ev, next.Value.(types.Evidence))
 
-	const evidenceBytes int64 = 372
+	const evidenceBytes int64 = 382
 	evs, size = pool.PendingEvidence(evidenceBytes)
 	assert.Equal(t, 1, len(evs))
 	assert.Equal(t, evidenceBytes, size) // check that the size of the single evidence in bytes is correct
@@ -379,6 +379,8 @@ func initializeStateFromValidatorSet(valSet *types.ValidatorSet, height int64) s
 				MaxAgeDuration:  20 * time.Minute,
 				MaxBytes:        1000,
 			},
+			// state.MakeBlock (initializeBlockStore) requires PBTS
+			Feature: types.FeatureParams{PbtsEnableHeight: 1},
 		},
 	}
 

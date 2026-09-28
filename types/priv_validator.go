@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/bls12381"
 	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/secp256k1"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 )
 
@@ -17,6 +19,9 @@ type PrivValidator interface {
 
 	SignVote(chainID string, vote *cmtproto.Vote) error
 	SignProposal(chainID string, proposal *cmtproto.Proposal) error
+
+	// SignBytes signs an arbitrary array of bytes.
+	SignBytes(bytes []byte) ([]byte, error)
 }
 
 type PrivValidatorsByAddress []PrivValidator
@@ -55,6 +60,25 @@ type MockPV struct {
 
 func NewMockPV() MockPV {
 	return MockPV{ed25519.GenPrivKey(), false, false}
+}
+
+func NewMockPVWithKeyType(keyType string) MockPV {
+	var pk crypto.PrivKey
+	switch keyType {
+	case "", ed25519.KeyType:
+		pk = ed25519.GenPrivKey()
+	case secp256k1.KeyType:
+		pk = secp256k1.GenPrivKey()
+	case bls12381.KeyType:
+		blsPk, err := bls12381.GenPrivKey()
+		if err != nil {
+			panic(err)
+		}
+		pk = blsPk
+	default:
+		panic("unexpected key type: " + keyType)
+	}
+	return MockPV{pk, false, false}
 }
 
 // NewMockPVWithParams allows one to create a MockPV instance, but with finer
@@ -112,6 +136,11 @@ func (pv MockPV) SignProposal(chainID string, proposal *cmtproto.Proposal) error
 	}
 	proposal.Signature = sig
 	return nil
+}
+
+// SignBytes implements PrivValidator.
+func (pv MockPV) SignBytes(bytes []byte) ([]byte, error) {
+	return pv.PrivKey.Sign(bytes)
 }
 
 func (pv MockPV) ExtractIntoValidator(votingPower int64) *Validator {

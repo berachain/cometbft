@@ -1,9 +1,14 @@
 package version
 
 const (
-	// TMCoreSemVer is the used as the fallback version of CometBFT
-	// when not using git describe. It is formatted with semantic versioning.
-	TMCoreSemVer = "0.39.0"
+	// TMCoreSemVer is used as the fallback version of CometBFT when not using
+	// git describe. It is formatted with semantic versioning.
+	//
+	// Berachain fork scheme: <upstream-base>-bera.<release> (e.g. 0.40.0-bera.1).
+	// The base tracks the upstream CometBFT release this fork is built on; the
+	// -bera.N counter is bumped per fork release and reset to 1 when the base
+	// moves to a newer upstream release.
+	TMCoreSemVer = "0.40.0-bera.1"
 	// ABCISemVer is the semantic version of the ABCI protocol
 	ABCISemVer  = "2.0.0"
 	ABCIVersion = ABCISemVer
