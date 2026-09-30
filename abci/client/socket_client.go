@@ -464,9 +464,11 @@ func (cli *socketClient) flushQueue() {
 	cli.mtx.Lock()
 	defer cli.mtx.Unlock()
 
-	// mark all in-flight messages as resolved (they will get cli.Error())
-	for req := cli.reqSent.Front(); req != nil; req = req.Next() {
-		reqres := req.Value.(*ReqRes)
+	// Mark all in-flight requests as resolved (they will get cli.Error()).
+	// Pop each one so a late response can't release the same ReqRes twice in
+	// didRecvResponse.
+	for req := cli.reqSent.Front(); req != nil; req = cli.reqSent.Front() {
+		reqres := cli.reqSent.Remove(req).(*ReqRes)
 		reqres.Done()
 	}
 
