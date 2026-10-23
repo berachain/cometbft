@@ -460,26 +460,15 @@ func TestValidateBlockTime(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("block time exceeds wall clock tolerance", func(t *testing.T) {
-		blockExecWithTol := newBlockExec(sm.BlockExecutorWithBlockTimeTolerance(30 * time.Second))
+	// The wall-clock bound (block_time_tolerance) is enforced in the consensus
+	// prevote step, not in ValidateBlock, which also runs on panic paths.
+	t.Run("far-future block time is not a ValidateBlock error", func(t *testing.T) {
 		height := int64(3)
 		block, err := makeBlock(state, height, lastCommit)
 		require.NoError(t, err)
 
-		block.Time = time.Now().Add(1000 * time.Hour)
-		err = blockExecWithTol.ValidateBlock(state, block)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "too far in the future")
-	})
-
-	t.Run("tolerance not set still allows valid blocks", func(t *testing.T) {
-		blockExecNoTol := newBlockExec()
-		height := int64(3)
-		block, err := makeBlock(state, height, lastCommit)
-		require.NoError(t, err)
-
-		err = blockExecNoTol.ValidateBlock(state, block)
+		block.Time = cmttime.Canonical(time.Now().Add(1000 * time.Hour))
+		err = blockExec.ValidateBlock(state, block)
 
 		require.NoError(t, err)
 	})

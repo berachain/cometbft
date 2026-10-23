@@ -22,6 +22,19 @@ bera-v1.x line, so an existing bera-v1.x network can restart on this binary (con
 with bera-v1.x networks). Upstream backports are tracked in the sections above. At release, this
 section becomes `## v0.40.0-bera.N`._
 
+### BUG FIXES
+
+- `[consensus,state]` Move the `block_time_tolerance` wall-clock check from `ValidateBlock` to the
+  prevote step, where it applies to every proposal (including re-proposals that skip the PBTS
+  timeliness check) and costs a nil prevote. `ValidateBlock` also runs on the `enterPrecommit` and
+  `finalizeCommit` panic paths, where a node-local clock check must not decide the outcome.
+- `[consensus]` `AddCommit` keeps the first whole aggregated commit received for a height and
+  ignores later ones for other rounds. Peers that committed the same block in different rounds
+  send different commits, and letting a later one overwrite the single slot left `CommitRound`
+  pointing at a round with no commit, so a lagging node could never finalize the height.
+- `[types]` `Validator.ValidateBasic` rejects unsupported public key types
+  (upstream [\#3706](https://github.com/cometbft/cometbft/pull/3706)).
+
 ### FEATURES
 
 - `[consensus,types,state]` Port Proposer-Based Timestamps (PBTS) from the bera-v1.x line.

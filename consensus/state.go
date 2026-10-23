@@ -517,8 +517,13 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (bool, error) {
 		return false, nil
 	}
 
-	if cs.Votes.GetCommit(commit.Round) != nil {
-		cs.Logger.Debug("Received commit, but we already have one", "height", commit.Height, "peer_ID", peerID)
+	// One commit per height. Any valid commit for this height is for the same
+	// block, and HeightVoteSet holds a single slot that CommitRound points at:
+	// peers that committed in different rounds send different commits, and
+	// letting a later one overwrite the slot would leave CommitRound pointing
+	// at a round with no commit, so the height could never finalize.
+	if cs.Votes.HasCommit() {
+		cs.Logger.Debug("Received commit, but we already have one", "height", commit.Height, "round", commit.Round, "peer_ID", peerID)
 		return false, nil
 	}
 	if !commit.HasAggregatedSignature() {
@@ -1598,6 +1603,18 @@ func (cs *State) defaultDoPrevote(height int64, round int32) {
 	if cs.isPBTSEnabled(height) {
 		if !cs.Proposal.Timestamp.Equal(cs.ProposalBlock.Time) {
 			logger.Debug("prevote step: proposal timestamp not equal; prevoting nil")
+			cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
+			return
+		}
+
+		// Node-local backstop on top of timeliness, applied to every proposal
+		// regardless of POLRound. It lives here rather than in ValidateBlock so a
+		// wall-clock disagreement between nodes costs a nil prevote, never a panic
+		// in enterPrecommit or finalizeCommit.
+		if tol := cs.config.BlockTimeTolerance; tol > 0 && !cs.ProposalBlock.Time.Before(cmttime.Now().Add(tol)) {
+			logger.Info("prevote step: proposal block time is beyond block_time_tolerance; prevoting nil",
+				"block_time", cs.ProposalBlock.Time.Format(time.RFC3339Nano),
+				"tolerance", tol.String())
 			cs.signAddVote(cmtproto.PrevoteType, nil, types.PartSetHeader{}, nil)
 			return
 		}
