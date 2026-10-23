@@ -178,6 +178,14 @@ func (hvs *HeightVoteSet) GetCommit(round int32) *types.Commit {
 	return hvs.commit
 }
 
+// HasCommit reports whether a whole aggregated commit is held for this height,
+// for any round.
+func (hvs *HeightVoteSet) HasCommit() bool {
+	hvs.mtx.Lock()
+	defer hvs.mtx.Unlock()
+	return hvs.commit != nil
+}
+
 // SetCommit stores a whole aggregated commit received via gossip.
 func (hvs *HeightVoteSet) SetCommit(commit *types.Commit) {
 	hvs.mtx.Lock()

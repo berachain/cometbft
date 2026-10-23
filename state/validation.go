@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/types"
@@ -15,7 +14,6 @@ import (
 // Validate block
 
 type blockValidationOptions struct {
-	blockTimeTolerance         time.Duration
 	skipLastCommitVerification bool
 }
 
@@ -121,13 +119,10 @@ func validateBlock(state State, block *types.Block, opts ...func(*blockValidatio
 		)
 	}
 
-	// Validate block Time
-	if tol := vopts.blockTimeTolerance; tol > 0 && !block.Time.Before(time.Now().Add(tol)) {
-		return fmt.Errorf(
-			"block time %v is too far in the future (wall clock %v + tolerance %v)",
-			block.Time, time.Now(), tol,
-		)
-	}
+	// Validate block Time. The wall-clock bound (block_time_tolerance) is
+	// applied in the consensus prevote step, not here: this function also runs
+	// on the enterPrecommit and finalizeCommit panic paths, where a node-local
+	// clock check must never decide the outcome.
 	// Vote timestamps are not signed in this fork, so there is no BFT Time
 	// median to check against and PBTS must be enabled (as in bera-v1.x).
 	if !state.ConsensusParams.Feature.PbtsEnabled(block.Height) {

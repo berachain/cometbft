@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/cometbft/cometbft/crypto"
 	ce "github.com/cometbft/cometbft/crypto/encoding"
+	cryptomocks "github.com/cometbft/cometbft/crypto/mocks"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,6 +75,9 @@ func TestValidatorFromProtoNoPanicOnNilPubKey(t *testing.T) {
 func TestValidatorValidateBasic(t *testing.T) {
 	priv := NewMockPV()
 	pubKey, _ := priv.GetPubKey()
+	unsupportedPubKey := &cryptomocks.PubKey{}
+	unsupportedPubKey.On("Address").Return(crypto.Address(make([]byte, crypto.AddressSize)))
+	unsupportedPubKey.On("Type").Return("unsupported")
 	testCases := []struct {
 		val *Validator
 		err bool
@@ -115,6 +120,15 @@ func TestValidatorValidateBasic(t *testing.T) {
 			},
 			err: true,
 			msg: fmt.Sprintf("validator address is incorrectly derived from pubkey. Exp: %v, got 61", pubKey.Address()),
+		},
+		{
+			val: &Validator{
+				PubKey:      unsupportedPubKey,
+				Address:     unsupportedPubKey.Address(),
+				VotingPower: 1,
+			},
+			err: true,
+			msg: ErrUnsupportedPubKeyType.Error(),
 		},
 	}
 

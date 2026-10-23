@@ -35,6 +35,10 @@ func NewValidator(pubKey crypto.PubKey, votingPower int64) *Validator {
 }
 
 // ValidateBasic performs basic validation.
+// ErrUnsupportedPubKeyType is returned by Validator.ValidateBasic for a key
+// type this node does not support (see ABCIPubKeyTypesToNames).
+var ErrUnsupportedPubKeyType = errors.New("unsupported validator public key type")
+
 func (v *Validator) ValidateBasic() error {
 	if v == nil {
 		return errors.New("nil validator")
@@ -50,6 +54,10 @@ func (v *Validator) ValidateBasic() error {
 	addr := v.PubKey.Address()
 	if !bytes.Equal(v.Address, addr) {
 		return fmt.Errorf("validator address is incorrectly derived from pubkey. Exp: %v, got %v", addr, v.Address)
+	}
+
+	if _, ok := ABCIPubKeyTypesToNames[v.PubKey.Type()]; !ok {
+		return ErrUnsupportedPubKeyType
 	}
 
 	return nil

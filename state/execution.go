@@ -51,9 +51,6 @@ type BlockExecutor struct {
 	logger log.Logger
 
 	metrics *Metrics
-
-	// blockTimeTolerance is the maximum allowed difference between proposed block time and wall clock.
-	blockTimeTolerance time.Duration
 }
 
 type cachedValidators struct {
@@ -66,12 +63,6 @@ type BlockExecutorOption func(executor *BlockExecutor)
 func BlockExecutorWithMetrics(metrics *Metrics) BlockExecutorOption {
 	return func(blockExec *BlockExecutor) {
 		blockExec.metrics = metrics
-	}
-}
-
-func BlockExecutorWithBlockTimeTolerance(d time.Duration) BlockExecutorOption {
-	return func(blockExec *BlockExecutor) {
-		blockExec.blockTimeTolerance = d
 	}
 }
 
@@ -234,18 +225,13 @@ func (blockExec *BlockExecutor) validateBlockAndCheckEvidence(state State, block
 
 	// safe to call with nil
 	if !lastValidated.HashesTo(block.Hash()) || block.Height != expectedHeight {
-		// always use blocktime tolerance set on the struct
-		if err := validateBlock(state, block, append(opts, blockExec.withBlockTimeTolerance)...); err != nil {
+		if err := validateBlock(state, block, opts...); err != nil {
 			return err
 		}
 		blockExec.setLastValidatedBlock(lastValidated, block)
 	}
 
 	return blockExec.evpool.CheckEvidence(block.Evidence.Evidence)
-}
-
-func (blockExec *BlockExecutor) withBlockTimeTolerance(opts *blockValidationOptions) {
-	opts.blockTimeTolerance = blockExec.blockTimeTolerance
 }
 
 func withSkipLastCommit(opts *blockValidationOptions) {
@@ -277,7 +263,7 @@ func (blockExec *BlockExecutor) ApplyBlock(
 
 	// safe to call with nil
 	if !lastValidated.HashesTo(block.Hash()) || block.Height != expectedHeight {
-		if err := validateBlock(state, block, blockExec.withBlockTimeTolerance); err != nil {
+		if err := validateBlock(state, block); err != nil {
 			return state, ErrInvalidBlock(err)
 		}
 		blockExec.setLastValidatedBlock(lastValidated, block)
