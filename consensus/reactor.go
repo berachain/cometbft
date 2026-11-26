@@ -370,6 +370,11 @@ func (conR *Reactor) Receive(e p2p.Envelope) {
 			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
 		case *CommitMessage:
+			// A commit for our height needs one signature per validator, or it can never verify.
+			if rs := conR.getRoundState(); msg.Commit.Height == rs.Height && len(msg.Commit.Signatures) != rs.Validators.Size() {
+				conR.Switch.StopPeerForError(e.Src, cmterrors.NewErrInvalidCommitSignatures(rs.Validators.Size(), len(msg.Commit.Signatures)))
+				return
+			}
 			conR.conS.peerMsgQueue <- msgInfo{msg, e.Src.ID(), time.Time{}}
 
 		default:
@@ -2099,7 +2104,7 @@ func (m *CommitMessage) ValidateBasic() error {
 
 // String returns a string representation.
 func (m *CommitMessage) String() string {
-	return fmt.Sprintf("[Commit with aggregated signatures %v]", m.Commit)
+	return fmt.Sprintf("[Commit H:%d R:%d Signatures:%d]", m.Commit.Height, m.Commit.Round, len(m.Commit.Signatures))
 }
 
 //-------------------------------------

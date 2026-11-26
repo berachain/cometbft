@@ -22,6 +22,13 @@ bera-v1.x line, so an existing bera-v1.x network can restart on this binary (con
 with bera-v1.x networks). Upstream backports are tracked in the sections above. At release, this
 section becomes `## v0.40.0-bera.N`._
 
+### BUG FIXES
+
+- `[consensus]` When a `CommitMessage` from a peer is rejected, the error log now shows only its
+  height, round and number of signatures. Before, it printed the entire commit, including every
+  signature. The reactor also disconnects a peer that sends a commit for the current height whose
+  number of signatures differs from the validator set size.
+
 ### FEATURES
 
 - `[consensus,types,state]` Port Proposer-Based Timestamps (PBTS) from the bera-v1.x line.
