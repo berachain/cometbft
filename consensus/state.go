@@ -523,7 +523,7 @@ func (cs *State) AddCommit(commit *types.Commit, peerID p2p.ID) (bool, error) {
 	}
 	if !commit.HasAggregatedSignature() {
 		// Only accept aggregated commits
-		cs.Logger.Error("Received non aggregated commit", "commit", commit.Height, "peer_ID", peerID, "commit", commit)
+		cs.Logger.Error("Received non aggregated commit", "height", commit.Height, "round", commit.Round, "num_signatures", len(commit.Signatures), "peer_ID", peerID)
 		return false, nil
 	}
 	// No need to check blockID. If the commit is valid, 2/3 of the voting power has signed it.
@@ -1054,7 +1054,7 @@ func (cs *State) handleMsg(mi msgInfo) {
 		// stats for commit messages
 		// cs.statsMsgQueue <- mi
 		if err != nil {
-			cs.Logger.Error("Failed to add commit ", "commit", msg.Commit, "err", err)
+			cs.Logger.Error("Failed to add commit", "height", msg.Commit.Height, "round", msg.Commit.Round, "num_signatures", len(msg.Commit.Signatures), "err", err)
 		}
 
 	case *ingestVerifiedBlockRequest:
